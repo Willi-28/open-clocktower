@@ -1,0 +1,68 @@
+services:
+  app:
+    image: ${OPEN_CLOCKTOWER_IMAGE:-willi28/open-clocktower:latest}
+    environment:
+      APP_ENV: production
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      DATA_DIR: /app/data
+      UPLOAD_DIR: /app/data/uploads
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-open_clocktower}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-open_clocktower}
+      FORCE_HTTPS: ${FORCE_HTTPS:-true}
+      ICE_SERVERS_JSON: ${ICE_SERVERS_JSON:-}
+      ROOM_IDLE_TTL_SECONDS: ${ROOM_IDLE_TTL_SECONDS:-3600}
+      ROOM_CLEANUP_INTERVAL_SECONDS: ${ROOM_CLEANUP_INTERVAL_SECONDS:-300}
+    volumes:
+      - open_clocktower_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik_proxy}"
+      - "traefik.http.routers.open-clocktower-http.rule=Host(`${APP_DOMAIN:?Set APP_DOMAIN in .env}`)"
+      - "traefik.http.routers.open-clocktower-http.entrypoints=${TRAEFIK_HTTP_ENTRYPOINT:-web}"
+      - "traefik.http.routers.open-clocktower-http.middlewares=open-clocktower-https-redirect"
+      - "traefik.http.routers.open-clocktower.rule=Host(`${APP_DOMAIN:?Set APP_DOMAIN in .env}`)"
+      - "traefik.http.routers.open-clocktower.entrypoints=${TRAEFIK_HTTPS_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.open-clocktower.tls=true"
+      - "traefik.http.routers.open-clocktower.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-le}"
+      - "traefik.http.routers.open-clocktower.middlewares=open-clocktower-secure-headers"
+      - "traefik.http.middlewares.open-clocktower-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.open-clocktower-https-redirect.redirectscheme.permanent=true"
+      - "traefik.http.middlewares.open-clocktower-secure-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.open-clocktower-secure-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.open-clocktower-secure-headers.headers.stsPreload=true"
+      - "traefik.http.middlewares.open-clocktower-secure-headers.headers.forceSTSHeader=true"
+      - "traefik.http.services.open-clocktower.loadbalancer.server.port=8000"
+    networks:
+      - internal
+      - traefik_proxy
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-open_clocktower}
+      POSTGRES_USER: ${POSTGRES_USER:-open_clocktower}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-open_clocktower} -d ${POSTGRES_DB:-open_clocktower}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  open_clocktower_data:
+
+networks:
+  internal:
+  traefik_proxy:
+    name: ${TRAEFIK_NETWORK:-traefik_proxy}
+    external: true

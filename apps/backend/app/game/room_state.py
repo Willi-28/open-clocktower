@@ -1,0 +1,219 @@
+from datetime import datetime, timezone
+from enum import StrEnum
+from pydantic import BaseModel, Field
+
+
+# This file describes the data exchanged between the API and frontend.
+# Pydantic checks types and simple rules before the backend processes data.
+
+class GamePhase(StrEnum):
+    # Manual game phases. The app does not automate specific game rules.
+    LOBBY = "lobby"
+    DAY = "day"
+    NIGHT = "night"
+
+
+class PlayerStatus(StrEnum):
+    # Publicly visible player status at the table.
+    ALIVE = "alive"
+    DEAD = "dead"
+    ABSENT = "absent"
+
+
+class Player(BaseModel):
+    # Player snapshot sent to the frontend.
+    id: str
+    display_name: str
+    seat_index: int | None = None
+    status: PlayerStatus = PlayerStatus.ALIVE
+    has_dead_vote: bool = True
+    is_connected: bool = True
+    is_storyteller: bool = False
+    avatar_url: str | None = None
+
+
+class Nomination(BaseModel):
+    # Active or recently closed room nomination.
+    id: str
+    nominator_id: str
+    nominee_id: str
+    is_open: bool = True
+    created_at: str
+
+
+class NominationRequestState(BaseModel):
+    # Player-created nomination request waiting for the storyteller.
+    id: str
+    nominator_id: str
+    nominee_id: str
+    created_at: str
+
+
+class Vote(BaseModel):
+    # Single yes/no vote from one player.
+    player_id: str
+    value: bool
+
+
+class Character(BaseModel):
+    # Public character data loaded from a storyteller-uploaded pack.
+    id: str
+    name: str
+    team: str
+    category: str
+    ability: str
+    icon: str | None = None
+    first_night: int = 0
+    first_night_reminder: str = ""
+    other_night: int = 0
+    other_night_reminder: str = ""
+    translations: dict[str, dict[str, str]] = Field(default_factory=dict)
+    default_language: str = "en"
+    available_languages: list[str] = Field(default_factory=list)
+
+
+class ReminderTokenDefinition(BaseModel):
+    # Public reminder token definition loaded from a room-local pack.
+    id: str
+    label: str
+    character: str | None = None
+    icon: str | None = None
+    translations: dict[str, dict[str, str]] = Field(default_factory=dict)
+    default_language: str = "en"
+    available_languages: list[str] = Field(default_factory=list)
+
+
+class CharacterAssignment(BaseModel):
+    # Actual character assignment. Normal players should only receive their own.
+    player_id: str
+    character_id: str
+
+
+class SharedReminderToken(BaseModel):
+    # Storyteller reminder token snapshot shared with selected players.
+    id: str
+    tokenId: str | None = None
+    label: str
+    x: float
+    y: float
+
+
+class RoomState(BaseModel):
+    # Full MVP room snapshot. This is broadcast over WebSocket after changes.
+    id: str
+    name: str
+    seat_count: int = Field(ge=5, le=20)
+    phase: GamePhase = GamePhase.LOBBY
+    day_count: int = 0
+    night_count: int = 0
+    allow_public_voice_during_night: bool = False
+    show_board: bool = False
+    shared_grimoire_player_ids: list[str] = Field(default_factory=list)
+    shared_grimoire_reminders: list[SharedReminderToken] = Field(default_factory=list)
+    players: list[Player] = Field(default_factory=list)
+    active_nomination: Nomination | None = None
+    nomination_requests: list[NominationRequestState] = Field(default_factory=list)
+    votes: list[Vote] = Field(default_factory=list)
+    created_at: str
+    updated_at: str
+
+
+class CreateRoomRequest(BaseModel):
+    # Data the frontend sends when creating a room.
+    name: str = Field(default="New room", max_length=120)
+    creator_name: str = Field(min_length=1, max_length=80)
+    seat_count: int = Field(default=9, ge=5, le=20)
+
+
+class UpdateRoomRequest(BaseModel):
+    # Storyteller-owned room settings that can still change while in lobby.
+    actor_player_id: str
+    seat_count: int | None = Field(default=None, ge=5, le=20)
+    allow_public_voice_during_night: bool | None = None
+    show_board: bool | None = None
+    shared_grimoire_player_ids: list[str] | None = None
+    shared_grimoire_reminders: list[SharedReminderToken] | None = None
+
+
+class JoinRoomRequest(BaseModel):
+    # Data a player sends when joining a room.
+    display_name: str = Field(min_length=1, max_length=80)
+    seat_index: int | None = Field(default=None, ge=0)
+
+
+class UpdatePlayerRequest(BaseModel):
+    # Player changes: seat and/or status.
+    actor_player_id: str | None = None
+    seat_index: int | None = Field(default=None, ge=0)
+    status: PlayerStatus | None = None
+    has_dead_vote: bool | None = None
+
+
+class LeaveRoomRequest(BaseModel):
+    # Normal players may remove only themselves from the lobby.
+    actor_player_id: str
+
+
+class SetStorytellerRequest(BaseModel):
+    # Current storyteller may transfer the role to another player in the lobby.
+    actor_player_id: str
+    player_id: str
+
+
+class PhaseRequest(BaseModel):
+    # New room phase.
+    phase: GamePhase
+    actor_player_id: str | None = None
+
+
+class StartNominationRequest(BaseModel):
+    # Storyteller-approved nomination.
+    actor_player_id: str | None = None
+    nominator_id: str
+    nominee_id: str
+
+
+class PlayerNominationRequest(BaseModel):
+    # Player request for a nomination. The storyteller decides whether it begins.
+    nominator_id: str
+    nominee_id: str
+
+
+class StorytellerActionRequest(BaseModel):
+    # Generic request body for storyteller-only actions without extra data.
+    actor_player_id: str | None = None
+
+
+class ExecuteNomineeRequest(BaseModel):
+    # Storyteller execution for the active nomination. The backend validates votes.
+    actor_player_id: str
+
+
+class VoteRequest(BaseModel):
+    # Player vote for the current nomination.
+    player_id: str
+    value: bool
+
+
+class AssignCharacterRequest(BaseModel):
+    # Storyteller assigns a real character to a player.
+    actor_player_id: str
+    player_id: str
+    character_id: str
+
+
+class RandomAssignCharactersRequest(BaseModel):
+    # Storyteller selects the in-play characters; the server shuffles who gets which.
+    actor_player_id: str
+    character_ids: list[str] = Field(min_length=1)
+
+
+class DemonBluffsRequest(BaseModel):
+    # Storyteller-only list of up to three bluff characters.
+    actor_player_id: str
+    character_ids: list[str] = Field(default_factory=list, max_length=3)
+
+
+def utc_now() -> str:
+    # ISO timestamp for API snapshots.
+    return datetime.now(timezone.utc).isoformat()

@@ -1,0 +1,28 @@
+{
+  "name": "open-clocktower-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "test:unit": "node tests/chatRules.test.mjs && node tests/voiceRooms.test.mjs && node tests/gameUiRules.test.mjs",
+    "analyze": "node ../../scripts/static-analysis.mjs",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run test:unit && npm run analyze",
+    "preview": "vite preview",
+    "lint": "npm run typecheck && npm run analyze"
+  },
+  "dependencies": {
+    "@shiguredo/rnnoise-wasm": "^2025.1.5",
+    "@vitejs/plugin-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  }
+}
