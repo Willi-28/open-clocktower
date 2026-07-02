@@ -1,3 +1,10 @@
+/**
+ * Room WebSocket client.
+ *
+ * The socket carries live room updates, chat messages, timer events, vote
+ * counting, and WebRTC signaling between the frontend and backend.
+ */
+
 import type { RoomState } from '../api/client';
 
 // Events the backend can currently send via WebSocket.
@@ -8,6 +15,7 @@ export type RoomSocketEvent =
   | { type: 'hand.state'; payload: { playerIds: string[] } }
   | { type: 'timer.state'; payload: { durationSeconds: number; remainingSeconds: number; isRunning: boolean; startedAt?: string | null } }
   | { type: 'bell.ring'; payload: { fromPlayerId: string } }
+  | { type: 'nomination.executed'; payload: { roomId: string } }
   | { type: 'vote_count.state'; payload: { index: number; isRunning: boolean } }
   | { type: 'voice.call.request'; payload: { fromPlayerId: string; voiceRoom: string } }
   | { type: 'voice.call.accept'; payload: { fromPlayerId: string; voiceRoom: string } }
@@ -17,6 +25,7 @@ export type RoomSocketEvent =
   | { type: 'room.kicked'; payload: { roomId: string; reason: string } }
   | { type: 'room.deleted'; payload: { roomId: string } };
 
+/** Open a room socket and expose typed send helpers for live room events. */
 export function openRoomSocket(roomId: string, playerId: string, onEvent: (event: RoomSocketEvent) => void) {
   // Automatically choose the WebSocket protocol based on http/https.
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -24,6 +33,7 @@ export function openRoomSocket(roomId: string, playerId: string, onEvent: (event
   const socket = new WebSocket(`${protocol}://${window.location.host}/ws/rooms/${roomId}${params}`);
   const pendingMessages: string[] = [];
 
+  /** Send JSON immediately or queue it until the socket finishes connecting. */
   function sendJson(payload: unknown) {
     const message = JSON.stringify(payload);
     if (socket.readyState === WebSocket.OPEN) {

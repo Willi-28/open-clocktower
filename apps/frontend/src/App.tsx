@@ -1,3 +1,10 @@
+/**
+ * Open Clocktower frontend root.
+ *
+ * App.tsx composes shared room state, realtime sockets, voice/chat hooks,
+ * storyteller controls, table rendering, local settings, and confirmation UI.
+ */
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 
@@ -68,6 +75,7 @@ type PendingConfirmation = {
   variant?: 'default' | 'danger';
 };
 
+/** Compose the full single-page game application. */
 export function App() {
   const roomSocketRef = useRef<ReturnType<typeof openRoomSocket> | null>(null);
 
@@ -124,6 +132,7 @@ export function App() {
     return () => window.clearTimeout(timeoutId);
   }, [error]);
 
+  /** Resolve a player id into the display name from the latest room snapshot. */
   const playerName = (playerId: string | undefined) => playerNameInRoom(room, playerId);
 
   const voice = useVoiceController({
@@ -281,6 +290,7 @@ export function App() {
     clientSettings.showTable ? '' : 'table-hidden',
   ].filter(Boolean).join(' ');
 
+  /** Send the current chat draft over the socket or append it locally if offline. */
   function submitChatMessage() {
     const text = chat.chatDraft.trim();
     if (!text || !currentPlayer) {
@@ -299,6 +309,7 @@ export function App() {
     chat.setChatDraft('');
   }
 
+  /** Toggle microphone mute state and play the matching local feedback sound. */
   function toggleMuted() {
     setIsMuted((value) => {
       const nextValue = !value;
@@ -307,12 +318,14 @@ export function App() {
     });
   }
 
+  /** Open a private chat tab after checking current chat permissions. */
   function openPrivateChat(playerId: string) {
     if (!chat.openPrivateChat(playerId)) {
       setError('You can only message neighbors or the storyteller.');
     }
   }
 
+  /** Copy the room code to the clipboard and show a short status message. */
   async function copyRoomCode() {
     if (!room) {
       return;
@@ -328,6 +341,7 @@ export function App() {
     }
   }
 
+  /** Handle clicks on seats, including open-seat movement and player selection. */
   function handleSeatClick(seatIndex: number) {
     if (!room) {
       return;
@@ -352,27 +366,32 @@ export function App() {
     tableUi.setSelectedSeatActionPlayerId(clickedPlayer.id);
   }
 
+  /** Place reminders on the table surface and clear any open seat menu. */
   function handleTableClick(x: number, y: number) {
     tableUi.setSelectedSeatActionPlayerId('');
     annotations.placeReminder(x, y);
   }
 
+  /** Select the storyteller when another player clicks the storyteller table token. */
   function handleStorytellerClick() {
     if (storyteller && storyteller.id !== currentPlayerId) {
       tableUi.setSelectedSeatActionPlayerId(storyteller.id);
     }
   }
 
+  /** Store a private suspicion marker for a player and close the seat menu. */
   function placeSuspicionOnPlayer(playerId: string) {
     if (annotations.placeSuspicionOnPlayer(playerId)) {
       tableUi.setSelectedSeatActionPlayerId('');
     }
   }
 
+  /** Return current occupant display names for one public voice room. */
   function publicVoiceOccupants(voiceRoom: string) {
     return publicVoiceOccupantNames(voiceSession.voiceParticipants, voiceRoom, playerName);
   }
 
+  /** Approve a pending nomination request and start that nomination. */
   function startRequestedNomination(nominatorId: string, nomineeId: string) {
     if (!room) {
       return;
@@ -380,6 +399,7 @@ export function App() {
     void lifecycle.run(() => startNomination(room.id, currentPlayerId, nominatorId, nomineeId));
   }
 
+  /** Reject one pending nomination request. */
   function rejectRequestedNomination(requestId: string) {
     if (!room) {
       return;
@@ -387,6 +407,7 @@ export function App() {
     void lifecycle.run(() => rejectNominationRequest(room.id, requestId, currentPlayerId));
   }
 
+  /** Raise or lower the current player's vote for the active nomination. */
   function toggleCurrentVote() {
     if (!room) {
       return;
@@ -394,6 +415,7 @@ export function App() {
     void lifecycle.run(() => castVote(room.id, currentPlayerId, !getVoteForPlayer(room, currentPlayerId)));
   }
 
+  /** Ask for confirmation before revealing all roles to every player. */
   function confirmShowBoard() {
     if (!room) {
       return;
@@ -409,6 +431,7 @@ export function App() {
     });
   }
 
+  /** Ask for confirmation before deleting the current room. */
   function confirmDeleteRoom() {
     setPendingConfirmation({
       confirmLabel: 'Delete Room',
@@ -422,6 +445,7 @@ export function App() {
     });
   }
 
+  /** Ask for confirmation before removing a player from the room. */
   function confirmKickPlayer(playerToKick: RoomState['players'][number]) {
     setPendingConfirmation({
       confirmLabel: 'Kick Player',
@@ -436,6 +460,7 @@ export function App() {
     });
   }
 
+  /** Persist whether one player can see the shared grimoire view. */
   function setSharedGrimoirePlayer(playerId: string, isShared: boolean) {
     if (!room) {
       return;
@@ -451,6 +476,7 @@ export function App() {
     );
   }
 
+  /** Toggle grimoire sharing, confirming before hidden information is exposed. */
   function selectSharedGrimoirePlayer(playerId: string, isShared: boolean) {
     if (isShared) {
       setSharedGrimoirePlayer(playerId, false);
@@ -467,6 +493,7 @@ export function App() {
     });
   }
 
+  /** Start a match, resetting post-game state first when the board had been shown. */
   function startGame() {
     if (!room) {
       return;

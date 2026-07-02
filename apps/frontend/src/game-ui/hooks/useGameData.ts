@@ -1,3 +1,10 @@
+/**
+ * Character and assignment data hook.
+ *
+ * Room state does not embed large script data, so this hook loads characters,
+ * reminder tokens, assignments, and storyteller-only demon bluffs on demand.
+ */
+
 import { useEffect, useState } from 'react';
 
 import {

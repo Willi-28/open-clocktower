@@ -1,3 +1,10 @@
+/**
+ * Lobby dashboard header.
+ *
+ * The panel shows room identity, phase status, current player, mute control,
+ * settings access, and the small leave-seat/leave-lobby actions.
+ */
+
 import type { Player, RoomState } from '../../api/client';
 import { VoiceMuteIcon } from './VoiceMuteIcon';
 
@@ -17,6 +24,7 @@ type LobbyInfoPanelProps = {
   room: RoomState;
 };
 
+/** Render the top-left dashboard for the current room and player. */
 export function LobbyInfoPanel({
   canChangeSeats,
   currentPlayer,

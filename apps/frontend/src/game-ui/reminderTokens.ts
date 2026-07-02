@@ -1,3 +1,10 @@
+/**
+ * Reminder token display helpers.
+ *
+ * Token definitions come from uploaded character packs, while placed reminders
+ * are local table annotations; this module joins those two shapes for display.
+ */
+
 import type { ReminderTokenDefinition } from '../api/client';
 import type { ReminderToken } from './types';
 
@@ -8,6 +15,7 @@ export type ReminderTokenOption = {
   icon: string;
 };
 
+/** Convert imported reminder token definitions into selectable UI options. */
 export function buildReminderTokenOptions(tokens: ReminderTokenDefinition[]): ReminderTokenOption[] {
   return tokens
     .filter((token) => token.icon)
@@ -19,6 +27,7 @@ export function buildReminderTokenOptions(tokens: ReminderTokenDefinition[]): Re
     }));
 }
 
+/** Enrich placed reminders with the latest label and icon from token options. */
 export function renderReminders(reminders: ReminderToken[], tokenOptions: ReminderTokenOption[]): ReminderToken[] {
   return reminders.map((reminder) => {
     const token = reminder.tokenId ? tokenOptions.find((option) => option.id === reminder.tokenId) : null;

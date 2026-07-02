@@ -1,3 +1,10 @@
+/*
+ * Global Open Clocktower styles.
+ *
+ * This stylesheet defines the responsive app shell, themed backgrounds, table,
+ * dashboards, chat, voice controls, storyteller tools, and mobile layouts.
+ */
+
 :root {
   --desktop-left-panel: clamp(300px, 18.75vw, 360px);
   --desktop-right-panel: clamp(292px, 17.7vw, 340px);
@@ -40,6 +47,16 @@
     0 0 50px rgba(92, 20, 38, 0.2);
   --table-line: rgba(216, 173, 98, 0.12);
   --table-shine: rgba(243, 211, 138, 0.026);
+  --vote-hand-core: #070304;
+  --vote-hand-dark: #16080b;
+  --vote-hand-mid: #2d1217;
+  --vote-hand-ridge: #34161b;
+  --vote-hand-accent: rgba(197, 146, 72, 0.42);
+  --vote-hand-accent-soft: rgba(197, 146, 72, 0.32);
+  --vote-hand-highlight: rgba(236, 192, 109, 0.24);
+  --vote-hand-center: #3a171c;
+  --vote-hand-center-light: #f4dfb0;
+  --vote-hand-border: rgba(168, 116, 54, 0.58);
   --seat-bg: linear-gradient(180deg, rgba(59, 15, 30, 0.94), rgba(15, 7, 11, 0.96)), #16060c;
   --seat-bg-character: linear-gradient(180deg, rgba(88, 22, 40, 0.94), rgba(22, 8, 13, 0.96)), #1b0710;
   --seat-border: rgba(216, 173, 98, 0.46);
@@ -456,6 +473,16 @@ h2 {
     0 0 42px rgba(138, 95, 45, 0.12);
   --table-line: rgba(104, 80, 54, 0.18);
   --table-shine: rgba(255, 252, 242, 0.24);
+  --vote-hand-core: #4a3320;
+  --vote-hand-dark: #7c5c37;
+  --vote-hand-mid: #aa854f;
+  --vote-hand-ridge: #c8a66a;
+  --vote-hand-accent: rgba(94, 70, 43, 0.42);
+  --vote-hand-accent-soft: rgba(94, 70, 43, 0.28);
+  --vote-hand-highlight: rgba(255, 250, 230, 0.42);
+  --vote-hand-center: #b99156;
+  --vote-hand-center-light: #fff7da;
+  --vote-hand-border: rgba(104, 80, 54, 0.58);
   --seat-bg: linear-gradient(180deg, rgba(255, 249, 238, 0.97), rgba(223, 208, 188, 0.96)), #f8efe0;
   --seat-bg-character: linear-gradient(180deg, rgba(255, 246, 229, 0.98), rgba(216, 192, 158, 0.96)), #f4dfbf;
   --seat-border: rgba(104, 80, 54, 0.22);
@@ -514,6 +541,16 @@ h2 {
     0 0 76px rgba(214, 174, 102, 0.1);
   --table-line: rgba(214, 174, 102, 0.22);
   --table-shine: rgba(240, 208, 140, 0.055);
+  --vote-hand-core: #07090c;
+  --vote-hand-dark: #14171b;
+  --vote-hand-mid: #2b2f35;
+  --vote-hand-ridge: #4a3c2b;
+  --vote-hand-accent: rgba(214, 174, 102, 0.44);
+  --vote-hand-accent-soft: rgba(214, 174, 102, 0.28);
+  --vote-hand-highlight: rgba(240, 208, 140, 0.28);
+  --vote-hand-center: #3b3328;
+  --vote-hand-center-light: #f0d08c;
+  --vote-hand-border: rgba(214, 174, 102, 0.5);
   --seat-bg:
     linear-gradient(180deg, rgba(39, 36, 41, 0.98), rgba(13, 14, 17, 0.99)),
     #191a1d;
@@ -575,6 +612,16 @@ h2 {
     0 0 76px rgba(36, 185, 220, 0.22);
   --table-line: rgba(116, 214, 230, 0.2);
   --table-shine: rgba(200, 255, 255, 0.055);
+  --vote-hand-core: #020817;
+  --vote-hand-dark: #063040;
+  --vote-hand-mid: #0d6e86;
+  --vote-hand-ridge: #33bcd0;
+  --vote-hand-accent: rgba(116, 214, 230, 0.46);
+  --vote-hand-accent-soft: rgba(116, 214, 230, 0.3);
+  --vote-hand-highlight: rgba(231, 251, 255, 0.32);
+  --vote-hand-center: #0a5266;
+  --vote-hand-center-light: #e7fbff;
+  --vote-hand-border: rgba(116, 214, 230, 0.58);
   --seat-bg: linear-gradient(180deg, rgba(7, 35, 52, 0.94), rgba(2, 8, 18, 0.98)), #040b14;
   --seat-bg-character: linear-gradient(180deg, rgba(15, 76, 96, 0.96), rgba(3, 13, 26, 0.98)), #061928;
   --seat-border: rgba(116, 214, 230, 0.44);
@@ -632,6 +679,16 @@ h2 {
     0 0 82px rgba(151, 116, 232, 0.22);
   --table-line: rgba(181, 220, 255, 0.2);
   --table-shine: rgba(230, 243, 255, 0.065);
+  --vote-hand-core: #080a12;
+  --vote-hand-dark: #222746;
+  --vote-hand-mid: #4d4b82;
+  --vote-hand-ridge: #8a7bd0;
+  --vote-hand-accent: rgba(184, 223, 255, 0.42);
+  --vote-hand-accent-soft: rgba(184, 223, 255, 0.28);
+  --vote-hand-highlight: rgba(240, 248, 255, 0.32);
+  --vote-hand-center: #56508b;
+  --vote-hand-center-light: #f0f8ff;
+  --vote-hand-border: rgba(181, 220, 255, 0.56);
   --seat-bg: linear-gradient(180deg, rgba(48, 47, 74, 0.95), rgba(15, 17, 30, 0.98)), #171a2a;
   --seat-bg-character: linear-gradient(180deg, rgba(82, 70, 126, 0.96), rgba(21, 27, 45, 0.98)), #1e253a;
   --seat-border: rgba(181, 220, 255, 0.4);
@@ -688,6 +745,16 @@ h2 {
     0 0 76px rgba(255, 194, 96, 0.18);
   --table-line: rgba(255, 232, 165, 0.22);
   --table-shine: rgba(255, 249, 212, 0.11);
+  --vote-hand-core: #042b35;
+  --vote-hand-dark: #075369;
+  --vote-hand-mid: #168a96;
+  --vote-hand-ridge: #f0b85c;
+  --vote-hand-accent: rgba(255, 219, 146, 0.46);
+  --vote-hand-accent-soft: rgba(255, 219, 146, 0.3);
+  --vote-hand-highlight: rgba(255, 247, 223, 0.36);
+  --vote-hand-center: #0f7783;
+  --vote-hand-center-light: #ffe59c;
+  --vote-hand-border: rgba(255, 219, 146, 0.6);
   --seat-bg: linear-gradient(180deg, rgba(20, 103, 111, 0.94), rgba(8, 49, 63, 0.97)), #0a4658;
   --seat-bg-character: linear-gradient(180deg, rgba(238, 165, 80, 0.96), rgba(15, 83, 93, 0.98)), #0d5b67;
   --seat-border: rgba(255, 219, 146, 0.46);
@@ -1604,12 +1671,12 @@ h2 {
 
 .vote-clock-hand::before {
   background:
-    radial-gradient(circle at 16px 50%, transparent 0 5px, #2a1115 6px 9px, #090405 10px 18px, transparent 19px),
-    linear-gradient(180deg, rgba(197, 146, 72, 0.42) 0 9%, transparent 10% 90%, rgba(197, 146, 72, 0.32) 91%),
-    radial-gradient(ellipse at 40% 50%, transparent 0 21%, #34161b 22% 28%, #070304 29% 33%, transparent 34% 49%, #34161b 50% 56%, #070304 57% 61%, transparent 62%),
-    linear-gradient(90deg, #16080b 0 13%, transparent 14% 19%, #2d1217 20% 25%, #070304 26% 27%, transparent 28% 32%, #2d1217 33% 61%, #070304 62% 75%, transparent 76%),
-    linear-gradient(90deg, transparent 0 76%, #2c1116 77% 88%, #070304 89% 96%, transparent 97%),
-    radial-gradient(ellipse at 77% 50%, #2d1217 0 18%, #070304 19% 26%, transparent 27%);
+    radial-gradient(circle at 16px 50%, transparent 0 5px, var(--vote-hand-mid) 6px 9px, var(--vote-hand-core) 10px 18px, transparent 19px),
+    linear-gradient(180deg, var(--vote-hand-accent) 0 9%, transparent 10% 90%, var(--vote-hand-accent-soft) 91%),
+    radial-gradient(ellipse at 40% 50%, transparent 0 21%, var(--vote-hand-ridge) 22% 28%, var(--vote-hand-core) 29% 33%, transparent 34% 49%, var(--vote-hand-ridge) 50% 56%, var(--vote-hand-core) 57% 61%, transparent 62%),
+    linear-gradient(90deg, var(--vote-hand-dark) 0 13%, transparent 14% 19%, var(--vote-hand-mid) 20% 25%, var(--vote-hand-core) 26% 27%, transparent 28% 32%, var(--vote-hand-mid) 33% 61%, var(--vote-hand-core) 62% 75%, transparent 76%),
+    linear-gradient(90deg, transparent 0 76%, var(--vote-hand-mid) 77% 88%, var(--vote-hand-core) 89% 96%, transparent 97%),
+    radial-gradient(ellipse at 77% 50%, var(--vote-hand-mid) 0 18%, var(--vote-hand-core) 19% 26%, transparent 27%);
   clip-path: polygon(
     0 50%,
     6% 7%,
@@ -1635,7 +1702,7 @@ h2 {
     6% 93%
   );
   filter:
-    drop-shadow(0 1px 0 rgba(236, 192, 109, 0.24))
+    drop-shadow(0 1px 0 var(--vote-hand-highlight))
     drop-shadow(0 5px 8px rgba(0, 0, 0, 0.55));
   content: "";
   height: 46px;
@@ -1647,9 +1714,9 @@ h2 {
 
 .vote-clock-hand::after {
   background:
-    radial-gradient(circle, #f4dfb0 0 3px, transparent 4px),
-    radial-gradient(circle at 38% 34%, #3a171c 0 22%, #120608 23% 100%);
-  border: 1px solid rgba(168, 116, 54, 0.58);
+    radial-gradient(circle, var(--vote-hand-center-light) 0 3px, transparent 4px),
+    radial-gradient(circle at 38% 34%, var(--vote-hand-center) 0 22%, var(--vote-hand-core) 23% 100%);
+  border: 1px solid var(--vote-hand-border);
   border-radius: 50%;
   box-shadow:
     inset 0 0 0 2px rgba(6, 3, 4, 0.66),

@@ -1,3 +1,10 @@
+/**
+ * RNNoise microphone processing pipeline.
+ *
+ * This module wraps rnnoise-wasm in a MediaStream transform so live voice can
+ * use client-side noise suppression before WebRTC sends audio to peers.
+ */
+
 import type { Rnnoise } from '@shiguredo/rnnoise-wasm';
 
 type NoiseSuppressedStream = {
@@ -16,14 +23,17 @@ class SampleRingBuffer {
   private writeIndex = 0;
   private length = 0;
 
+  /** Allocate a fixed-size sample buffer for audio frames. */
   constructor(capacity: number) {
     this.samples = new Float32Array(capacity);
   }
 
+  /** Return how many samples can currently be read. */
   get available() {
     return this.length;
   }
 
+  /** Add one sample, dropping the oldest sample if the ring is full. */
   push(value: number) {
     if (this.length === this.samples.length) {
       this.readIndex = (this.readIndex + 1) % this.samples.length;
@@ -34,6 +44,7 @@ class SampleRingBuffer {
     this.length += 1;
   }
 
+  /** Remove one sample, returning silence when the buffer is empty. */
   pop() {
     if (this.length === 0) {
       return 0;
@@ -44,6 +55,7 @@ class SampleRingBuffer {
     return value;
   }
 
+  /** Fill a frame-sized target array with samples from the ring. */
   readInto(target: Float32Array) {
     for (let index = 0; index < target.length; index += 1) {
       target[index] = this.pop();
@@ -51,11 +63,13 @@ class SampleRingBuffer {
   }
 }
 
+/** Load rnnoise-wasm once and reuse the promise for later microphone restarts. */
 function loadRnnoise() {
   rnnoisePromise ??= import('@shiguredo/rnnoise-wasm').then(({ Rnnoise }) => Rnnoise.load());
   return rnnoisePromise;
 }
 
+/** Create a denoised MediaStream and cleanup callback from a raw microphone stream. */
 export async function createNoiseSuppressedStream(inputStream: MediaStream): Promise<NoiseSuppressedStream> {
   const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioContextClass) {
@@ -132,6 +146,7 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
   limiter.connect(destination);
   void audioContext.resume();
 
+  /** Release RNNoise, audio graph nodes, and all media tracks created for the stream. */
   const cleanup = () => {
     if (isCleanedUp) {
       return;

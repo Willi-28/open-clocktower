@@ -1,3 +1,9 @@
+"""Character-pack ZIP parser.
+
+This module validates uploaded character packs, reads manifest and night-order
+JSON, embeds safe icon files as data URLs, and returns room-local definitions.
+"""
+
 import base64
 import json
 from io import BytesIO
@@ -23,6 +29,7 @@ MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
 
 
 def parse_character_pack(data: bytes) -> tuple[list[Character], list[ReminderTokenDefinition]]:
+    """Parse uploaded ZIP bytes into character and reminder token definitions."""
     try:
         archive = ZipFile(BytesIO(data))
     except BadZipFile as error:
@@ -120,6 +127,7 @@ def parse_character_pack(data: bytes) -> tuple[list[Character], list[ReminderTok
 
 
 def _validate_archive_shape(archive: ZipFile) -> None:
+    """Reject oversized archives and unsafe paths before reading pack content."""
     entries = archive.infolist()
     if len(entries) > MAX_ARCHIVE_ENTRIES:
         raise ValueError("character pack contains too many files")
@@ -132,6 +140,7 @@ def _validate_archive_shape(archive: ZipFile) -> None:
 
 
 def _read_manifest(archive: ZipFile) -> dict[str, object]:
+    """Read and validate the root manifest.json document."""
     try:
         manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError) as error:
@@ -142,10 +151,12 @@ def _read_manifest(archive: ZipFile) -> dict[str, object]:
 
 
 def _default_language(manifest: dict[str, object]) -> str:
+    """Return the manifest default language, falling back to English."""
     return _language_code(manifest.get("defaultLocale", manifest.get("defaultLanguage", ""))) or "en"
 
 
 def _supported_languages(manifest: dict[str, object], default_language: str) -> list[str]:
+    """Collect translated languages from manifest metadata, characters, and tokens."""
     raw_languages = manifest.get("supportedLocales", manifest.get("supported_languages", manifest.get("languages", [])))
     languages = [_language_code(language) for language in raw_languages] if isinstance(raw_languages, list) else []
     for source in [manifest.get("translations"), *(character.get("translations") for character in manifest.get("characters", []) if isinstance(character, dict))]:
@@ -160,12 +171,14 @@ def _supported_languages(manifest: dict[str, object], default_language: str) -> 
 
 
 def _language_code(language: object) -> str:
+    """Normalize a language entry into its locale code."""
     if isinstance(language, dict):
         return str(language.get("code", language.get("locale", language.get("id", "")))).strip()
     return str(language).strip()
 
 
 def _raw_reminder_tokens(manifest: dict[str, object]) -> list[dict[str, object]]:
+    """Return reminder token objects from any supported manifest location."""
     raw_tokens = manifest.get("tokens") or manifest.get("reminderTokens") or manifest.get("reminder_tokens")
     if isinstance(raw_tokens, list):
         return [token for token in raw_tokens if isinstance(token, dict)]
@@ -176,6 +189,7 @@ def _raw_reminder_tokens(manifest: dict[str, object]) -> list[dict[str, object]]
 
 
 def _character_translations(raw_character: dict[str, object], supported_languages: list[str]) -> dict[str, dict[str, str]]:
+    """Extract clean per-language character translations."""
     translations = raw_character.get("translations")
     if not isinstance(translations, dict):
         return {}
@@ -199,6 +213,7 @@ def _character_translations(raw_character: dict[str, object], supported_language
 
 
 def _token_translations(raw_token: dict[str, object], supported_languages: list[str]) -> dict[str, dict[str, str]]:
+    """Extract clean per-language reminder token translations."""
     translations = raw_token.get("translations")
     if not isinstance(translations, dict):
         return {}
@@ -218,6 +233,7 @@ def _token_translations(raw_token: dict[str, object], supported_languages: list[
 
 
 def _read_night_order(archive: ZipFile, manifest: dict[str, object]) -> dict[str, dict[str, int | str]]:
+    """Read optional night-order data and map it back to manifest character ids."""
     raw_night_order = manifest.get("nightOrder")
     order_file = raw_night_order.get("file") if isinstance(raw_night_order, dict) else None
     if not order_file:
@@ -271,6 +287,7 @@ def _read_night_order(archive: ZipFile, manifest: dict[str, object]) -> dict[str
 
 
 def _discover_night_order_file(archive: ZipFile) -> str | None:
+    """Find a likely night-order JSON file when the manifest omits its path."""
     for archive_name in archive.namelist():
         path = _normalize_pack_path(archive_name)
         filename = path.rsplit("/", 1)[-1].lower()
@@ -280,6 +297,7 @@ def _discover_night_order_file(archive: ZipFile) -> str | None:
 
 
 def _pack_int(source: dict[str, object], *keys: str) -> int:
+    """Read the first integer value found under the provided keys."""
     for key in keys:
         value = source.get(key)
         if value is None or value == "":
@@ -292,6 +310,7 @@ def _pack_int(source: dict[str, object], *keys: str) -> int:
 
 
 def _read_icon(archive: ZipFile, icon_path: object) -> str | None:
+    """Validate an icon file and return it as a browser-ready data URL."""
     if not icon_path:
         return None
     path = _normalize_pack_path(str(icon_path))
@@ -325,6 +344,7 @@ def _read_icon(archive: ZipFile, icon_path: object) -> str | None:
 
 
 def _detect_icon_media_type(data: bytes) -> str | None:
+    """Detect supported image media types from file signatures."""
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"
     if data.startswith(b"\xff\xd8"):
@@ -335,6 +355,7 @@ def _detect_icon_media_type(data: bytes) -> str | None:
 
 
 def _guess_reminder_token_icon(archive: ZipFile, token_id: str, character: object, label: str) -> str | None:
+    """Guess a reminder token icon path from common archive naming patterns."""
     candidates = {
         _slug(token_id),
         _slug(f"{character}_{label}"),
@@ -356,6 +377,7 @@ def _guess_reminder_token_icon(archive: ZipFile, token_id: str, character: objec
 
 
 def _discover_reminder_tokens_from_files(archive: ZipFile, seen_token_ids: set[str]) -> list[ReminderTokenDefinition]:
+    """Create reminder token definitions for token icons not listed in the manifest."""
     discovered: list[ReminderTokenDefinition] = []
     for archive_name in archive.namelist():
         path = _normalize_pack_path(archive_name)
@@ -383,6 +405,7 @@ def _discover_reminder_tokens_from_files(archive: ZipFile, seen_token_ids: set[s
 
 
 def _split_reminder_file_name(stem: str) -> tuple[str | None, str]:
+    """Split a reminder token filename into an optional character and label."""
     parts = [part for part in stem.replace("-", "_").split("_") if part]
     if len(parts) <= 1:
         return None, stem.replace("_", " ").title()
@@ -392,6 +415,7 @@ def _split_reminder_file_name(stem: str) -> tuple[str | None, str]:
 
 
 def _slug(value: object) -> str:
+    """Convert arbitrary text to a lowercase underscore identifier."""
     text = str(value or "").lower()
     result = []
     previous_was_separator = False
@@ -406,10 +430,12 @@ def _slug(value: object) -> str:
 
 
 def _normalize_pack_path(path: str) -> str:
+    """Normalize archive paths to a consistent forward-slash form."""
     return path.replace("\\", "/").removeprefix("./").strip()
 
 
 def _find_pack_path(archive: ZipFile, requested_path: str) -> str | None:
+    """Resolve a requested pack path even if it appears nested or case-shifted."""
     normalized_request = _normalize_pack_path(requested_path).lower()
     request_name = normalized_request.rsplit("/", 1)[-1]
     for candidate in archive.namelist():

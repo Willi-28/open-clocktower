@@ -1,3 +1,10 @@
+/**
+ * Initial setup screen.
+ *
+ * Before joining a room, users choose their display name, enter a room code,
+ * or create a new room with a required character pack upload.
+ */
+
 type SetupScreenProps = {
   characterPackFile: File | null;
   displayName: string;
@@ -11,6 +18,7 @@ type SetupScreenProps = {
   roomName: string;
 };
 
+/** Render the create-room and join-room forms shown before a session starts. */
 export function SetupScreen({
   characterPackFile,
   displayName,

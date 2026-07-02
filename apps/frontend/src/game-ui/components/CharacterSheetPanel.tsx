@@ -1,3 +1,10 @@
+/**
+ * Character sheet display panel.
+ *
+ * The panel lists the currently loaded character pack so players can read role
+ * names, categories, icons, and ability text in their selected language.
+ */
+
 import type { Character } from '../../api/client';
 import { characterRole } from '../gameText';
 
@@ -5,6 +12,7 @@ type CharacterSheetPanelProps = {
   characters: Character[];
 };
 
+/** Render the imported character sheet as a collapsible side panel. */
 export function CharacterSheetPanel({ characters }: CharacterSheetPanelProps) {
   return (
     <details className="panel compact sheet-panel">

@@ -1,3 +1,10 @@
+/**
+ * Local UI-only data types.
+ *
+ * These shapes describe browser-side annotations and chat messages that are
+ * rendered by the frontend but are not full backend room models.
+ */
+
 export type ReminderToken = {
   id: string;
   tokenId?: string;

@@ -1,27 +1,33 @@
+"""Shared room-state schemas for the backend API.
+
+These Pydantic models describe the data exchanged between REST endpoints,
+WebSockets, and the frontend, while also enforcing basic validation limits.
+"""
+
 from datetime import datetime, timezone
 from enum import StrEnum
 from pydantic import BaseModel, Field
 
 
-# This file describes the data exchanged between the API and frontend.
-# Pydantic checks types and simple rules before the backend processes data.
-
 class GamePhase(StrEnum):
-    # Manual game phases. The app does not automate specific game rules.
+    """Manual game phases. The app does not automate specific game rules."""
+
     LOBBY = "lobby"
     DAY = "day"
     NIGHT = "night"
 
 
 class PlayerStatus(StrEnum):
-    # Publicly visible player status at the table.
+    """Publicly visible player status at the table."""
+
     ALIVE = "alive"
     DEAD = "dead"
     ABSENT = "absent"
 
 
 class Player(BaseModel):
-    # Player snapshot sent to the frontend.
+    """Player snapshot sent to the frontend."""
+
     id: str
     display_name: str
     seat_index: int | None = None
@@ -33,7 +39,8 @@ class Player(BaseModel):
 
 
 class Nomination(BaseModel):
-    # Active or recently closed room nomination.
+    """Active or recently closed room nomination."""
+
     id: str
     nominator_id: str
     nominee_id: str
@@ -42,7 +49,8 @@ class Nomination(BaseModel):
 
 
 class NominationRequestState(BaseModel):
-    # Player-created nomination request waiting for the storyteller.
+    """Player-created nomination request waiting for the storyteller."""
+
     id: str
     nominator_id: str
     nominee_id: str
@@ -50,13 +58,15 @@ class NominationRequestState(BaseModel):
 
 
 class Vote(BaseModel):
-    # Single yes/no vote from one player.
+    """Single yes/no vote from one player."""
+
     player_id: str
     value: bool
 
 
 class Character(BaseModel):
-    # Public character data loaded from a storyteller-uploaded pack.
+    """Public character data loaded from a storyteller-uploaded pack."""
+
     id: str
     name: str
     team: str
@@ -73,7 +83,8 @@ class Character(BaseModel):
 
 
 class ReminderTokenDefinition(BaseModel):
-    # Public reminder token definition loaded from a room-local pack.
+    """Public reminder token definition loaded from a room-local pack."""
+
     id: str
     label: str
     character: str | None = None
@@ -84,13 +95,15 @@ class ReminderTokenDefinition(BaseModel):
 
 
 class CharacterAssignment(BaseModel):
-    # Actual character assignment. Normal players should only receive their own.
+    """Actual character assignment. Normal players should only receive their own."""
+
     player_id: str
     character_id: str
 
 
 class SharedReminderToken(BaseModel):
-    # Storyteller reminder token snapshot shared with selected players.
+    """Storyteller reminder token snapshot shared with selected players."""
+
     id: str
     tokenId: str | None = None
     label: str
@@ -99,7 +112,8 @@ class SharedReminderToken(BaseModel):
 
 
 class RoomState(BaseModel):
-    # Full MVP room snapshot. This is broadcast over WebSocket after changes.
+    """Full room snapshot that is broadcast over WebSocket after changes."""
+
     id: str
     name: str
     seat_count: int = Field(ge=5, le=20)
@@ -119,14 +133,16 @@ class RoomState(BaseModel):
 
 
 class CreateRoomRequest(BaseModel):
-    # Data the frontend sends when creating a room.
+    """Data the frontend sends when creating a room."""
+
     name: str = Field(default="New room", max_length=120)
     creator_name: str = Field(min_length=1, max_length=80)
     seat_count: int = Field(default=9, ge=5, le=20)
 
 
 class UpdateRoomRequest(BaseModel):
-    # Storyteller-owned room settings that can still change while in lobby.
+    """Storyteller-owned room settings that can still change when allowed."""
+
     actor_player_id: str
     seat_count: int | None = Field(default=None, ge=5, le=20)
     allow_public_voice_during_night: bool | None = None
@@ -136,13 +152,15 @@ class UpdateRoomRequest(BaseModel):
 
 
 class JoinRoomRequest(BaseModel):
-    # Data a player sends when joining a room.
+    """Data a player sends when joining a room."""
+
     display_name: str = Field(min_length=1, max_length=80)
     seat_index: int | None = Field(default=None, ge=0)
 
 
 class UpdatePlayerRequest(BaseModel):
-    # Player changes: seat and/or status.
+    """Player changes such as seat, status, or dead-vote state."""
+
     actor_player_id: str | None = None
     seat_index: int | None = Field(default=None, ge=0)
     status: PlayerStatus | None = None
@@ -150,70 +168,81 @@ class UpdatePlayerRequest(BaseModel):
 
 
 class LeaveRoomRequest(BaseModel):
-    # Normal players may remove only themselves from the lobby.
+    """Request body for a player leaving or being removed from a room."""
+
     actor_player_id: str
 
 
 class SetStorytellerRequest(BaseModel):
-    # Current storyteller may transfer the role to another player in the lobby.
+    """Current storyteller may transfer the role before the next match starts."""
+
     actor_player_id: str
     player_id: str
 
 
 class PhaseRequest(BaseModel):
-    # New room phase.
+    """Request body for changing the room phase."""
+
     phase: GamePhase
     actor_player_id: str | None = None
 
 
 class StartNominationRequest(BaseModel):
-    # Storyteller-approved nomination.
+    """Storyteller-approved nomination."""
+
     actor_player_id: str | None = None
     nominator_id: str
     nominee_id: str
 
 
 class PlayerNominationRequest(BaseModel):
-    # Player request for a nomination. The storyteller decides whether it begins.
+    """Player request for a nomination that the storyteller can approve."""
+
     nominator_id: str
     nominee_id: str
 
 
 class StorytellerActionRequest(BaseModel):
-    # Generic request body for storyteller-only actions without extra data.
+    """Generic request body for storyteller-only actions without extra data."""
+
     actor_player_id: str | None = None
 
 
 class ExecuteNomineeRequest(BaseModel):
-    # Storyteller execution for the active nomination. The backend validates votes.
+    """Storyteller execution for the active nomination after vote validation."""
+
     actor_player_id: str
 
 
 class VoteRequest(BaseModel):
-    # Player vote for the current nomination.
+    """Player vote for the current nomination."""
+
     player_id: str
     value: bool
 
 
 class AssignCharacterRequest(BaseModel):
-    # Storyteller assigns a real character to a player.
+    """Storyteller assigns one real character to one player."""
+
     actor_player_id: str
     player_id: str
     character_id: str
 
 
 class RandomAssignCharactersRequest(BaseModel):
-    # Storyteller selects the in-play characters; the server shuffles who gets which.
+    """Storyteller selects characters; the server shuffles them across seated players."""
+
     actor_player_id: str
     character_ids: list[str] = Field(min_length=1)
 
 
 class DemonBluffsRequest(BaseModel):
-    # Storyteller-only list of up to three bluff characters.
+    """Storyteller-only list of up to three demon bluff characters."""
+
     actor_player_id: str
     character_ids: list[str] = Field(default_factory=list, max_length=3)
 
 
 def utc_now() -> str:
-    # ISO timestamp for API snapshots.
+    """Return the current UTC time as an ISO string for API snapshots."""
     return datetime.now(timezone.utc).isoformat()

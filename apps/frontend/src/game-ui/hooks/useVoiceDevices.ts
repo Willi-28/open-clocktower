@@ -1,3 +1,10 @@
+/**
+ * Voice device management hook.
+ *
+ * This hook discovers microphones/speakers, requests microphone streams,
+ * applies RNNoise when enabled, and routes playback to selected outputs.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 
 import { getClientConfig } from '../../api/client';
@@ -37,6 +44,7 @@ export function useVoiceDevices({
       return;
     }
     void refreshMediaDevices();
+    /** Refresh device lists when the browser reports hardware changes. */
     const handleDeviceChange = () => {
       void refreshMediaDevices();
     };

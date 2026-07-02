@@ -1,3 +1,9 @@
+"""Backend runtime configuration.
+
+This module reads environment variables, normalizes deployment settings, and
+exposes one Settings object used by the API, database, HTTPS, and WebRTC code.
+"""
+
 import json
 import os
 from typing import Any
@@ -6,10 +12,12 @@ from pydantic import BaseModel
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
+    """Parse a common truthy/falsy environment variable into a boolean."""
     return os.getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _database_url() -> str:
+    """Return the SQLAlchemy database URL and normalize PostgreSQL driver names."""
     # SQLAlchemy uses psycopg2 for plain "postgresql://" URLs. The image ships
     # psycopg v3 instead, so normalize common PostgreSQL URLs to the v3 driver.
     database_url = os.getenv(
@@ -28,6 +36,8 @@ def _database_url() -> str:
 # Central backend configuration.
 # Values come from environment variables, for example docker-compose.yml/.env.
 class Settings(BaseModel):
+    """Typed configuration values shared by the whole backend process."""
+
     app_env: str = os.getenv("APP_ENV", "development")
     data_dir: str = os.getenv("DATA_DIR", "/app/data")
     upload_dir: str = os.getenv("UPLOAD_DIR", "/app/data/uploads")
@@ -44,6 +54,7 @@ class Settings(BaseModel):
     room_cleanup_interval_seconds: int = int(os.getenv("ROOM_CLEANUP_INTERVAL_SECONDS", "300"))
 
     def ice_servers(self) -> list[dict[str, Any]]:
+        """Parse the public WebRTC ICE server list that the frontend may use."""
         try:
             servers = json.loads(self.ice_servers_json)
         except json.JSONDecodeError:

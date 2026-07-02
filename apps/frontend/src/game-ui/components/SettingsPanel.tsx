@@ -1,3 +1,10 @@
+/**
+ * Client settings dialog.
+ *
+ * This panel owns local preferences such as profile image upload, output test,
+ * microphone test/monitoring, board theme, language, and per-player volume.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 
 import type { VoiceParticipant } from '../voiceRooms';
@@ -45,6 +52,7 @@ type SettingsPanelProps = {
   onUpdateClientSettings: (settings: Partial<SettingsPanelProps['clientSettings']>) => void;
 };
 
+/** Render and manage all client-local settings tabs. */
 export function SettingsPanel({
   audioInputDevices,
   audioOutputDevices,
@@ -120,6 +128,7 @@ export function SettingsPanel({
     }
   }, [selectedAudioOutputId]);
 
+  /** Play a short generated tone through the selected output device. */
   async function testOutputDevice() {
     setTestStatus('');
     const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -163,6 +172,7 @@ export function SettingsPanel({
     }, 1200);
   }
 
+  /** Start microphone capture, level metering, RNNoise if enabled, and self-monitoring. */
   async function startMicTest() {
     setTestStatus('');
     stopMicTest();
@@ -181,6 +191,7 @@ export function SettingsPanel({
       const values = new Uint8Array(analyser.frequencyBinCount);
       let lastUpdate = 0;
 
+      /** Update the visible input meter from analyser data. */
       const updateLevel = (timestamp: number) => {
         analyser.getByteFrequencyData(values);
         if (timestamp - lastUpdate > 120) {
@@ -203,6 +214,7 @@ export function SettingsPanel({
     }
   }
 
+  /** Route the tested microphone stream back to the selected output device. */
   async function startSelfMonitor(stream: MediaStream) {
     const audio = monitorAudioRef.current ?? new Audio();
     monitorAudioRef.current = audio;
@@ -227,6 +239,7 @@ export function SettingsPanel({
       .catch(() => setTestStatus('Browser blocked microphone monitoring. Try clicking again.'));
   }
 
+  /** Stop the hidden audio element used for local microphone monitoring. */
   function stopSelfMonitor() {
     const audio = monitorAudioRef.current;
     if (audio) {
@@ -237,6 +250,7 @@ export function SettingsPanel({
     monitorAudioRef.current = null;
   }
 
+  /** Stop microphone testing, cleanup media tracks, and reset the level meter. */
   function stopMicTest() {
     stopSelfMonitor();
     if (micAnimationRef.current !== null) {
@@ -465,6 +479,7 @@ export function SettingsPanel({
   );
 }
 
+/** Convert a locale code into the label shown in the language dropdown. */
 function languageLabel(language: string) {
   const labels: Record<string, string> = {
     de: 'Deutsch',

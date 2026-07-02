@@ -1,3 +1,10 @@
+/**
+ * Settings panel data adapter.
+ *
+ * This container connects the presentational settings dialog to room state,
+ * avatar uploads, saved client settings, and the composed voice controller.
+ */
+
 import type { Dispatch, SetStateAction } from 'react';
 
 import { uploadProfileImage, type RoomState } from '../../api/client';

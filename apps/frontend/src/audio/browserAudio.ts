@@ -1,5 +1,13 @@
+/**
+ * Browser audio effects and output routing helpers.
+ *
+ * This file owns short UI sounds, bell playback, and the optional setSinkId
+ * bridge that lets supported browsers route audio to a chosen output device.
+ */
+
 import clockTickUrl from './clock-tick.m4a';
 import churchBellUrl from './church_bell.mp3';
+import nominateKillUrl from './nominate_kill.mp3';
 
 let soundEffectsVolume = 1;
 
@@ -11,10 +19,12 @@ export type MediaDevicesWithOutputPicker = MediaDevices & {
   selectAudioOutput?: () => Promise<MediaDeviceInfo>;
 };
 
+/** Store the global sound-effects volume after clamping it to a safe range. */
 export function setSoundEffectsVolume(volume: number) {
   soundEffectsVolume = Math.max(0, Math.min(2, volume));
 }
 
+/** Connect an audio node through the shared sound-effects gain control. */
 function connectWithSoundEffectsVolume(audioContext: AudioContext, source: AudioNode) {
   const masterGain = audioContext.createGain();
   masterGain.gain.value = soundEffectsVolume;
@@ -22,6 +32,7 @@ function connectWithSoundEffectsVolume(audioContext: AudioContext, source: Audio
   masterGain.connect(audioContext.destination);
 }
 
+/** Route an audio element to a selected output device when the browser supports it. */
 export async function setAudioSink(audio: HTMLAudioElement, sinkId: string): Promise<boolean> {
   // Chrome exposes output routing through setSinkId. Other browsers safely ignore it.
   const audioWithSink = audio as AudioElementWithSink;
@@ -32,6 +43,7 @@ export async function setAudioSink(audio: HTMLAudioElement, sinkId: string): Pro
   return true;
 }
 
+/** Play a short tone for joining, leaving, or receiving a voice call. */
 export function playVoiceTone(kind: 'join' | 'leave' | 'call') {
   const AudioContextClass =
     window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -56,6 +68,7 @@ export function playVoiceTone(kind: 'join' | 'leave' | 'call') {
   oscillator.stop(audioContext.currentTime + (kind === 'call' ? 0.45 : 0.25));
 }
 
+/** Play the two-note text chat notification tone. */
 export function playMessageTone() {
   const AudioContextClass =
     window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -80,6 +93,7 @@ export function playMessageTone() {
   });
 }
 
+/** Play a small ascending or descending tone for mute state changes. */
 export function playMuteToggleTone(isMuted: boolean) {
   const AudioContextClass =
     window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -105,6 +119,7 @@ export function playMuteToggleTone(isMuted: boolean) {
   });
 }
 
+/** Play one clock tick for vote counting movement. */
 export function playTickTone() {
   const audio = new Audio(clockTickUrl);
   audio.volume = Math.min(1, 0.5 * soundEffectsVolume);
@@ -117,12 +132,21 @@ export function playTickTone() {
   audio.play().catch(() => window.clearTimeout(stopAfterOneTick));
 }
 
+/** Play the church bell used by timer alarms and manual bell rings. */
 export function playTimerAlarm() {
   const audio = new Audio(churchBellUrl);
   audio.volume = Math.min(1, 0.72 * soundEffectsVolume);
   audio.play().catch(() => undefined);
 }
 
+/** Play the execution sound after a nominee is successfully killed. */
+export function playNominationKillSound() {
+  const audio = new Audio(nominateKillUrl);
+  audio.volume = Math.min(1, 0.78 * soundEffectsVolume);
+  audio.play().catch(() => undefined);
+}
+
+/** Ring the shared room bell sound. */
 export function ringBell() {
   playTimerAlarm();
 }

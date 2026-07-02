@@ -1,3 +1,9 @@
+"""FastAPI application entry point.
+
+This file assembles middleware, lifecycle hooks, API routers, WebSocket routes,
+and the production static frontend mount into one ASGI app.
+"""
+
 import asyncio
 from contextlib import suppress
 from fastapi import FastAPI, Request
@@ -19,6 +25,7 @@ app = FastAPI(title="Open Clocktower")
 
 
 def cache_control_for_path(path: str) -> str | None:
+    """Choose a browser cache policy for API, HTML, and fingerprinted assets."""
     # Vite fingerprints production assets in /assets, so they are safe to cache
     # indefinitely. The HTML shell must always be fetched again so a deployment
     # immediately points browsers at the newest fingerprinted assets.
@@ -33,6 +40,7 @@ def cache_control_for_path(path: str) -> str | None:
 
 @app.middleware("http")
 async def set_browser_cache_policy(request: Request, call_next):
+    """Attach cache headers to responses whose paths need explicit browser policy."""
     response = await call_next(request)
     cache_control = cache_control_for_path(request.url.path)
     if cache_control is not None:
@@ -58,12 +66,14 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health():
+    """Return a minimal health response for containers and monitoring."""
     # Simple health check for Docker, monitoring, or quick manual tests.
     return {"status": "ok"}
 
 
 @app.get("/api/client-config")
 def client_config():
+    """Expose safe runtime browser configuration such as WebRTC ICE servers."""
     # Runtime configuration that the browser needs after the frontend was built.
     # Do not put private server-only secrets here.
     return {"iceServers": settings.ice_servers()}
@@ -71,6 +81,7 @@ def client_config():
 
 @app.on_event("startup")
 async def startup() -> None:
+    """Prepare database state and start background cleanup when the app boots."""
     # Creates database tables automatically until proper migrations exist.
     create_db_schema()
     room_store.mark_all_players_disconnected()
@@ -81,6 +92,7 @@ async def startup() -> None:
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
+    """Cancel the background cleanup task during graceful shutdown."""
     cleanup_task = getattr(app.state, "cleanup_task", None)
     if cleanup_task is not None:
         cleanup_task.cancel()
@@ -89,6 +101,7 @@ async def shutdown() -> None:
 
 
 async def cleanup_inactive_rooms() -> None:
+    """Periodically delete abandoned rooms and notify any stale browser clients."""
     # Deletes fully empty rooms in the background. This keeps abandoned lobbies
     # from living forever without needing a separate worker for version 0.1.
     interval = max(60, settings.room_cleanup_interval_seconds)

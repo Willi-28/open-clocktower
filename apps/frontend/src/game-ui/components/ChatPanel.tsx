@@ -1,3 +1,10 @@
+/**
+ * Text chat panel.
+ *
+ * This component renders public/private chat tabs, keeps the chat log scrolled
+ * to the newest message, and sends messages from the textarea.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 
 import type { ChatMessage } from '../types';
@@ -15,6 +22,7 @@ type ChatPanelProps = {
   setChatDraft: (draft: string) => void;
 };
 
+/** Render the docked text chat with public and private tabs. */
 export function ChatPanel({
   activeChatTab,
   attentionChatTabs,

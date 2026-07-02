@@ -1,3 +1,10 @@
+/**
+ * Demon bluff slot editor.
+ *
+ * The storyteller uses this compact bar to choose up to three bluff characters
+ * after character data has been imported for the room.
+ */
+
 import type { Character } from '../../api/client';
 
 type DemonBluffBarProps = {

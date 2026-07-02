@@ -1,3 +1,10 @@
+/**
+ * Voting and nomination control hook.
+ *
+ * This hook keeps player nomination requests, storyteller vote counting,
+ * execution actions, raised-hand state, and bell ringing in one place.
+ */
+
 import { useEffect, useState } from 'react';
 import type { MutableRefObject } from 'react';
 

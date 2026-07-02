@@ -1,3 +1,10 @@
+/**
+ * Character-pack night order builder.
+ *
+ * Uploaded packs can include first-night and other-night ordering data, and
+ * this helper turns that character metadata into sorted panel rows.
+ */
+
 import type { Character } from '../api/client';
 import { characterRole } from './gameText';
 
@@ -12,7 +19,9 @@ export type PackNightOrder = {
   otherNights: NightOrderStep[];
 };
 
+/** Build sorted first-night and other-night steps from imported characters. */
 export function buildPackNightOrder(characters: Character[]): PackNightOrder {
+  /** Convert one character into the row shape used by the night order panel. */
   const toNightStep = (character: Character, phase: 'first' | 'other') => ({
     character: character.name,
     note:

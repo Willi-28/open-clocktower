@@ -1,3 +1,10 @@
+/**
+ * Right-side control stack.
+ *
+ * This component composes character sheet, night order, reminder tokens, and
+ * storyteller tools into the right edge dashboard.
+ */
+
 import type { Character, RoomState } from '../../api/client';
 import type { PackNightOrder } from '../nightOrder';
 import type { ReminderTokenOption } from '../reminderTokens';
@@ -19,6 +26,7 @@ type RightControlStackProps = StorytellerToolsPanelProps & {
   onToggleReminderToken: (tokenId: string) => void;
 };
 
+/** Render all right-edge panels that belong beside the table. */
 export function RightControlStack(props: RightControlStackProps) {
   return (
     <aside className="edge-panel right-edge control-stack">

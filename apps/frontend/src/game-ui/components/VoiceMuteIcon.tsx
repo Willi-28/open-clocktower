@@ -1,7 +1,15 @@
+/**
+ * Voice mute icon.
+ *
+ * This small SVG component keeps microphone and muted-microphone visuals
+ * consistent across the lobby dashboard and settings panel buttons.
+ */
+
 type VoiceMuteIconProps = {
   isMuted: boolean;
 };
 
+/** Render the microphone icon and optional strike-through for muted state. */
 export function VoiceMuteIcon({ isMuted }: VoiceMuteIconProps) {
   return (
     <span className={isMuted ? 'voice-toggle-icon muted' : 'voice-toggle-icon'} aria-hidden="true">

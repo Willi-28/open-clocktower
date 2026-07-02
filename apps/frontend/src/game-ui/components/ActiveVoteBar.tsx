@@ -1,3 +1,10 @@
+/**
+ * Active vote controls for players.
+ *
+ * This component renders the compact nomination bar shown near the table when
+ * a normal player can raise or lower their hand for the active vote.
+ */
+
 import type { Nomination } from '../../api/client';
 
 type ActiveVoteBarProps = {

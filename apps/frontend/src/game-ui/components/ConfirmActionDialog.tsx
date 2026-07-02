@@ -1,3 +1,10 @@
+/**
+ * Confirmation dialog component.
+ *
+ * Storyteller actions such as deleting rooms or showing the board use this
+ * modal so high-impact decisions stay explicit and reversible until confirmed.
+ */
+
 type ConfirmActionDialogProps = {
   confirmLabel: string;
   message: string;

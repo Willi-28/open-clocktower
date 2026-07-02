@@ -1,3 +1,10 @@
+/**
+ * Nomination request popup.
+ *
+ * Players can request nominations; this component lets the storyteller approve
+ * or reject each pending request without opening a larger tools panel.
+ */
+
 import type { NominationRequestState } from '../../api/client';
 
 type NominationRequestPopupProps = {

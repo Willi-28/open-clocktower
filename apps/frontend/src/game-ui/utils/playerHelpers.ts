@@ -1,3 +1,10 @@
+/**
+ * Player lookup helpers.
+ *
+ * Components use these small helpers to avoid repeating room null checks and
+ * seat-index map construction in render code.
+ */
+
 import type { Player, RoomState } from '../../api/client';
 
 /**

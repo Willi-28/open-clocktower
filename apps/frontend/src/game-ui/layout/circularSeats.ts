@@ -1,3 +1,10 @@
+/**
+ * Circular table layout helper.
+ *
+ * Seat positions are generated as percentage offsets from the center so the
+ * same math can scale across desktop, laptop, and mobile table sizes.
+ */
+
 export type SeatPosition = {
   index: number;
   x: number;
@@ -5,9 +12,8 @@ export type SeatPosition = {
   angle: number;
 };
 
+/** Calculate evenly spaced seat positions on a circle. */
 export function calculateCircularSeats(count: number, radius: number): SeatPosition[] {
-  // Calculates evenly spaced seat positions on a circle.
-  // x/y are percentage offsets from the center and are later used in CSS.
   return Array.from({ length: count }, (_, index) => {
     const angle = (Math.PI * 2 * index) / count - Math.PI / 2;
     return {

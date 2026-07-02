@@ -1,3 +1,9 @@
+"""SQLAlchemy table models.
+
+These classes persist rooms, players, votes, nominations, character packs,
+assignments, demon bluffs, avatars, and imported reminder tokens.
+"""
+
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
@@ -7,11 +13,14 @@ from app.db.session import Base
 
 
 def utc_now() -> datetime:
+    """Return a timezone-aware UTC timestamp for database defaults."""
     # Shared timestamp helper for database rows.
     return datetime.now(timezone.utc)
 
 
 class RoomModel(Base):
+    """Persist one room and own all cascading room-local game data."""
+
     # Persisted game session. Deleting the room cascades to players,
     # nominations, and votes, so most game data lives only as long as the room.
     __tablename__ = "rooms"
@@ -51,6 +60,8 @@ class RoomModel(Base):
 
 
 class PlayerModel(Base):
+    """Persist one player or storyteller inside a room."""
+
     # A player belongs to exactly one room. Storytellers are technically players too,
     # but is_storyteller later gives them a different view and different permissions.
     __tablename__ = "players"
@@ -70,6 +81,8 @@ class PlayerModel(Base):
 
 
 class NominationModel(Base):
+    """Persist one nomination between a nominator and nominee."""
+
     # A nomination connects nominator and nominee. For the MVP, each room has only
     # one active nomination; older nominations remain as history.
     __tablename__ = "nominations"
@@ -86,6 +99,8 @@ class NominationModel(Base):
 
 
 class NominationRequestModel(Base):
+    """Persist a player nomination request waiting for storyteller action."""
+
     # A player-created nomination request waiting for storyteller approval.
     __tablename__ = "nomination_requests"
 
@@ -99,6 +114,8 @@ class NominationRequestModel(Base):
 
 
 class VoteModel(Base):
+    """Persist a single player's current vote for one room."""
+
     # One vote per player and room. New votes replace that player's previous vote.
     __tablename__ = "votes"
     __table_args__ = (UniqueConstraint("room_id", "player_id", name="uq_votes_room_player"),)
@@ -113,6 +130,8 @@ class VoteModel(Base):
 
 
 class PlayerAvatarModel(Base):
+    """Persist one room-local profile image as a data URL."""
+
     # User-uploaded room-local profile image. Stored as a data URL for the MVP.
     __tablename__ = "player_avatars"
 
@@ -125,6 +144,8 @@ class PlayerAvatarModel(Base):
 
 
 class CharacterModel(Base):
+    """Persist one imported character definition for a room."""
+
     # Character definition imported from a room-local character pack.
     __tablename__ = "characters"
     __table_args__ = (UniqueConstraint("room_id", "external_id", name="uq_characters_room_external_id"),)
@@ -149,6 +170,8 @@ class CharacterModel(Base):
 
 
 class ReminderTokenModel(Base):
+    """Persist one imported reminder token definition for a room."""
+
     # Reminder token definition imported from a room-local pack.
     __tablename__ = "reminder_tokens"
     __table_args__ = (UniqueConstraint("room_id", "external_id", name="uq_reminder_tokens_room_external_id"),)
@@ -167,6 +190,8 @@ class ReminderTokenModel(Base):
 
 
 class CharacterAssignmentModel(Base):
+    """Persist the real storyteller-owned role assignment for a player."""
+
     # Storyteller-owned real character assignment for one player.
     __tablename__ = "character_assignments"
     __table_args__ = (UniqueConstraint("room_id", "player_id", name="uq_character_assignments_room_player"),)
@@ -181,6 +206,8 @@ class CharacterAssignmentModel(Base):
 
 
 class DemonBluffModel(Base):
+    """Persist one storyteller-selected demon bluff character."""
+
     # Three storyteller-selected characters that can later be shown to the evil team.
     # They are not part of public room state and are never returned to normal players.
     __tablename__ = "demon_bluffs"

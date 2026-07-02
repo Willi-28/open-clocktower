@@ -1,3 +1,10 @@
+/**
+ * Browser-side HTTP API client.
+ *
+ * The types mirror the backend Pydantic models, and the exported helpers keep
+ * fetch details out of React components and hooks.
+ */
+
 export type GamePhase = 'lobby' | 'day' | 'night';
 export type PlayerStatus = 'alive' | 'dead' | 'absent';
 
@@ -96,8 +103,7 @@ export type ClientConfig = {
   iceServers: RTCIceServer[];
 };
 
-// Generic helper for all HTTP requests to the backend.
-// It throws an Error when FastAPI responds with 4xx/5xx.
+/** Send a JSON request to the backend and raise readable errors for failed responses. */
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     headers: {
@@ -115,11 +121,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json();
 }
 
+/** Load runtime browser config such as WebRTC ICE servers. */
 export function getClientConfig() {
-  // Runtime browser config, especially WebRTC STUN/TURN servers.
   return request<ClientConfig>('/api/client-config');
 }
 
+/** Create a room and make the creator the first storyteller. */
 export function createRoom(name: string, creatorName: string, seatCount: number) {
   return request<RoomState>('/api/rooms', {
     method: 'POST',
@@ -127,10 +134,12 @@ export function createRoom(name: string, creatorName: string, seatCount: number)
   });
 }
 
+/** Fetch the latest room snapshot. */
 export function getRoom(roomId: string) {
   return request<RoomState>(`/api/rooms/${roomId}`);
 }
 
+/** Update storyteller-owned room settings. */
 export function updateRoom(
   roomId: string,
   actorPlayerId: string,
@@ -148,6 +157,7 @@ export function updateRoom(
   });
 }
 
+/** Join an existing room as player or spectator. */
 export function joinRoom(roomId: string, displayName: string, seatIndex: number | null) {
   return request<RoomState>(`/api/rooms/${roomId}/players`, {
     method: 'POST',
@@ -155,6 +165,7 @@ export function joinRoom(roomId: string, displayName: string, seatIndex: number 
   });
 }
 
+/** Transfer storyteller rights to another player when the backend allows it. */
 export function setStoryteller(roomId: string, actorPlayerId: string, playerId: string) {
   return request<RoomState>(`/api/rooms/${roomId}/storyteller`, {
     method: 'POST',
@@ -162,6 +173,7 @@ export function setStoryteller(roomId: string, actorPlayerId: string, playerId: 
   });
 }
 
+/** Update one player's seat, public status, or dead-vote state. */
 export function updatePlayer(
   roomId: string,
   playerId: string,
@@ -173,6 +185,7 @@ export function updatePlayer(
   });
 }
 
+/** Leave a room or remove another player as storyteller. */
 export function leaveRoom(roomId: string, playerId: string, actorPlayerId: string) {
   return request<RoomState>(`/api/rooms/${roomId}/players/${playerId}`, {
     method: 'DELETE',
@@ -180,6 +193,7 @@ export function leaveRoom(roomId: string, playerId: string, actorPlayerId: strin
   });
 }
 
+/** Upload and store one player's profile image. */
 export async function uploadProfileImage(roomId: string, playerId: string, actorPlayerId: string, file: File) {
   const formData = new FormData();
   formData.append('actor_player_id', actorPlayerId);
@@ -196,6 +210,7 @@ export async function uploadProfileImage(roomId: string, playerId: string, actor
   return response.json() as Promise<RoomState>;
 }
 
+/** Change the current phase to lobby, day, or night. */
 export function setPhase(roomId: string, phase: GamePhase, actorPlayerId: string) {
   return request<RoomState>(`/api/rooms/${roomId}/phase`, {
     method: 'POST',
@@ -203,6 +218,7 @@ export function setPhase(roomId: string, phase: GamePhase, actorPlayerId: string
   });
 }
 
+/** Start a storyteller-approved nomination. */
 export function startNomination(roomId: string, actorPlayerId: string, nominatorId: string, nomineeId: string) {
   return request<RoomState>(`/api/rooms/${roomId}/nominations`, {
     method: 'POST',
@@ -210,6 +226,7 @@ export function startNomination(roomId: string, actorPlayerId: string, nominator
   });
 }
 
+/** Request a nomination from a normal player. */
 export function requestNomination(roomId: string, nominatorId: string, nomineeId: string) {
   return request<RoomState>(`/api/rooms/${roomId}/nomination-requests`, {
     method: 'POST',
@@ -217,6 +234,7 @@ export function requestNomination(roomId: string, nominatorId: string, nomineeId
   });
 }
 
+/** Reject a pending player nomination request. */
 export function rejectNominationRequest(roomId: string, requestId: string, actorPlayerId: string) {
   return request<RoomState>(`/api/rooms/${roomId}/nomination-requests/${requestId}`, {
     method: 'DELETE',
@@ -224,6 +242,7 @@ export function rejectNominationRequest(roomId: string, requestId: string, actor
   });
 }
 
+/** Cast or replace a vote for the current nomination. */
 export function castVote(roomId: string, playerId: string, value: boolean) {
   return request<RoomState>(`/api/rooms/${roomId}/votes`, {
     method: 'POST',
@@ -231,6 +250,7 @@ export function castVote(roomId: string, playerId: string, value: boolean) {
   });
 }
 
+/** Close the active vote without executing anyone. */
 export function closeVote(roomId: string, actorPlayerId: string) {
   return request<RoomState>(`/api/rooms/${roomId}/votes/close`, {
     method: 'POST',
@@ -238,6 +258,7 @@ export function closeVote(roomId: string, actorPlayerId: string) {
   });
 }
 
+/** Execute the active nominee after backend vote validation. */
 export function executeNominee(roomId: string, actorPlayerId: string) {
   return request<RoomState>(`/api/rooms/${roomId}/executions`, {
     method: 'POST',
@@ -245,6 +266,7 @@ export function executeNominee(roomId: string, actorPlayerId: string) {
   });
 }
 
+/** Reset match state while keeping the room available. */
 export function resetGame(roomId: string, actorPlayerId: string) {
   return request<RoomState>(`/api/rooms/${roomId}/reset`, {
     method: 'POST',
@@ -252,6 +274,7 @@ export function resetGame(roomId: string, actorPlayerId: string) {
   });
 }
 
+/** Delete a room after storyteller authorization. */
 export function deleteRoom(roomId: string, actorPlayerId: string) {
   return request<{ status: string }>(`/api/rooms/${roomId}`, {
     method: 'DELETE',
@@ -259,6 +282,7 @@ export function deleteRoom(roomId: string, actorPlayerId: string) {
   });
 }
 
+/** Upload and parse a room-local character pack ZIP. */
 export async function uploadCharacterPack(roomId: string, actorPlayerId: string, file: File) {
   const formData = new FormData();
   formData.append('actor_player_id', actorPlayerId);
@@ -275,16 +299,19 @@ export async function uploadCharacterPack(roomId: string, actorPlayerId: string,
   return response.json() as Promise<{ characters: number; reminder_tokens: number }>;
 }
 
+/** List characters, optionally translated into a selected pack language. */
 export function listCharacters(roomId: string, language = '') {
   const query = language ? `?language=${encodeURIComponent(language)}` : '';
   return request<Character[]>(`/api/rooms/${roomId}/characters${query}`);
 }
 
+/** List reminder token definitions, optionally translated into a selected language. */
 export function listReminderTokens(roomId: string, language = '') {
   const query = language ? `?language=${encodeURIComponent(language)}` : '';
   return request<ReminderTokenDefinition[]>(`/api/rooms/${roomId}/reminder-tokens${query}`);
 }
 
+/** Shuffle selected characters across seated players. */
 export function assignRandomCharacters(roomId: string, actorPlayerId: string, characterIds: string[]) {
   return request<CharacterAssignment[]>(`/api/rooms/${roomId}/character-assignments/random`, {
     method: 'POST',
@@ -292,14 +319,17 @@ export function assignRandomCharacters(roomId: string, actorPlayerId: string, ch
   });
 }
 
+/** Load character assignments visible to the current viewer. */
 export function listCharacterAssignments(roomId: string, viewerPlayerId: string) {
   return request<CharacterAssignment[]>(`/api/rooms/${roomId}/character-assignments?viewer_player_id=${viewerPlayerId}`);
 }
 
+/** Load storyteller-only demon bluff ids. */
 export function listDemonBluffs(roomId: string, viewerPlayerId: string) {
   return request<string[]>(`/api/rooms/${roomId}/demon-bluffs?viewer_player_id=${viewerPlayerId}`);
 }
 
+/** Replace the storyteller's selected demon bluff ids. */
 export function setDemonBluffs(roomId: string, actorPlayerId: string, characterIds: string[]) {
   return request<string[]>(`/api/rooms/${roomId}/demon-bluffs`, {
     method: 'POST',

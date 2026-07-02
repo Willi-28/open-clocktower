@@ -1,3 +1,10 @@
+/**
+ * Voice room chooser.
+ *
+ * This panel shows public voice rooms, current occupants, and compact SVG
+ * controls for joining or leaving the selected room.
+ */
+
 import type { GamePhase } from '../../api/client';
 
 type VoiceRoomsPanelProps = {
@@ -13,6 +20,7 @@ type VoiceRoomsPanelProps = {
   voiceRooms: string[];
 };
 
+/** Render public voice rooms and their join/leave controls. */
 export function VoiceRoomsPanel({
   isStoryteller,
   isVoiceSwitching,
@@ -76,6 +84,7 @@ export function VoiceRoomsPanel({
   );
 }
 
+/** Draw the SVG action icon for current, join, and leave states. */
 function VoiceRoomActionIcon({ state }: { state: 'current' | 'join' | 'leave' }) {
   if (state === 'current') {
     return (

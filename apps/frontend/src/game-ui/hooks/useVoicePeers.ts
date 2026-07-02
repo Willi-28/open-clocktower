@@ -1,3 +1,10 @@
+/**
+ * WebRTC voice peer hook.
+ *
+ * The hook owns peer connections, remote audio elements, ICE candidate queues,
+ * codec preferences, output routing, volume, and diagnostic labels.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 
@@ -66,6 +73,7 @@ export function useVoicePeers({
   }, []);
 
   useEffect(() => {
+    /** Retry autoplay-blocked remote audio after any user interaction. */
     const retryPlayback = () => retryRemoteAudioPlayback();
     window.addEventListener('pointerdown', retryPlayback, true);
     window.addEventListener('keydown', retryPlayback, true);
@@ -259,6 +267,7 @@ export function useVoicePeers({
     }
   }
 
+  /** Resume remote audio contexts and retry every remote audio element. */
   function retryRemoteAudioPlayback() {
     Object.values(remoteAudioContextRef.current).forEach((audioContext) => {
       if (audioContext.state !== 'closed') {
@@ -272,6 +281,7 @@ export function useVoicePeers({
     });
   }
 
+  /** Play one remote audio element and update diagnostics for autoplay failures. */
   function playRemoteAudio(playerId: string, audio: HTMLAudioElement) {
     void audio
       .play()

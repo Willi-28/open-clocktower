@@ -1,11 +1,19 @@
+"""Private chat permission rules.
+
+This module decides who can message whom: storytellers can talk to everyone,
+while normal players are limited to adjacent seated neighbors.
+"""
+
 from .room_state import Player, RoomState
 
 
 def find_player(players: list[Player], player_id: str) -> Player | None:
+    """Find one player snapshot by id in a room player list."""
     return next((player for player in players if player.id == player_id), None)
 
 
 def can_chat(room: RoomState, from_player_id: str, to_player_id: str) -> bool:
+    """Return whether one player is allowed to send a private chat message to another."""
     sender = find_player(room.players, from_player_id)
     recipient = find_player(room.players, to_player_id)
     if sender is None or recipient is None or sender.id == recipient.id:

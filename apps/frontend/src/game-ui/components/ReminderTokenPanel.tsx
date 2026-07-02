@@ -1,3 +1,10 @@
+/**
+ * Reminder token picker.
+ *
+ * The storyteller selects imported token icons here, then places them on the
+ * table by clicking the game surface while reminder mode is active.
+ */
+
 import type { ReminderTokenOption } from '../reminderTokens';
 
 type ReminderTokenPanelProps = {
@@ -6,6 +13,7 @@ type ReminderTokenPanelProps = {
   onToggleReminderToken: (tokenId: string) => void;
 };
 
+/** Render selectable reminder token icons from the loaded pack. */
 export function ReminderTokenPanel({
   reminderTokenOptions,
   selectedReminderLabel,

@@ -1,5 +1,13 @@
+/**
+ * Text chat permission rules.
+ *
+ * This module keeps private chat range logic outside the UI so the chat panel
+ * can simply render the targets that the current player may message.
+ */
+
 import type { Player, RoomState } from '../api/client';
 
+/** Return players that the current viewer may open a private chat with. */
 export function privateChatTargets(room: RoomState | null, currentPlayer: Player | undefined, storyteller: Player | undefined) {
   if (!room || !currentPlayer) {
     return [];

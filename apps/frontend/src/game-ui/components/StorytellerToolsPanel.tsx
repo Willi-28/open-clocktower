@@ -1,3 +1,10 @@
+/**
+ * Storyteller tools dashboard.
+ *
+ * This component groups pre-game setup, live timer/vote/grimoire tools, and
+ * post-game room actions while keeping each subsection collapsible.
+ */
+
 import { useEffect, useMemo, useState } from 'react';
 
 import type { Character, Player, RoomState } from '../../api/client';
@@ -45,6 +52,7 @@ export type StorytellerToolsPanelProps = {
   onTransferStoryteller: (playerId: string) => void;
 };
 
+/** Render the collapsible storyteller-only controls. */
 export function StorytellerToolsPanel({
   activeNomination,
   activeVoteOrderLength,
@@ -93,6 +101,7 @@ export function StorytellerToolsPanel({
   const isSelectedGrimoirePlayerShared = Boolean(
     selectedGrimoirePlayer && room.shared_grimoire_player_ids.includes(selectedGrimoirePlayer.id),
   );
+  const canTransferStoryteller = isLobby || room.show_board;
 
   useEffect(() => {
     if (!isEditingTimer) {
@@ -106,6 +115,7 @@ export function StorytellerToolsPanel({
     }
   }, [selectedGrimoirePlayerId, shareablePlayers]);
 
+  /** Validate the editable MM:SS timer input and apply it to the shared timer. */
   function commitTimerDraft() {
     const seconds = parseTimerDraft(timerDraft);
     if (seconds === null) {
@@ -175,38 +185,35 @@ export function StorytellerToolsPanel({
           Randomly Assign {randomCharacterIds.length}/{seatedPlayerCount}
         </button>
 
-        {isLobby ? (
-          <>
-            <h3 className="tool-section-heading">Lobby Players</h3>
-            <div className="player-list">
-              {room.players.map((player) => (
-                <button
-                  className={selectedPlayerId === player.id ? 'player-row selected' : 'player-row'}
-                  key={player.id}
-                  onClick={() => onSelectPlayer(player.id)}
-                  type="button"
-                >
-                  <span>{player.display_name}</span>
-                  <small>
-                    {player.is_storyteller ? 'Storyteller' : 'Player'} - {player.is_connected ? 'Online' : 'Offline'}
-                  </small>
-                </button>
-              ))}
-            </div>
-            <button disabled={!selectedPlayerId || selectedPlayerId === currentPlayerId} onClick={() => onTransferStoryteller(selectedPlayerId)} type="button">
-              Transfer Storyteller Role
-            </button>
+        <h3 className="tool-section-heading">{isLobby ? 'Lobby Players' : 'Room Players'}</h3>
+        <div className="player-list">
+          {room.players.map((player) => (
             <button
-              className="secondary danger-button"
-              disabled={!selectedPlayerId || selectedPlayerId === currentPlayerId || Boolean(selectedPlayer?.is_storyteller)}
-              onClick={() => onKickPlayer(selectedPlayerId)}
+              className={selectedPlayerId === player.id ? 'player-row selected' : 'player-row'}
+              key={player.id}
+              onClick={() => onSelectPlayer(player.id)}
               type="button"
             >
-              Kick Player
+              <span>{player.display_name}</span>
+              <small>
+                {player.is_storyteller ? 'Storyteller' : 'Player'} - {player.is_connected ? 'Online' : 'Offline'}
+              </small>
             </button>
-            {selectedPlayer?.is_storyteller ? <p className="helper-text">The storyteller stays in the room without a seat.</p> : null}
-          </>
-        ) : null}
+          ))}
+        </div>
+        <button disabled={!canTransferStoryteller || !selectedPlayerId || selectedPlayerId === currentPlayerId} onClick={() => onTransferStoryteller(selectedPlayerId)} type="button">
+          Transfer Storyteller Role
+        </button>
+        <button
+          className="secondary danger-button"
+          disabled={!canTransferStoryteller || !selectedPlayerId || selectedPlayerId === currentPlayerId || Boolean(selectedPlayer?.is_storyteller)}
+          onClick={() => onKickPlayer(selectedPlayerId)}
+          type="button"
+        >
+          Kick Player
+        </button>
+        {!canTransferStoryteller ? <p className="helper-text">Storyteller transfer is available before the game starts or after Show Board.</p> : null}
+        {selectedPlayer?.is_storyteller ? <p className="helper-text">The storyteller stays in the room without a seat.</p> : null}
       </details>
 
       <details>
@@ -331,6 +338,7 @@ export function StorytellerToolsPanel({
   );
 }
 
+/** Parse a MM:SS or minute-only timer draft into clamped seconds. */
 function parseTimerDraft(value: string) {
   const trimmed = value.trim();
   if (!trimmed) {

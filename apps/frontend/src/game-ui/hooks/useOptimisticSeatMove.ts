@@ -1,3 +1,10 @@
+/**
+ * Optimistic seat movement hook.
+ *
+ * Fast seat clicks update the local UI immediately, then debounce backend
+ * writes so players cannot flood the server with seat-change requests.
+ */
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { RoomState, updatePlayer } from '../../api/client';
@@ -17,6 +24,7 @@ type UseOptimisticSeatMoveOptions = {
   setRoom: (room: RoomState) => void;
 };
 
+/** Queue and flush seat changes while displaying the latest local choice. */
 export function useOptimisticSeatMove({
   canChangeSeats,
   currentPlayer,
@@ -61,6 +69,7 @@ export function useOptimisticSeatMove({
     };
   }, []);
 
+  /** Schedule the latest pending seat move after the rapid-click debounce window. */
   function scheduleSeatMoveFlush() {
     if (seatMoveTimeoutRef.current !== null) {
       window.clearTimeout(seatMoveTimeoutRef.current);
@@ -73,6 +82,7 @@ export function useOptimisticSeatMove({
     }, 450);
   }
 
+  /** Persist queued seat moves one at a time and keep only the latest request. */
   async function flushSeatMoves() {
     seatMoveInFlightRef.current = true;
     try {
@@ -103,6 +113,7 @@ export function useOptimisticSeatMove({
     }
   }
 
+  /** Optimistically move to a seat or spectator state if seat changes are allowed. */
   function queueSeatMove(seatIndex: number | null) {
     if (!room || !currentPlayerId || !canChangeSeats || currentPlayer?.is_storyteller) {
       return;

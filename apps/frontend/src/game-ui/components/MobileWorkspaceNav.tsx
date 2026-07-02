@@ -1,3 +1,10 @@
+/**
+ * Mobile workspace navigation.
+ *
+ * On narrow screens the table, communication, and tools areas become separate
+ * workspaces; this nav lets users switch between them without long scrolling.
+ */
+
 export type MobileWorkspaceView = 'table' | 'communication' | 'tools';
 
 type MobileWorkspaceNavProps = {

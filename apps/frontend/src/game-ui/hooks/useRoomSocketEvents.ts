@@ -1,7 +1,14 @@
+/**
+ * Room socket event hook.
+ *
+ * The hook opens the WebSocket for the active room and translates realtime
+ * events into React state updates, local sounds, and voice signaling callbacks.
+ */
+
 import { useEffect, useRef } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 
-import { playMessageTone, playVoiceTone, ringBell } from '../../audio/browserAudio';
+import { playMessageTone, playNominationKillSound, playVoiceTone, ringBell } from '../../audio/browserAudio';
 import type { RoomState } from '../../api/client';
 import { openRoomSocket } from '../../websocket/roomSocket';
 import { lastSessionKey, sessionKey } from '../sessionStorage';
@@ -117,6 +124,7 @@ export function useRoomSocketEvents({
       setSelectedPlayerId((current) => current || rememberedPlayerId);
     }
 
+    /** Route one parsed room socket event to the latest React handlers. */
     const socket = openRoomSocket(room.id, currentPlayerId, (event) => {
       const handlers = latestHandlersRef.current;
       if (event.type === 'connected' && handlers.joinedVoiceRoom) {
@@ -167,6 +175,9 @@ export function useRoomSocketEvents({
       }
       if (event.type === 'bell.ring') {
         ringBell();
+      }
+      if (event.type === 'nomination.executed') {
+        playNominationKillSound();
       }
       if (event.type === 'vote_count.state') {
         handlers.setVoteCountIndex(event.payload.index);

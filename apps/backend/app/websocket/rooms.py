@@ -1,3 +1,9 @@
+"""Room WebSocket endpoint and event routing.
+
+This module accepts browser WebSockets, validates room/player identity, and
+forwards realtime chat, voice, timer, bell, hand, and vote-count events.
+"""
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.game.chat_rules import can_chat, find_player
@@ -9,6 +15,7 @@ router = APIRouter()
 
 @router.websocket("/ws/rooms/{room_id}")
 async def room_socket(websocket: WebSocket, room_id: str):
+    """Handle one browser's live connection to a room."""
     # Keeps the room connection open and handles lightweight private chat and voice events.
     player_id = websocket.query_params.get("player_id")
     room = room_store.get_room(room_id)
@@ -63,6 +70,7 @@ async def room_socket(websocket: WebSocket, room_id: str):
 
 
 async def _handle_chat_message(room_id: str, player_id: str, payload: dict) -> None:
+    """Validate and forward a public or private chat message."""
     room = room_store.get_room(room_id)
     target_player_id = payload.get("toPlayerId")
     text = str(payload.get("text", "")).strip()
@@ -87,6 +95,7 @@ async def _handle_chat_message(room_id: str, player_id: str, payload: dict) -> N
 
 
 async def _forward_voice_call(room_id: str, player_id: str, payload: dict, event_type: str) -> None:
+    """Forward a private voice call request or acceptance to the target player."""
     target_player_id = payload.get("toPlayerId")
     voice_room = str(payload.get("voiceRoom", "")).strip()
     if isinstance(target_player_id, str) and voice_room and _players_are_in_room(room_id, player_id, target_player_id):
@@ -98,6 +107,7 @@ async def _forward_voice_call(room_id: str, player_id: str, payload: dict, event
 
 
 async def _forward_voice_reject(room_id: str, player_id: str, payload: dict) -> None:
+    """Tell a caller that the target player rejected the private voice call."""
     target_player_id = payload.get("toPlayerId")
     if isinstance(target_player_id, str) and _players_are_in_room(room_id, player_id, target_player_id):
         await room_hub.send_to_players(
@@ -108,6 +118,7 @@ async def _forward_voice_reject(room_id: str, player_id: str, payload: dict) -> 
 
 
 async def _forward_voice_signal(room_id: str, player_id: str, payload: dict) -> None:
+    """Forward WebRTC offer, answer, or ICE candidate data between room players."""
     target_player_id = payload.get("toPlayerId")
     if isinstance(target_player_id, str) and _players_are_in_room(room_id, player_id, target_player_id):
         await room_hub.send_voice_signal(
@@ -118,6 +129,7 @@ async def _forward_voice_signal(room_id: str, player_id: str, payload: dict) -> 
 
 
 async def _handle_timer(room_id: str, player_id: str, payload: dict) -> None:
+    """Apply storyteller timer changes and broadcast the synced timer state."""
     if _is_storyteller(room_id, player_id):
         await room_hub.set_timer(
             room_id,
@@ -128,22 +140,26 @@ async def _handle_timer(room_id: str, player_id: str, payload: dict) -> None:
 
 
 async def _handle_bell(room_id: str, player_id: str) -> None:
+    """Broadcast a bell event when the storyteller rings it."""
     if _is_storyteller(room_id, player_id):
         await room_hub.broadcast_room_event(room_id, {"type": "bell.ring", "payload": {"fromPlayerId": player_id}})
 
 
 async def _handle_vote_count(room_id: str, player_id: str, payload: dict) -> None:
+    """Apply storyteller-controlled vote counter state."""
     if _is_storyteller(room_id, player_id):
         await room_hub.set_vote_count(room_id, int(payload.get("index", -1)), bool(payload.get("isRunning")))
 
 
 def _is_storyteller(room_id: str, player_id: str) -> bool:
+    """Return whether a connected player is currently the room storyteller."""
     room = room_store.get_room(room_id)
     sender = find_player(room.players, player_id) if room else None
     return bool(sender and sender.is_storyteller)
 
 
 def _players_are_in_room(room_id: str, player_id: str, target_player_id: str) -> bool:
+    """Check that both voice signaling participants still belong to the room."""
     room = room_store.get_room(room_id)
     if room is None:
         return False
@@ -151,6 +167,7 @@ def _players_are_in_room(room_id: str, player_id: str, target_player_id: str) ->
 
 
 def _can_join_voice_room(room_id: str, player_id: str, voice_room: str | None) -> bool:
+    """Return whether a player may join a public or private voice room now."""
     room = room_store.get_room(room_id)
     sender = find_player(room.players, player_id) if room else None
     if room is None or sender is None or voice_room is None:

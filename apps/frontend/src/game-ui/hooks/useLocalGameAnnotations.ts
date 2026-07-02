@@ -1,3 +1,10 @@
+/**
+ * Local table annotations hook.
+ *
+ * Guesses and reminder tokens are private browser state, persisted per
+ * room/player pair so they survive reloads without leaking to other users.
+ */
+
 import { useEffect, useState } from 'react';
 
 import type { RoomState } from '../../api/client';

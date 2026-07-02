@@ -1,3 +1,10 @@
+/**
+ * Voice session membership hook.
+ *
+ * This module tracks the current public/private voice room, handles private
+ * call flows, and tears down/restarts local voice capture when membership changes.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 

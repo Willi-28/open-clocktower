@@ -1,3 +1,9 @@
+"""SQLAlchemy engine, sessions, and schema bootstrap helpers.
+
+This module owns the database connection pool and creates or lightly migrates
+the MVP schema until a dedicated migration system is introduced.
+"""
+
 from collections.abc import Iterator
 
 from sqlalchemy import create_engine
@@ -10,6 +16,8 @@ from app.config import settings
 
 # Shared base class for all SQLAlchemy table models.
 class Base(DeclarativeBase):
+    """Declarative base class used by every SQLAlchemy model."""
+
     pass
 
 
@@ -22,12 +30,14 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 
 def get_session() -> Iterator[Session]:
+    """Yield one database session for FastAPI dependency-style use."""
     # FastAPI dependency for later endpoints that should receive an injected session.
     with SessionLocal() as session:
         yield session
 
 
 def create_db_schema() -> None:
+    """Create missing tables and apply small compatibility column additions."""
     # Imports the models so SQLAlchemy knows them, then creates missing tables.
     # A later production version should replace this with Alembic migrations.
     from app.db import models  # noqa: F401
@@ -37,6 +47,7 @@ def create_db_schema() -> None:
 
 
 def _add_missing_columns() -> None:
+    """Add columns introduced after the initial schema when they are missing."""
     # Tiny development migration bridge until Alembic exists.
     inspector = inspect(engine)
     room_columns = {column["name"] for column in inspector.get_columns("rooms")}

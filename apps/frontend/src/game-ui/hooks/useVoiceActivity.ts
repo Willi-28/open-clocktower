@@ -1,3 +1,10 @@
+/**
+ * Voice activity detection hook.
+ *
+ * The hook samples local and remote audio streams, detects likely speech, and
+ * exposes speaking player ids for visual table highlights.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 
@@ -70,6 +77,7 @@ export function useVoiceActivity({ currentPlayerId, isMutedRef }: UseVoiceActivi
     source.connect(analyser);
     void audioContext.resume?.();
 
+    /** Re-sample the analyser and update speaking state on a short interval. */
     const readLevel = () => {
       analyser.getByteTimeDomainData(samples);
       let sum = 0;

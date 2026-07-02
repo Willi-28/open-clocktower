@@ -1,3 +1,10 @@
+/**
+ * Night order panel.
+ *
+ * This collapsible panel shows first-night and other-night steps derived from
+ * the uploaded character pack's night-order metadata.
+ */
+
 import type { PackNightOrder } from '../nightOrder';
 
 type NightOrderPanelProps = {
@@ -6,6 +13,7 @@ type NightOrderPanelProps = {
   onSetTab: (tab: 'first' | 'other') => void;
 };
 
+/** Render sorted first-night or other-night character instructions. */
 export function NightOrderPanel({ activeTab, packNightOrder, onSetTab }: NightOrderPanelProps) {
   return (
     <details className="panel compact night-order-panel">

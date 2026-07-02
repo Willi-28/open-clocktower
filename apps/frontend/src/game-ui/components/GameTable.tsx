@@ -1,3 +1,10 @@
+/**
+ * Main circular game table.
+ *
+ * This component renders seats, reminders, character visibility, voice focus,
+ * storyteller position, nominations, and the animated vote-counting hand.
+ */
+
 import { useMemo } from 'react';
 import type { CSSProperties } from 'react';
 
@@ -36,6 +43,7 @@ type GameTableProps = {
   storytellerVoiceLabel?: string;
 };
 
+/** Render the central table and all seat-level interaction targets. */
 export function GameTable({
   assignments,
   characters,
@@ -96,6 +104,7 @@ export function GameTable({
   );
   const voiceFocusSeatScale = Math.max(0.6, Math.min(0.8, 0.82 - Math.max(0, voiceFocusPlayerIds.length - 2) * 0.035));
 
+  /** Decide whether a player should be visually dimmed by the current voice focus. */
   function shouldDimForVoice(playerId: string | undefined) {
     if (!playerId) {
       return false;
@@ -106,6 +115,7 @@ export function GameTable({
     return townSquareDimmedPlayerIds.has(playerId);
   }
 
+  /** Place focused voice participants near the center without losing their fallback seat. */
   function voiceFocusPosition(playerId: string, fallbackX: number, fallbackY: number) {
     const focusIndex = voiceFocusPlayerIds.indexOf(playerId);
     if (focusIndex === -1) {
@@ -141,9 +151,8 @@ export function GameTable({
         }
       : null;
 
+  /** Keep clock-hand rotation moving clockwise when angles wrap around the circle. */
   function normalizedClockAngle(angle: number, startAngle: number) {
-    // CSS rotation would jump at -pi/pi. Unwrapping keeps vote counting moving
-    // visually clockwise around the table instead of snapping backward.
     let nextAngle = angle;
     while (nextAngle < startAngle - 0.001) {
       nextAngle += Math.PI * 2;

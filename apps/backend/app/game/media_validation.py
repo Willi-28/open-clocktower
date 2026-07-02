@@ -1,3 +1,9 @@
+"""Profile image validation helpers.
+
+The upload API uses this module to check file size, extension, MIME type,
+magic bytes, and image dimensions before storing room-local avatar images.
+"""
+
 import struct
 from pathlib import Path
 
@@ -11,6 +17,7 @@ PROFILE_TYPE_NAMES = {
 
 
 def validate_profile_image(filename: str, media_type: str, data: bytes) -> None:
+    """Validate one uploaded avatar image and raise ValueError when it is unsafe."""
     suffix = Path(filename).suffix.lower().lstrip(".")
     allowed_suffixes = ALLOWED_PROFILE_IMAGE_TYPES.get(media_type)
     if allowed_suffixes is None:
@@ -36,6 +43,7 @@ def validate_profile_image(filename: str, media_type: str, data: bytes) -> None:
 
 
 def image_dimensions(media_type: str, data: bytes) -> tuple[int, int]:
+    """Read image dimensions from PNG, GIF, or JPG bytes without decoding pixels."""
     if media_type == "image/png":
         if len(data) < 33 or not data.startswith(b"\x89PNG\r\n\x1a\n") or data[12:16] != b"IHDR":
             raise ValueError("Profile image is not a valid PNG")
@@ -71,6 +79,7 @@ def image_dimensions(media_type: str, data: bytes) -> tuple[int, int]:
 
 
 def detect_profile_image_media_type(data: bytes) -> str | None:
+    """Detect the likely profile image MIME type from its magic bytes."""
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"
     if data.startswith(b"\xff\xd8"):

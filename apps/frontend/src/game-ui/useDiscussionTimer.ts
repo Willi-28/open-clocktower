@@ -1,3 +1,10 @@
+/**
+ * Shared discussion timer hook.
+ *
+ * The storyteller controls the authoritative timer state, while all clients
+ * tick locally between socket updates and play the bell when time expires.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 
 type UseDiscussionTimerOptions = {
@@ -6,6 +13,7 @@ type UseDiscussionTimerOptions = {
   onSyncTimer: (durationSeconds: number, remainingSeconds: number, isRunning: boolean) => void;
 };
 
+/** Manage synced countdown state and local timer completion effects. */
 export function useDiscussionTimer({ isStoryteller, onRingBell, onSyncTimer }: UseDiscussionTimerOptions) {
   const timerTickAnchorRef = useRef(Date.now());
   const [timerSeconds, setTimerSeconds] = useState(300);
@@ -52,6 +60,7 @@ export function useDiscussionTimer({ isStoryteller, onRingBell, onSyncTimer }: U
     return () => window.clearTimeout(timeoutId);
   }, [showTimerDone]);
 
+  /** Apply timer state received from the room socket. */
   function applyTimerState(durationSeconds: number, remainingSeconds: number, isRunning: boolean, startedAt?: string | null) {
     setTimerSeconds(durationSeconds);
     setTimerRemaining(remainingSeconds);
@@ -60,6 +69,7 @@ export function useDiscussionTimer({ isStoryteller, onRingBell, onSyncTimer }: U
     setTimerStartedAt(isRunning && startedAt ? new Date().toISOString() : null);
   }
 
+  /** Reset the timer to a chosen duration and publish the stopped state. */
   function resetTimer(nextSeconds = timerSeconds) {
     setTimerSeconds(nextSeconds);
     setTimerRemaining(nextSeconds);
@@ -68,6 +78,7 @@ export function useDiscussionTimer({ isStoryteller, onRingBell, onSyncTimer }: U
     onSyncTimer(nextSeconds, nextSeconds, false);
   }
 
+  /** Start or pause the timer and sync that action to the room. */
   function toggleTimer() {
     const nextRunning = !isTimerRunning;
     const nextRemaining = nextRunning && timerRemaining === 0 ? timerSeconds : timerRemaining;

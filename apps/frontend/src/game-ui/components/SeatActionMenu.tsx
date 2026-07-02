@@ -1,3 +1,10 @@
+/**
+ * Per-seat action menu.
+ *
+ * The menu adapts to storyteller and player permissions, exposing chat, calls,
+ * nominations, status changes, execution, suspicion, and kick controls.
+ */
+
 import type { Character, Nomination, Player, RoomState } from '../../api/client';
 import { characterRole } from '../gameText';
 
@@ -24,6 +31,7 @@ type SeatActionMenuProps = {
   onToggleDeadVote: (player: Player) => void;
 };
 
+/** Render contextual actions for the selected seat/player. */
 export function SeatActionMenu({
   activeNomination,
   characters,

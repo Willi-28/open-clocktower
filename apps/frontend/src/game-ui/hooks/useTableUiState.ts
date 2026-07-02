@@ -1,3 +1,10 @@
+/**
+ * Local table UI state hook.
+ *
+ * Selection, settings visibility, zoom, reminder mode, and tool tabs live here
+ * because they belong to this browser rather than the shared room state.
+ */
+
 import { useEffect, useState } from 'react';
 
 /**
@@ -13,6 +20,7 @@ export function useTableUiState() {
   const [activeNightOrderTab, setActiveNightOrderTab] = useState<'first' | 'other'>('first');
 
   useEffect(() => {
+    /** Zoom the table when the user scrolls with Control pressed. */
     const zoomTableWithCtrlWheel = (event: WheelEvent) => {
       if (event.ctrlKey) {
         event.preventDefault();

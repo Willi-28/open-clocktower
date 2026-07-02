@@ -1,3 +1,9 @@
+"""Persistent room store and game mutation layer.
+
+RoomStore is the backend's central write/read service for rooms, players,
+votes, nominations, character packs, assignments, and storyteller-only checks.
+"""
+
 import json
 from random import SystemRandom
 from secrets import token_urlsafe
@@ -51,11 +57,15 @@ from .room_state import (
 
 
 class RoomStore:
+    """Coordinate validated room mutations against the database."""
+
     def __init__(self) -> None:
+        """Create store-level helpers such as secure randomization and seat throttles."""
         self._random = SystemRandom()
         self._next_seat_change_at: dict[tuple[str, str], float] = {}
 
     def create_room(self, request: CreateRoomRequest) -> RoomState:
+        """Create a new room with the creator as its initial storyteller."""
         with SessionLocal() as session:
             room = RoomModel(
                 id=token_urlsafe(5),
@@ -74,11 +84,13 @@ class RoomStore:
             return self._to_state(session, room)
 
     def get_room(self, room_id: str) -> RoomState | None:
+        """Return the current snapshot for one room if it exists."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             return self._to_state(session, room) if room else None
 
     def update_room(self, room_id: str, request: UpdateRoomRequest) -> RoomState | None:
+        """Apply storyteller-controlled room settings and shared grimoire changes."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -113,6 +125,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def join_room(self, room_id: str, request: JoinRoomRequest) -> RoomState | None:
+        """Add a new player, assigning a seat only when seat changes are allowed."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -128,6 +141,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def leave_room(self, room_id: str, player_id: str, actor_player_id: str) -> RoomState | None:
+        """Remove a player when they leave themselves or the storyteller removes them."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -148,12 +162,13 @@ class RoomStore:
             return self._to_state(session, room)
 
     def set_storyteller(self, room_id: str, request: SetStorytellerRequest) -> RoomState | None:
+        """Transfer the storyteller role before a match starts or after the board is shown."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
-            if room.phase != GamePhase.LOBBY.value:
-                raise ValueError("storyteller can only be selected in lobby")
+            if not self._can_change_seats(room):
+                raise ValueError("storyteller can only be selected before the game or after the board is shown")
             self._require_storyteller(session, room_id, request.actor_player_id)
             selected = self._find_player(session, room_id, request.player_id)
             if selected is None:
@@ -167,6 +182,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def update_player(self, room_id: str, player_id: str, request: UpdatePlayerRequest) -> RoomState | None:
+        """Update a player's seat, status, or dead-vote flag with role checks."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -200,6 +216,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def set_phase(self, room_id: str, request: PhaseRequest) -> RoomState | None:
+        """Move the room between lobby, day, and night while resetting phase data."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -222,6 +239,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def request_nomination(self, room_id: str, request: PlayerNominationRequest) -> RoomState | None:
+        """Store a player nomination request for later storyteller approval."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -244,6 +262,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def start_nomination(self, room_id: str, request: StartNominationRequest) -> RoomState | None:
+        """Start an active nomination after storyteller approval and rule validation."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -280,6 +299,7 @@ class RoomStore:
         request_id: str,
         request: StorytellerActionRequest,
     ) -> RoomState | None:
+        """Delete a pending nomination request after the storyteller rejects it."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -294,6 +314,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def cast_vote(self, room_id: str, request: VoteRequest) -> RoomState | None:
+        """Record a player's vote for the active nomination."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             nomination = self._active_nomination(session, room_id)
@@ -322,6 +343,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def close_vote(self, room_id: str, request: StorytellerActionRequest) -> RoomState | None:
+        """Close the active vote without executing the nominee."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -337,6 +359,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def execute_nominee(self, room_id: str, request: ExecuteNomineeRequest) -> RoomState | None:
+        """Mark the nominated player dead after confirming the vote threshold."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             nomination = self._active_nomination(session, room_id)
@@ -357,6 +380,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def reset_game(self, room_id: str, request: StorytellerActionRequest) -> RoomState | None:
+        """Reset match-only state so the same room can be prepared again."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -381,6 +405,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def delete_room(self, room_id: str, actor_player_id: str | None) -> bool:
+        """Delete a room after storyteller authorization."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -391,6 +416,7 @@ class RoomStore:
             return True
 
     def delete_inactive_rooms(self, idle_seconds: int) -> list[str]:
+        """Delete rooms whose players disconnected and whose idle window expired."""
         # A room becomes disposable only after every player disconnected and the
         # room has stayed untouched for the configured idle window.
         from datetime import timedelta
@@ -412,6 +438,7 @@ class RoomStore:
             return room_ids
 
     def mark_all_players_disconnected(self) -> None:
+        """Clear stale connection flags after backend startup."""
         # After a backend restart there are no live WebSockets, even if the DB
         # still contains old is_connected=true flags from the previous process.
         with SessionLocal() as session:
@@ -426,6 +453,7 @@ class RoomStore:
         characters: list[Character],
         reminder_tokens: list[ReminderTokenDefinition],
     ) -> RoomState | None:
+        """Replace a room's imported characters and reminder tokens."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -476,6 +504,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def list_characters(self, room_id: str, language: str | None = None) -> list[Character] | None:
+        """List room characters, optionally applying one translated language."""
         with SessionLocal() as session:
             if session.get(RoomModel, room_id) is None:
                 return None
@@ -487,6 +516,7 @@ class RoomStore:
             return [self._to_character(row, language) for row in rows]
 
     def list_reminder_tokens(self, room_id: str, language: str | None = None) -> list[ReminderTokenDefinition] | None:
+        """List room reminder tokens, optionally applying one translated language."""
         with SessionLocal() as session:
             if session.get(RoomModel, room_id) is None:
                 return None
@@ -498,6 +528,7 @@ class RoomStore:
             return [self._to_reminder_token(row, language) for row in rows]
 
     def assign_character(self, room_id: str, request: AssignCharacterRequest) -> list[CharacterAssignment] | None:
+        """Assign one imported character to one player."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -533,6 +564,7 @@ class RoomStore:
         room_id: str,
         request: RandomAssignCharactersRequest,
     ) -> list[CharacterAssignment] | None:
+        """Shuffle selected characters across all currently seated players."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -577,6 +609,7 @@ class RoomStore:
             return self.list_assignments(room_id, request.actor_player_id)
 
     def set_demon_bluffs(self, room_id: str, request: DemonBluffsRequest) -> list[str] | None:
+        """Replace the storyteller-only demon bluff character list."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -599,6 +632,7 @@ class RoomStore:
             return self.list_demon_bluffs(room_id, request.actor_player_id)
 
     def set_player_connection(self, room_id: str, player_id: str, is_connected: bool) -> RoomState | None:
+        """Persist a player's WebSocket connection status."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -612,6 +646,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def set_player_avatar(self, room_id: str, player_id: str, actor_player_id: str, data_url: str) -> RoomState | None:
+        """Replace a player's stored avatar image after ownership validation."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -628,6 +663,7 @@ class RoomStore:
             return self._to_state(session, room)
 
     def list_assignments(self, room_id: str, viewer_player_id: str) -> list[CharacterAssignment] | None:
+        """Return character assignments visible to the requesting viewer."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -646,6 +682,7 @@ class RoomStore:
             ]
 
     def list_demon_bluffs(self, room_id: str, viewer_player_id: str) -> list[str] | None:
+        """Return demon bluffs after verifying the viewer is storyteller."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -659,6 +696,7 @@ class RoomStore:
             return [row.character_id for row in rows]
 
     def _to_state(self, session: Session, room: RoomModel) -> RoomState:
+        """Convert database models into the API-facing room snapshot."""
         session.expire(room, ["players", "nominations", "nomination_requests", "votes"])
         active_nomination = self._active_nomination(session, room.id)
         nomination_requests = session.scalars(
@@ -721,6 +759,7 @@ class RoomStore:
         )
 
     def _to_character(self, row: CharacterModel, language: str | None = None) -> Character:
+        """Convert one character row into the translated API model."""
         translations = self._parse_translations(row.translations)
         selected = translations.get(language or "", {})
         return Character(
@@ -740,6 +779,7 @@ class RoomStore:
         )
 
     def _to_reminder_token(self, row: ReminderTokenModel, language: str | None = None) -> ReminderTokenDefinition:
+        """Convert one reminder token row into the translated API model."""
         translations = self._parse_translations(row.translations)
         selected = translations.get(language or "", {})
         return ReminderTokenDefinition(
@@ -753,6 +793,7 @@ class RoomStore:
         )
 
     def _parse_translations(self, serialized: str | None) -> dict[str, dict[str, str]]:
+        """Safely parse serialized translation maps from the database."""
         try:
             parsed = json.loads(serialized or "{}")
         except json.JSONDecodeError:
@@ -770,11 +811,13 @@ class RoomStore:
         return translations
 
     def _touch(self, room: RoomModel) -> None:
+        """Update a room timestamp so cleanup and clients see recent activity."""
         from app.db.models import utc_now
 
         room.updated_at = utc_now()
 
     def _parse_shared_grimoire_player_ids(self, room: RoomModel) -> list[str]:
+        """Read the shared-grimoire player id list from persisted JSON."""
         try:
             parsed = json.loads(room.shared_grimoire_player_ids or "[]")
         except json.JSONDecodeError:
@@ -782,6 +825,7 @@ class RoomStore:
         return [player_id for player_id in parsed if isinstance(player_id, str)]
 
     def _parse_shared_grimoire_reminders(self, room: RoomModel) -> list[SharedReminderToken]:
+        """Read shared storyteller reminder tokens from persisted JSON."""
         try:
             parsed = json.loads(room.shared_grimoire_reminders or "[]")
         except json.JSONDecodeError:
@@ -802,6 +846,7 @@ class RoomStore:
         room_id: str,
         player_ids: list[str],
     ) -> str:
+        """Serialize only valid non-storyteller player ids for grimoire sharing."""
         valid_player_ids = {
             player.id
             for player in session.scalars(
@@ -819,15 +864,18 @@ class RoomStore:
         return json.dumps(unique_player_ids)
 
     def _find_player(self, session: Session, room_id: str, player_id: str) -> PlayerModel | None:
+        """Return a player only if they belong to the requested room."""
         return session.get(PlayerModel, player_id) if self._player_in_room(session, room_id, player_id) else None
 
     def _player_in_room(self, session: Session, room_id: str, player_id: str) -> bool:
+        """Check whether a player id belongs to a room."""
         return (
             session.scalar(select(PlayerModel.id).where(PlayerModel.room_id == room_id, PlayerModel.id == player_id))
             is not None
         )
 
     def _claim_seat(self, room: RoomModel, seat_index: int | None, current_player_id: str | None = None) -> int | None:
+        """Validate and reserve a seat index while ignoring the current player."""
         occupied = {
             player.seat_index
             for player in room.players
@@ -836,9 +884,11 @@ class RoomStore:
         return claim_seat_index(seat_index, room.seat_count, occupied)
 
     def _can_change_seats(self, room: RoomModel) -> bool:
+        """Return whether the room currently allows seat changes."""
         return can_change_seats(room.phase, room.show_board)
 
     def _require_seat_change_rate(self, room_id: str, player_id: str) -> None:
+        """Throttle rapid seat changes from the same player."""
         key = (room_id, player_id)
         now = monotonic()
         if now < self._next_seat_change_at.get(key, 0):
@@ -846,10 +896,12 @@ class RoomStore:
         self._next_seat_change_at[key] = now + 0.35
 
     def _require_exactly_one_storyteller(self, room: RoomModel) -> None:
+        """Ensure a room has exactly one storyteller before game play starts."""
         if sum(1 for player in room.players if player.is_storyteller) != 1:
             raise ValueError("select exactly one storyteller before starting the game")
 
     def _require_storyteller(self, session: Session, room_id: str, player_id: str | None) -> PlayerModel:
+        """Return the actor when they are the room storyteller, otherwise raise."""
         if player_id is None:
             raise ValueError("storyteller action requires actor_player_id")
         player = self._find_player(session, room_id, player_id)
@@ -858,6 +910,7 @@ class RoomStore:
         return player
 
     def _active_nomination(self, session: Session, room_id: str) -> NominationModel | None:
+        """Return the newest active nomination for a room."""
         return session.scalar(
             select(NominationModel)
             .where(NominationModel.room_id == room_id, NominationModel.is_active.is_(True))
@@ -865,6 +918,7 @@ class RoomStore:
         )
 
     def _clear_active_nomination(self, session: Session, room_id: str) -> None:
+        """Mark all active nominations in a room as inactive."""
         nominations = session.scalars(
             select(NominationModel).where(NominationModel.room_id == room_id, NominationModel.is_active.is_(True))
         )
@@ -872,11 +926,13 @@ class RoomStore:
             nomination.is_active = False
 
     def _clear_day_nominations(self, session: Session, room_id: str) -> None:
+        """Delete day-specific votes, requests, and nominations."""
         session.execute(delete(VoteModel).where(VoteModel.room_id == room_id))
         session.execute(delete(NominationRequestModel).where(NominationRequestModel.room_id == room_id))
         session.execute(delete(NominationModel).where(NominationModel.room_id == room_id))
 
     def _valid_nomination_pair(self, session: Session, room: RoomModel, nominator_id: str, nominee_id: str) -> bool:
+        """Validate whether two players may form a nomination pair."""
         nominator = self._find_player(session, room.id, nominator_id)
         nominee = self._find_player(session, room.id, nominee_id)
         if nominator is None or nominee is None:
@@ -900,6 +956,7 @@ class RoomStore:
         nominator_id: str,
         nominee_id: str,
     ) -> None:
+        """Ensure neither nominator nor nominee has already used today's nomination."""
         already_nominated = session.scalar(
             select(NominationModel.id).where(
                 NominationModel.room_id == room_id,
@@ -918,6 +975,7 @@ class RoomStore:
             raise ValueError("player has already been nominated today")
 
     def _has_execution_votes(self, session: Session, room_id: str) -> bool:
+        """Check whether the active vote has enough yes votes to execute."""
         living_count = session.scalar(
             select(func.count(PlayerModel.id)).where(
                 PlayerModel.room_id == room_id,

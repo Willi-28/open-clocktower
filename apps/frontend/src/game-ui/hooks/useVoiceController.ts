@@ -1,3 +1,10 @@
+/**
+ * Voice feature composition hook.
+ *
+ * It wires together device capture, room membership, peer connections, and
+ * speech activity so App.tsx can consume one coherent voice controller.
+ */
+
 import { useEffect, useRef } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 

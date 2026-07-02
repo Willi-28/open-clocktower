@@ -1,3 +1,10 @@
+/**
+ * Room lifecycle hook.
+ *
+ * This hook handles saved-session restoration, creating rooms, joining rooms,
+ * leaving, kicking, deleting, and local cleanup around those room transitions.
+ */
+
 import { useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 

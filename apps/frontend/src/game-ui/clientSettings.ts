@@ -1,3 +1,10 @@
+/**
+ * Client-only settings persistence.
+ *
+ * These values are stored in localStorage so each browser can keep its own
+ * theme, language, audio, and visibility preferences between sessions.
+ */
+
 export const clientSettingsKey = 'open-clocktower.client-settings.v1';
 
 export type ClientSettings = {
@@ -18,6 +25,7 @@ export const defaultClientSettings: ClientSettings = {
   characterLanguage: '',
 };
 
+/** Load saved client settings and sanitize unknown or outdated values. */
 export function loadClientSettings(): ClientSettings {
   try {
     const stored = JSON.parse(localStorage.getItem(clientSettingsKey) ?? '{}') as Record<string, unknown>;

@@ -1,3 +1,10 @@
+/**
+ * Text chat state hook.
+ *
+ * The hook keeps chat drafts, open tabs, unread attention markers, and room
+ * resets together so the chat panel can stay mostly presentational.
+ */
+
 import { useEffect, useMemo, useState } from 'react';
 
 import type { ChatMessage } from './types';
@@ -9,6 +16,7 @@ type UseChatStateOptions = {
   roomId: string;
 };
 
+/** Manage public/private chat tabs and visible messages for one room. */
 export function useChatState({ allowedPrivateChatIds, allowedPrivateChatKey, currentPlayerId, roomId }: UseChatStateOptions) {
   const [chatDraft, setChatDraft] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -48,6 +56,7 @@ export function useChatState({ allowedPrivateChatIds, allowedPrivateChatKey, cur
     [activeChatTab, chatMessages, currentPlayerId],
   );
 
+  /** Append a socket-delivered chat message and open/mark its private tab if needed. */
   function appendChatMessage(message: ChatMessage, tabId?: string) {
     setChatMessages((current) => [...current, message]);
     if (tabId) {
@@ -61,6 +70,7 @@ export function useChatState({ allowedPrivateChatIds, allowedPrivateChatKey, cur
     }
   }
 
+  /** Open a private chat only when the current player is allowed to message that target. */
   function openPrivateChat(playerId: string) {
     if (!playerId || !allowedPrivateChatIds.has(playerId)) {
       return false;
@@ -71,6 +81,7 @@ export function useChatState({ allowedPrivateChatIds, allowedPrivateChatKey, cur
     return true;
   }
 
+  /** Close a private chat tab and return to public chat if it was active. */
   function closeChatTab(playerId: string) {
     setOpenChatTabs((current) => current.filter((tabId) => tabId !== playerId));
     setAttentionChatTabs((current) => current.filter((tabId) => tabId !== playerId));
@@ -79,6 +90,7 @@ export function useChatState({ allowedPrivateChatIds, allowedPrivateChatKey, cur
     }
   }
 
+  /** Select a chat tab and clear its temporary attention marker. */
   function selectChatTab(tabId: string) {
     setActiveChatTab(tabId);
     setAttentionChatTabs((current) => current.filter((attentionTabId) => attentionTabId !== tabId));
