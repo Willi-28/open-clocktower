@@ -1,31 +1,72 @@
 # Open Clocktower
 
-Self-hosted browser app for hidden-role / social-deduction games.
+Open Clocktower is a self-hosted browser app for live, moderated social-deduction games.
 
-## Tech stack
+It gives a group a shared digital table with rooms, seats, phases, nominations, voting, private notes, private chat, calls, and custom character packs. It is meant for groups that want to run their own game night online or around a table with a browser-based helper.
 
-- Frontend: React + Vite + TypeScript
-- Backend: Python + FastAPI
-- Realtime: WebSockets
-- Persistence: PostgreSQL via SQLAlchemy
-- Deployment: Docker / Docker Compose
+## What it is
 
-## Development
+Open Clocktower helps a storyteller host a hidden-role game session:
+
+* create a private room
+* invite players with a room code
+* arrange players around a digital table
+* upload a character pack to play
+* choose which characters are in play
+* assign hidden characters
+* manage day and night phases
+* run nominations and votes
+* keep local notes, reminders, and private suspicions
+
+Players do not need accounts. They join with a name and a room code.
+
+## Character packs
+
+To play, you need to upload a character pack.
+
+Character packs contain the roles and character information used in a room. Open Clocktower does not include official game content, so each server operator or storyteller provides their own packs.
+
+Packs are uploaded per room and can be customized for your own group, scripts, variants, or homebrew content.
+
+See [`docs/character-packs.md`](docs/character-packs.md) for the expected format.
+
+## Inspiration and content
+
+Open Clocktower is inspired by the style of live, storyteller-led hidden-role games, especially Blood on the Clocktower.
+
+This project is independent and unaffiliated. It does not include official game content, character names, rules text, logos, artwork, or protected assets. Server operators are responsible for the content they upload to their own instance.
+
+## Install and run locally
+
+You need Docker and Docker Compose.
 
 ```bash
 docker compose up --build
 ```
 
-Open the app at `http://localhost:3000`.
+Then open:
 
-## Production With Traefik
+```text
+http://localhost:3000
+```
 
-Open Clocktower 0.1 is designed to run as one app container plus one PostgreSQL
-container behind an existing Traefik reverse proxy.
+## Docker image
 
-1. Create an `.env` from `.env.production.example`.
+A Docker image is available on Docker Hub:
+
+[Docker Hub: willi28/open-clocktower](https://hub.docker.com/repository/docker/willi28/open-clocktower/general)
+
+The project repositories and Docker image may remain private while the project is still in preparation. They are intended to become public once the project is ready.
+
+## Production setup
+
+Production is designed for a small self-hosted setup behind an existing Traefik reverse proxy.
+
+Basic steps:
+
+1. Copy `.env.production.example` to `.env`.
 2. Set `APP_DOMAIN`, `POSTGRES_PASSWORD`, and `OPEN_CLOCKTOWER_IMAGE`.
-3. Make sure your Traefik container has an external Docker network named `traefik_proxy`.
+3. Make sure Traefik has an external Docker network named `traefik_proxy`.
 4. Start the production stack:
 
 ```bash
@@ -33,56 +74,16 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Traefik terminates HTTPS and forwards HTTP/WebSocket traffic to the app on port `8000`.
-Plain HTTP is redirected to HTTPS, and production enables a backend HTTPS guard
-as a second layer.
-Do not scale the `app` service above one replica in version 0.1 because live room
-state and WebRTC signaling are kept in memory per app container.
+For the full setup, see [`docs/deployment.md`](docs/deployment.md).
 
-See [docs/deployment.md](docs/deployment.md) for the homeserver setup.
+## More information
 
-To test several players on one machine, start the app and then run:
+* [`docs/deployment.md`](docs/deployment.md) — homeserver and Traefik setup
+* [`docs/development.md`](docs/development.md) — local development
+* [`docs/character-packs.md`](docs/character-packs.md) — custom character pack format
+* [`docs/api-events.md`](docs/api-events.md) — API and realtime events
+* [`docs/webapp-structure.md`](docs/webapp-structure.md) — project structure
 
-```powershell
-.\scripts\open-test-browsers.ps1 -Players 5
-```
+## Status
 
-The script opens isolated incognito/profile windows so each window gets its own browser session.
-
-## Manual MVP Test Flow
-
-1. Create a room as storyteller and upload a character pack zip.
-2. Join from several isolated browser windows with the room code.
-3. Let players choose seats by clicking open seats.
-4. Select the possible characters and click `Randomly Assign`.
-5. Pick three demon bluffs as storyteller.
-6. Switch between `Day` and `Night` from the storyteller tools.
-7. Use seats for nominations, private chat, calls, deaths, and dead votes.
-8. Use `Reminder Tokens` and `Private Suspicions` for local table markers.
-
-## MVP 1 Scope
-
-The current scaffold follows the Notion MVP 1 cut:
-
-- create and open rooms
-- join as player with only name and room code, without accounts
-- choose exactly one storyteller in the lobby before the game starts
-- lock joining and storyteller selection after the game starts
-- configure dynamic seat counts
-- render a circular digital table
-- assign players to seats
-- switch lobby/day/night manually
-- start nominations and cast votes
-- show public votes visually
-- upload room-local character packs
-- assign real characters as storyteller
-- save private character suspicions in the browser
-- reset the persisted game state
-
-Players can reconnect from the same browser session. For version 0.1, room state
-is intentionally stored in one app process, so production should run a single app
-container.
-
-Most game data is scoped to a room session. Deleting a room deletes its players, nominations, and votes through database cascades.
-
-Open Clocktower does not ship official game content, names, rules text, logos, or protected assets. Server operators are responsible for the content they upload to their own instance.
+Open Clocktower is an early MVP. It is usable for testing and small private sessions, but it is intentionally simple. Most game data is scoped to a room session, and deleting a room also deletes its related players, nominations, and votes.
