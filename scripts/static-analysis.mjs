@@ -1,7 +1,12 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = process.cwd();
+// Resolve the repo root from this script's own location (scripts/ sits directly
+// under the root) instead of process.cwd(). Otherwise, invoked through the
+// frontend npm script, the walk only ever sees apps/frontend and the Python
+// risky-pattern rules never run against the backend.
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const ignoredDirs = new Set([
   '.git',
   '.codex',

@@ -37,6 +37,7 @@ apps/frontend/src/
 │  ├─ utils/                     Pure player/table helpers
 │  ├─ chatRules.ts               Private chat visibility rules
 │  ├─ clientSettings.ts          Local browser settings
+│  ├─ emojis.ts                  Chat emoji shortcodes, search, and rendering
 │  ├─ gameConfig.ts              Static frontend game defaults
 │  ├─ nightOrder.ts              Character night-order derivation
 │  ├─ reminderTokens.ts          Reminder token display helpers

@@ -6,10 +6,12 @@ votes, nominations, character packs, assignments, and storyteller-only checks.
 
 import json
 from random import SystemRandom
-from secrets import token_urlsafe
+from secrets import compare_digest, token_urlsafe
+from threading import Lock
 from time import monotonic
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.models import (
@@ -40,6 +42,7 @@ from .room_state import (
     NominationRequestState,
     PhaseRequest,
     Player,
+    PlayerSession,
     PlayerStatus,
     PlayerNominationRequest,
     RandomAssignCharactersRequest,
@@ -63,10 +66,12 @@ class RoomStore:
         """Create store-level helpers such as secure randomization and seat throttles."""
         self._random = SystemRandom()
         self._next_seat_change_at: dict[tuple[str, str], float] = {}
+        self._seat_change_locks: dict[str, Lock] = {}
 
-    def create_room(self, request: CreateRoomRequest) -> RoomState:
+    def create_room(self, request: CreateRoomRequest) -> PlayerSession:
         """Create a new room with the creator as its initial storyteller."""
         with SessionLocal() as session:
+            secret = token_urlsafe(16)
             room = RoomModel(
                 id=token_urlsafe(5),
                 name=request.name.strip() or "New room",
@@ -77,11 +82,16 @@ class RoomStore:
                 id=token_urlsafe(6),
                 display_name=request.creator_name.strip() or "Storyteller",
                 is_storyteller=True,
+                secret=secret,
             )
             room.players.append(founder)
             session.add(room)
             session.commit()
-            return self._to_state(session, room)
+            return PlayerSession(
+                room=self._to_state(session, room),
+                player_id=founder.id,
+                player_secret=secret,
+            )
 
     def get_room(self, room_id: str) -> RoomState | None:
         """Return the current snapshot for one room if it exists."""
@@ -89,19 +99,20 @@ class RoomStore:
             room = session.get(RoomModel, room_id)
             return self._to_state(session, room) if room else None
 
-    def update_room(self, room_id: str, request: UpdateRoomRequest) -> RoomState | None:
+    def update_room(self, room_id: str, request: UpdateRoomRequest, secret: str | None) -> RoomState | None:
         """Apply storyteller-controlled room settings and shared grimoire changes."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
-            self._require_storyteller(session, room_id, request.actor_player_id)
+            self._require_storyteller(session, room_id, request.actor_player_id, secret)
             if request.seat_count is not None:
                 if not self._can_change_seats(room):
                     raise ValueError("room seats can only be changed before the game or after the board is shown")
-                occupied_seats = [player.seat_index for player in room.players if player.seat_index is not None]
-                if occupied_seats and max(occupied_seats) >= request.seat_count:
-                    raise ValueError("seat_count cannot remove occupied seats")
+                seated_players = [player for player in room.players if player.seat_index is not None]
+                if len(seated_players) > request.seat_count:
+                    raise ValueError("No free seats available.")
+                self._compact_seats(session, seated_players, room.seat_count, request.seat_count)
                 room.seat_count = request.seat_count
             if request.allow_public_voice_during_night is not None:
                 room.allow_public_voice_during_night = request.allow_public_voice_during_night
@@ -124,23 +135,29 @@ class RoomStore:
             session.commit()
             return self._to_state(session, room)
 
-    def join_room(self, room_id: str, request: JoinRoomRequest) -> RoomState | None:
+    def join_room(self, room_id: str, request: JoinRoomRequest) -> PlayerSession | None:
         """Add a new player, assigning a seat only when seat changes are allowed."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
+            secret = token_urlsafe(16)
             player = PlayerModel(
                 id=token_urlsafe(6),
                 display_name=request.display_name.strip() or "Player",
                 seat_index=self._claim_seat(room, request.seat_index) if self._can_change_seats(room) else None,
+                secret=secret,
             )
             room.players.append(player)
             self._touch(room)
             session.commit()
-            return self._to_state(session, room)
+            return PlayerSession(
+                room=self._to_state(session, room),
+                player_id=player.id,
+                player_secret=secret,
+            )
 
-    def leave_room(self, room_id: str, player_id: str, actor_player_id: str) -> RoomState | None:
+    def leave_room(self, room_id: str, player_id: str, actor_player_id: str, secret: str | None) -> RoomState | None:
         """Remove a player when they leave themselves or the storyteller removes them."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
@@ -149,19 +166,17 @@ class RoomStore:
             player = self._find_player(session, room_id, player_id)
             if player is None:
                 return None
+            actor = self._authenticate(session, room_id, actor_player_id, secret)
             if player.is_storyteller:
-                raise ValueError("storyteller cannot leave the lobby")
-            if actor_player_id == player_id:
-                if room.phase != GamePhase.LOBBY.value:
-                    raise ValueError("players can only leave while the room is in lobby")
-            else:
-                self._require_storyteller(session, room_id, actor_player_id)
+                raise ValueError("storyteller cannot leave the room")
+            if actor_player_id != player_id and not actor.is_storyteller:
+                raise ValueError("only the storyteller can perform this action")
             session.delete(player)
             self._touch(room)
             session.commit()
             return self._to_state(session, room)
 
-    def set_storyteller(self, room_id: str, request: SetStorytellerRequest) -> RoomState | None:
+    def set_storyteller(self, room_id: str, request: SetStorytellerRequest, secret: str | None) -> RoomState | None:
         """Transfer the storyteller role before a match starts or after the board is shown."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
@@ -169,7 +184,7 @@ class RoomStore:
                 return None
             if not self._can_change_seats(room):
                 raise ValueError("storyteller can only be selected before the game or after the board is shown")
-            self._require_storyteller(session, room_id, request.actor_player_id)
+            self._require_storyteller(session, room_id, request.actor_player_id, secret)
             selected = self._find_player(session, room_id, request.player_id)
             if selected is None:
                 return None
@@ -181,8 +196,31 @@ class RoomStore:
             session.commit()
             return self._to_state(session, room)
 
-    def update_player(self, room_id: str, player_id: str, request: UpdatePlayerRequest) -> RoomState | None:
+    def update_player(
+        self,
+        room_id: str,
+        player_id: str,
+        request: UpdatePlayerRequest,
+        secret: str | None,
+    ) -> RoomState | None:
         """Update a player's seat, status, or dead-vote flag with role checks."""
+        fields_set = self._request_fields_set(request)
+        if "seat_index" in fields_set and request.actor_player_id == player_id:
+            self._require_seat_change_rate(room_id, player_id)
+        if "seat_index" in fields_set:
+            with self._seat_change_lock(room_id):
+                return self._update_player(room_id, player_id, request, fields_set, secret)
+        return self._update_player(room_id, player_id, request, fields_set, secret)
+
+    def _update_player(
+        self,
+        room_id: str,
+        player_id: str,
+        request: UpdatePlayerRequest,
+        fields_set: set[str],
+        secret: str | None,
+    ) -> RoomState | None:
+        """Apply a player update inside one database transaction."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -190,9 +228,9 @@ class RoomStore:
             player = self._find_player(session, room_id, player_id)
             if player is None:
                 return None
-            fields_set = getattr(request, "model_fields_set", None)
-            if fields_set is None:
-                fields_set = request.__fields_set__
+            # The actor must always prove their identity; per-field role checks
+            # below then decide whether they may change this particular player.
+            self._authenticate(session, room_id, request.actor_player_id, secret)
             if "seat_index" in fields_set:
                 if not self._can_change_seats(room):
                     raise ValueError("seats can only be changed before the game or after the board is shown")
@@ -200,29 +238,36 @@ class RoomStore:
                     raise ValueError("players can only change their own seat")
                 if player.is_storyteller and request.seat_index is not None:
                     raise ValueError("storyteller cannot take a seat")
-                self._require_seat_change_rate(room_id, player_id)
                 player.seat_index = self._claim_seat(room, request.seat_index, player_id)
             if request.status is not None:
-                if room.phase != GamePhase.LOBBY.value:
-                    self._require_storyteller(session, room_id, request.actor_player_id)
+                # Outside the lobby only the storyteller may set status. In the
+                # lobby a player may still set their own, but not anyone else's.
+                if room.phase != GamePhase.LOBBY.value or request.actor_player_id != player_id:
+                    self._require_storyteller(session, room_id, request.actor_player_id, secret)
                 player.status = request.status.value
                 if request.status == PlayerStatus.ALIVE:
                     player.has_dead_vote = True
             if request.has_dead_vote is not None:
-                self._require_storyteller(session, room_id, request.actor_player_id)
+                self._require_storyteller(session, room_id, request.actor_player_id, secret)
                 player.has_dead_vote = request.has_dead_vote
             self._touch(room)
-            session.commit()
+            try:
+                session.commit()
+            except IntegrityError as error:
+                session.rollback()
+                if "seat_index" in fields_set:
+                    raise ValueError("seat is no longer available") from error
+                raise
             return self._to_state(session, room)
 
-    def set_phase(self, room_id: str, request: PhaseRequest) -> RoomState | None:
+    def set_phase(self, room_id: str, request: PhaseRequest, secret: str | None) -> RoomState | None:
         """Move the room between lobby, day, and night while resetting phase data."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
+            self._require_storyteller(session, room_id, request.actor_player_id, secret)
             if request.phase != GamePhase.LOBBY:
-                self._require_storyteller(session, room_id, request.actor_player_id)
                 self._require_exactly_one_storyteller(room)
             if request.phase == GamePhase.DAY and room.phase != GamePhase.DAY.value:
                 self._clear_day_nominations(session, room_id)
@@ -238,12 +283,13 @@ class RoomStore:
             session.commit()
             return self._to_state(session, room)
 
-    def request_nomination(self, room_id: str, request: PlayerNominationRequest) -> RoomState | None:
+    def request_nomination(self, room_id: str, request: PlayerNominationRequest, secret: str | None) -> RoomState | None:
         """Store a player nomination request for later storyteller approval."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
+            self._authenticate(session, room_id, request.nominator_id, secret)
             if room.phase == GamePhase.LOBBY.value:
                 raise ValueError("nominations can only be requested after the game starts")
             if not self._valid_nomination_pair(session, room, request.nominator_id, request.nominee_id):
@@ -261,13 +307,13 @@ class RoomStore:
             session.commit()
             return self._to_state(session, room)
 
-    def start_nomination(self, room_id: str, request: StartNominationRequest) -> RoomState | None:
+    def start_nomination(self, room_id: str, request: StartNominationRequest, secret: str | None) -> RoomState | None:
         """Start an active nomination after storyteller approval and rule validation."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
-            self._require_storyteller(session, room_id, request.actor_player_id)
+            self._require_storyteller(session, room_id, request.actor_player_id, secret)
             if not self._valid_nomination_pair(session, room, request.nominator_id, request.nominee_id):
                 return None
             self._require_can_nominate_today(session, room_id, request.nominator_id, request.nominee_id)
@@ -298,13 +344,14 @@ class RoomStore:
         room_id: str,
         request_id: str,
         request: StorytellerActionRequest,
+        secret: str | None,
     ) -> RoomState | None:
         """Delete a pending nomination request after the storyteller rejects it."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
-            self._require_storyteller(session, room_id, request.actor_player_id)
+            self._require_storyteller(session, room_id, request.actor_player_id, secret)
             nomination_request = session.get(NominationRequestModel, request_id)
             if nomination_request is None or nomination_request.room_id != room_id:
                 return None
@@ -313,7 +360,7 @@ class RoomStore:
             session.commit()
             return self._to_state(session, room)
 
-    def cast_vote(self, room_id: str, request: VoteRequest) -> RoomState | None:
+    def cast_vote(self, room_id: str, request: VoteRequest, secret: str | None) -> RoomState | None:
         """Record a player's vote for the active nomination."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
@@ -322,9 +369,7 @@ class RoomStore:
                 return None
             if not nomination.is_open:
                 raise ValueError("vote is closed")
-            player = self._find_player(session, room_id, request.player_id)
-            if player is None:
-                return None
+            player = self._authenticate(session, room_id, request.player_id, secret)
             if player.is_storyteller:
                 raise ValueError("storyteller cannot vote")
             if player.seat_index is None:
@@ -342,13 +387,13 @@ class RoomStore:
             session.commit()
             return self._to_state(session, room)
 
-    def close_vote(self, room_id: str, request: StorytellerActionRequest) -> RoomState | None:
+    def close_vote(self, room_id: str, request: StorytellerActionRequest, secret: str | None) -> RoomState | None:
         """Close the active vote without executing the nominee."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
-            self._require_storyteller(session, room_id, request.actor_player_id)
+            self._require_storyteller(session, room_id, request.actor_player_id, secret)
             nomination = self._active_nomination(session, room_id)
             if nomination is not None:
                 nomination.is_open = False
@@ -358,14 +403,14 @@ class RoomStore:
             session.commit()
             return self._to_state(session, room)
 
-    def execute_nominee(self, room_id: str, request: ExecuteNomineeRequest) -> RoomState | None:
+    def execute_nominee(self, room_id: str, request: ExecuteNomineeRequest, secret: str | None) -> RoomState | None:
         """Mark the nominated player dead after confirming the vote threshold."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             nomination = self._active_nomination(session, room_id)
             if room is None or nomination is None:
                 return None
-            self._require_storyteller(session, room_id, request.actor_player_id)
+            self._require_storyteller(session, room_id, request.actor_player_id, secret)
             nominee = self._find_player(session, room_id, nomination.nominee_id)
             if nominee is None:
                 return None
@@ -379,13 +424,13 @@ class RoomStore:
             session.commit()
             return self._to_state(session, room)
 
-    def reset_game(self, room_id: str, request: StorytellerActionRequest) -> RoomState | None:
+    def reset_game(self, room_id: str, request: StorytellerActionRequest, secret: str | None) -> RoomState | None:
         """Reset match-only state so the same room can be prepared again."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
-            self._require_storyteller(session, room_id, request.actor_player_id)
+            self._require_storyteller(session, room_id, request.actor_player_id, secret)
             room.phase = GamePhase.LOBBY.value
             room.day_count = 0
             room.night_count = 0
@@ -404,15 +449,16 @@ class RoomStore:
             session.commit()
             return self._to_state(session, room)
 
-    def delete_room(self, room_id: str, actor_player_id: str | None) -> bool:
+    def delete_room(self, room_id: str, actor_player_id: str | None, secret: str | None) -> bool:
         """Delete a room after storyteller authorization."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return False
-            self._require_storyteller(session, room_id, actor_player_id)
+            self._require_storyteller(session, room_id, actor_player_id, secret)
             session.delete(room)
             session.commit()
+            self._forget_room_runtime_state(room_id)
             return True
 
     def delete_inactive_rooms(self, idle_seconds: int) -> list[str]:
@@ -435,6 +481,8 @@ class RoomStore:
             for room in rooms:
                 session.delete(room)
             session.commit()
+            for room_id in room_ids:
+                self._forget_room_runtime_state(room_id)
             return room_ids
 
     def mark_all_players_disconnected(self) -> None:
@@ -442,14 +490,16 @@ class RoomStore:
         # After a backend restart there are no live WebSockets, even if the DB
         # still contains old is_connected=true flags from the previous process.
         with SessionLocal() as session:
-            for player in session.scalars(select(PlayerModel).where(PlayerModel.is_connected.is_(True))).all():
-                player.is_connected = False
+            session.execute(
+                update(PlayerModel).where(PlayerModel.is_connected.is_(True)).values(is_connected=False)
+            )
             session.commit()
 
     def replace_pack(
         self,
         room_id: str,
         actor_player_id: str,
+        secret: str | None,
         characters: list[Character],
         reminder_tokens: list[ReminderTokenDefinition],
     ) -> RoomState | None:
@@ -458,7 +508,7 @@ class RoomStore:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
-            self._require_storyteller(session, room_id, actor_player_id)
+            self._require_storyteller(session, room_id, actor_player_id, secret)
             if room.phase != GamePhase.LOBBY.value:
                 raise ValueError("character packs can only be uploaded in lobby")
             if not characters:
@@ -467,7 +517,7 @@ class RoomStore:
             session.execute(delete(DemonBluffModel).where(DemonBluffModel.room_id == room_id))
             session.execute(delete(CharacterModel).where(CharacterModel.room_id == room_id))
             session.execute(delete(ReminderTokenModel).where(ReminderTokenModel.room_id == room_id))
-            for character in characters:
+            for sort_order, character in enumerate(characters):
                 session.add(
                     CharacterModel(
                         id=token_urlsafe(8),
@@ -478,6 +528,7 @@ class RoomStore:
                         category=character.category,
                         ability=character.ability,
                         icon=character.icon,
+                        sort_order=sort_order,
                         first_night=character.first_night,
                         first_night_reminder=character.first_night_reminder,
                         other_night=character.other_night,
@@ -511,7 +562,7 @@ class RoomStore:
             rows = session.scalars(
                 select(CharacterModel)
                 .where(CharacterModel.room_id == room_id)
-                .order_by(CharacterModel.category.asc(), CharacterModel.name.asc())
+                .order_by(CharacterModel.sort_order.asc(), CharacterModel.category.asc(), CharacterModel.name.asc())
             ).all()
             return [self._to_character(row, language) for row in rows]
 
@@ -527,13 +578,18 @@ class RoomStore:
             ).all()
             return [self._to_reminder_token(row, language) for row in rows]
 
-    def assign_character(self, room_id: str, request: AssignCharacterRequest) -> list[CharacterAssignment] | None:
+    def assign_character(
+        self,
+        room_id: str,
+        request: AssignCharacterRequest,
+        secret: str | None,
+    ) -> list[CharacterAssignment] | None:
         """Assign one imported character to one player."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
-            self._require_storyteller(session, room_id, request.actor_player_id)
+            self._require_storyteller(session, room_id, request.actor_player_id, secret)
             player = self._find_player(session, room_id, request.player_id)
             if player is None:
                 return None
@@ -557,19 +613,20 @@ class RoomStore:
             )
             self._touch(room)
             session.commit()
-            return self.list_assignments(room_id, request.actor_player_id)
+            return self.list_assignments(room_id, request.actor_player_id, secret)
 
     def assign_random_characters(
         self,
         room_id: str,
         request: RandomAssignCharactersRequest,
+        secret: str | None,
     ) -> list[CharacterAssignment] | None:
         """Shuffle selected characters across all currently seated players."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
-            self._require_storyteller(session, room_id, request.actor_player_id)
+            self._require_storyteller(session, room_id, request.actor_player_id, secret)
             players = [
                 player
                 for player in room.players
@@ -606,15 +663,15 @@ class RoomStore:
                 )
             self._touch(room)
             session.commit()
-            return self.list_assignments(room_id, request.actor_player_id)
+            return self.list_assignments(room_id, request.actor_player_id, secret)
 
-    def set_demon_bluffs(self, room_id: str, request: DemonBluffsRequest) -> list[str] | None:
+    def set_demon_bluffs(self, room_id: str, request: DemonBluffsRequest, secret: str | None) -> list[str] | None:
         """Replace the storyteller-only demon bluff character list."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
-            self._require_storyteller(session, room_id, request.actor_player_id)
+            self._require_storyteller(session, room_id, request.actor_player_id, secret)
             character_ids = list(dict.fromkeys(request.character_ids))
             if len(character_ids) != len(request.character_ids):
                 raise ValueError("bluff characters must be unique")
@@ -629,7 +686,7 @@ class RoomStore:
                 session.add(DemonBluffModel(room_id=room_id, character_id=character_id))
             self._touch(room)
             session.commit()
-            return self.list_demon_bluffs(room_id, request.actor_player_id)
+            return self.list_demon_bluffs(room_id, request.actor_player_id, secret)
 
     def set_player_connection(self, room_id: str, player_id: str, is_connected: bool) -> RoomState | None:
         """Persist a player's WebSocket connection status."""
@@ -645,7 +702,48 @@ class RoomStore:
             session.commit()
             return self._to_state(session, room)
 
-    def set_player_avatar(self, room_id: str, player_id: str, actor_player_id: str, data_url: str) -> RoomState | None:
+    def authenticate_player(self, room_id: str, player_id: str, secret: str | None) -> bool:
+        """Return whether a player id and bearer secret match, for the WS handshake."""
+        if not player_id or not secret:
+            return False
+        with SessionLocal() as session:
+            stored = session.scalar(
+                select(PlayerModel.secret).where(PlayerModel.room_id == room_id, PlayerModel.id == player_id)
+            )
+        return bool(stored) and compare_digest(stored, secret)
+
+    def is_storyteller(self, room_id: str, player_id: str) -> bool:
+        """Return whether a player is the room storyteller using one cheap query."""
+        with SessionLocal() as session:
+            return (
+                session.scalar(
+                    select(PlayerModel.is_storyteller).where(
+                        PlayerModel.room_id == room_id,
+                        PlayerModel.id == player_id,
+                    )
+                )
+                is True
+            )
+
+    def players_in_room(self, room_id: str, player_ids: set[str]) -> bool:
+        """Return whether every given player id belongs to the room."""
+        wanted = {player_id for player_id in player_ids if player_id}
+        if not wanted:
+            return False
+        with SessionLocal() as session:
+            found = session.scalars(
+                select(PlayerModel.id).where(PlayerModel.room_id == room_id, PlayerModel.id.in_(wanted))
+            ).all()
+        return set(found) == wanted
+
+    def set_player_avatar(
+        self,
+        room_id: str,
+        player_id: str,
+        actor_player_id: str,
+        secret: str | None,
+        data_url: str,
+    ) -> RoomState | None:
         """Replace a player's stored avatar image after ownership validation."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
@@ -654,6 +752,7 @@ class RoomStore:
             player = self._find_player(session, room_id, player_id)
             if player is None:
                 return None
+            self._authenticate(session, room_id, actor_player_id, secret)
             if actor_player_id != player_id:
                 raise ValueError("players can only change their own profile image")
             session.execute(delete(PlayerAvatarModel).where(PlayerAvatarModel.player_id == player_id))
@@ -662,15 +761,18 @@ class RoomStore:
             session.commit()
             return self._to_state(session, room)
 
-    def list_assignments(self, room_id: str, viewer_player_id: str) -> list[CharacterAssignment] | None:
+    def list_assignments(
+        self,
+        room_id: str,
+        viewer_player_id: str,
+        secret: str | None,
+    ) -> list[CharacterAssignment] | None:
         """Return character assignments visible to the requesting viewer."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
-            viewer = self._find_player(session, room_id, viewer_player_id)
-            if viewer is None:
-                return None
+            viewer = self._authenticate(session, room_id, viewer_player_id, secret)
             query = select(CharacterAssignmentModel).where(CharacterAssignmentModel.room_id == room_id)
             shared_grimoire_player_ids = set(self._parse_shared_grimoire_player_ids(room))
             if not viewer.is_storyteller and not room.show_board and viewer_player_id not in shared_grimoire_player_ids:
@@ -681,13 +783,13 @@ class RoomStore:
                 for row in rows
             ]
 
-    def list_demon_bluffs(self, room_id: str, viewer_player_id: str) -> list[str] | None:
+    def list_demon_bluffs(self, room_id: str, viewer_player_id: str, secret: str | None) -> list[str] | None:
         """Return demon bluffs after verifying the viewer is storyteller."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
                 return None
-            self._require_storyteller(session, room_id, viewer_player_id)
+            self._require_storyteller(session, room_id, viewer_player_id, secret)
             rows = session.scalars(
                 select(DemonBluffModel)
                 .where(DemonBluffModel.room_id == room_id)
@@ -867,6 +969,27 @@ class RoomStore:
         """Return a player only if they belong to the requested room."""
         return session.get(PlayerModel, player_id) if self._player_in_room(session, room_id, player_id) else None
 
+    def _request_fields_set(self, request: UpdatePlayerRequest) -> set[str]:
+        """Return explicitly supplied request fields for Pydantic v1 or v2."""
+        fields_set = getattr(request, "model_fields_set", None)
+        if fields_set is None:
+            fields_set = request.__fields_set__
+        return set(fields_set)
+
+    def _seat_change_lock(self, room_id: str) -> Lock:
+        """Return the in-process lock that serializes seat claims for one room."""
+        lock = self._seat_change_locks.get(room_id)
+        if lock is None:
+            lock = Lock()
+            self._seat_change_locks[room_id] = lock
+        return lock
+
+    def _forget_room_runtime_state(self, room_id: str) -> None:
+        """Drop in-memory rate limits and locks after a room is deleted."""
+        self._seat_change_locks.pop(room_id, None)
+        for key in [key for key in self._next_seat_change_at if key[0] == room_id]:
+            self._next_seat_change_at.pop(key, None)
+
     def _player_in_room(self, session: Session, room_id: str, player_id: str) -> bool:
         """Check whether a player id belongs to a room."""
         return (
@@ -887,6 +1010,42 @@ class RoomStore:
         """Return whether the room currently allows seat changes."""
         return can_change_seats(room.phase, room.show_board)
 
+    def _compact_seats(self, session: Session, seated_players: list[PlayerModel], old_count: int, new_count: int) -> None:
+        """Reindex seated players when shrinking removes free seats.
+
+        Occupied seats are never dropped: free seats are removed from the top
+        of the circle downwards and everyone keeps their relative order.
+        """
+        if new_count >= old_count:
+            return
+        occupied = {player.seat_index for player in seated_players}
+        kept_seats = list(range(old_count))
+        for seat_index in range(old_count - 1, -1, -1):
+            if len(kept_seats) <= new_count:
+                break
+            if seat_index not in occupied:
+                kept_seats.remove(seat_index)
+        if len(kept_seats) > new_count:
+            raise ValueError("No free seats available.")
+        new_index_by_seat = {seat_index: position for position, seat_index in enumerate(kept_seats)}
+        final_index_by_player: dict[str, int] = {}
+        for player in seated_players:
+            if player.seat_index is None or player.seat_index not in new_index_by_seat:
+                raise ValueError("No free seats available.")
+            final_index_by_player[player.id] = new_index_by_seat[player.seat_index]
+        if all(player.seat_index == final_index_by_player[player.id] for player in seated_players):
+            return
+
+        # Move seats into unused temporary slots before the final compacted
+        # indices so the database never sees two players on the same seat.
+        highest_existing_seat = max((player.seat_index for player in seated_players if player.seat_index is not None), default=-1)
+        temporary_start = max(old_count, highest_existing_seat) + len(seated_players) + 1
+        for offset, player in enumerate(seated_players):
+            player.seat_index = temporary_start + offset
+        session.flush()
+        for player in seated_players:
+            player.seat_index = final_index_by_player[player.id]
+
     def _require_seat_change_rate(self, room_id: str, player_id: str) -> None:
         """Throttle rapid seat changes from the same player."""
         key = (room_id, player_id)
@@ -900,12 +1059,25 @@ class RoomStore:
         if sum(1 for player in room.players if player.is_storyteller) != 1:
             raise ValueError("select exactly one storyteller before starting the game")
 
-    def _require_storyteller(self, session: Session, room_id: str, player_id: str | None) -> PlayerModel:
-        """Return the actor when they are the room storyteller, otherwise raise."""
-        if player_id is None:
-            raise ValueError("storyteller action requires actor_player_id")
+    def _authenticate(self, session: Session, room_id: str, player_id: str | None, secret: str | None) -> PlayerModel:
+        """Return the acting player only when their id and bearer secret both match."""
+        if not player_id or not secret:
+            raise ValueError("invalid player credentials")
         player = self._find_player(session, room_id, player_id)
-        if player is None or not player.is_storyteller:
+        if player is None or not player.secret or not compare_digest(player.secret, secret):
+            raise ValueError("invalid player credentials")
+        return player
+
+    def _require_storyteller(
+        self,
+        session: Session,
+        room_id: str,
+        player_id: str | None,
+        secret: str | None,
+    ) -> PlayerModel:
+        """Return the actor when they are the authenticated room storyteller."""
+        player = self._authenticate(session, room_id, player_id, secret)
+        if not player.is_storyteller:
             raise ValueError("only the storyteller can perform this action")
         return player
 

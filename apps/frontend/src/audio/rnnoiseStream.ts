@@ -76,15 +76,43 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
     throw new Error('RNNoise suppression is not supported by this browser.');
   }
 
+  // RNNoise strictly needs a 48 kHz context. Create it first and bail out if the
+  // browser/OS cannot honour that or refuses to start the engine; the caller then
+  // falls back to the raw microphone. This is the difference between "no noise
+  // suppression" (fine) and a silently empty outgoing track (the user is heard as
+  // silence) on Windows setups whose audio device runs at 44.1 kHz or in exclusive
+  // mode, and on browsers where a MediaStream-only graph never leaves 'suspended'.
+  const audioContext = new AudioContextClass({ sampleRate: 48000 });
+  if (audioContext.sampleRate !== 48000) {
+    await audioContext.close();
+    throw new Error(
+      `Noise suppression needs a 48 kHz audio engine but this device reported ${audioContext.sampleRate} Hz.`,
+    );
+  }
+  try {
+    await audioContext.resume();
+  } catch {
+    // resume() can reject when the call is outside a user gesture; the running
+    // check below decides whether the pipeline is actually usable.
+  }
+  if (audioContext.state !== 'running') {
+    await audioContext.close();
+    throw new Error('The audio engine for noise suppression could not start on this device.');
+  }
+
   const rnnoise = await loadRnnoise();
   const denoiseState = rnnoise.createDenoiseState();
-  const audioContext = new AudioContextClass({ sampleRate: 48000 });
   const source = audioContext.createMediaStreamSource(inputStream);
   const highPass = audioContext.createBiquadFilter();
   const processor = audioContext.createScriptProcessor(1024, 1, 1);
   const compressor = audioContext.createDynamicsCompressor();
   const limiter = audioContext.createDynamicsCompressor();
   const destination = audioContext.createMediaStreamDestination();
+  // A ScriptProcessorNode only keeps firing while its graph reaches a real output
+  // on some browsers. Tapping a muted gain node to the speakers keeps processing
+  // alive (so the WebRTC destination stream is never silently empty) without echo.
+  const keepAlive = audioContext.createGain();
+  keepAlive.gain.value = 0;
   const frameSize = rnnoise.frameSize;
   const inputBuffer = new SampleRingBuffer(frameSize * 32);
   const outputBuffer = new SampleRingBuffer(frameSize * 32);
@@ -144,6 +172,8 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
   processor.connect(compressor);
   compressor.connect(limiter);
   limiter.connect(destination);
+  limiter.connect(keepAlive);
+  keepAlive.connect(audioContext.destination);
   void audioContext.resume();
 
   /** Release RNNoise, audio graph nodes, and all media tracks created for the stream. */
@@ -153,6 +183,7 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
     }
     isCleanedUp = true;
     processor.onaudioprocess = null;
+    keepAlive.disconnect();
     limiter.disconnect();
     compressor.disconnect();
     processor.disconnect();

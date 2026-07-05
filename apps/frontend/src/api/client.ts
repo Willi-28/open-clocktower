@@ -103,15 +103,38 @@ export type ClientConfig = {
   iceServers: RTCIceServer[];
 };
 
+/** Room snapshot plus the private per-player credentials returned at create/join. */
+export type PlayerSession = {
+  room: RoomState;
+  player_id: string;
+  player_secret: string;
+};
+
+// The browser only ever holds one active player identity at a time. The secret
+// is kept here and attached to every request, so individual call sites never
+// have to thread it through. It is set at create/join and on session restore.
+let activePlayerSecret: string | null = null;
+
+/** Set (or clear) the bearer secret attached to authenticated requests. */
+export function setActivePlayerSecret(secret: string | null) {
+  activePlayerSecret = secret;
+}
+
+/** Return the active bearer secret, used by the WebSocket client for its handshake. */
+export function getActivePlayerSecret(): string | null {
+  return activePlayerSecret;
+}
+
 /** Send a JSON request to the backend and raise readable errors for failed responses. */
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    ...options,
-  });
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options?.headers as Record<string, string> | undefined),
+  };
+  if (activePlayerSecret) {
+    headers['X-Player-Secret'] = activePlayerSecret;
+  }
+  const response = await fetch(path, { ...options, headers });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
@@ -121,6 +144,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json();
 }
 
+/** Build the auth header for multipart uploads, which bypass the JSON request helper. */
+function uploadHeaders(): Record<string, string> {
+  return activePlayerSecret ? { 'X-Player-Secret': activePlayerSecret } : {};
+}
+
 /** Load runtime browser config such as WebRTC ICE servers. */
 export function getClientConfig() {
   return request<ClientConfig>('/api/client-config');
@@ -128,7 +156,7 @@ export function getClientConfig() {
 
 /** Create a room and make the creator the first storyteller. */
 export function createRoom(name: string, creatorName: string, seatCount: number) {
-  return request<RoomState>('/api/rooms', {
+  return request<PlayerSession>('/api/rooms', {
     method: 'POST',
     body: JSON.stringify({ name, creator_name: creatorName, seat_count: seatCount }),
   });
@@ -159,7 +187,7 @@ export function updateRoom(
 
 /** Join an existing room as player or spectator. */
 export function joinRoom(roomId: string, displayName: string, seatIndex: number | null) {
-  return request<RoomState>(`/api/rooms/${roomId}/players`, {
+  return request<PlayerSession>(`/api/rooms/${roomId}/players`, {
     method: 'POST',
     body: JSON.stringify({ display_name: displayName, seat_index: seatIndex }),
   });
@@ -202,6 +230,7 @@ export async function uploadProfileImage(roomId: string, playerId: string, actor
   const response = await fetch(`/api/rooms/${roomId}/players/${playerId}/avatar`, {
     method: 'POST',
     body: formData,
+    headers: uploadHeaders(),
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
@@ -291,6 +320,7 @@ export async function uploadCharacterPack(roomId: string, actorPlayerId: string,
   const response = await fetch(`/api/rooms/${roomId}/characters/upload`, {
     method: 'POST',
     body: formData,
+    headers: uploadHeaders(),
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));

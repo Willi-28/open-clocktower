@@ -16,8 +16,7 @@ type NightOrderPanelProps = {
 /** Render sorted first-night or other-night character instructions. */
 export function NightOrderPanel({ activeTab, packNightOrder, onSetTab }: NightOrderPanelProps) {
   return (
-    <details className="panel compact night-order-panel">
-      <summary>Night Order</summary>
+    <div className="night-order-panel">
       <div className="segmented-control night-order-tabs" role="tablist" aria-label="Night order phase">
         <button className={activeTab === 'first' ? 'active' : ''} onClick={() => onSetTab('first')} type="button">
           First Night
@@ -53,6 +52,6 @@ export function NightOrderPanel({ activeTab, packNightOrder, onSetTab }: NightOr
           </ol>
         )}
       </section>
-    </details>
+    </div>
   );
 }

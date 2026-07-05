@@ -4,6 +4,7 @@ The hub tracks active WebSocket connections and ephemeral realtime state such
 as raised hands, voice rooms, synced timers, and vote counters.
 """
 
+import json
 from datetime import datetime, timezone
 
 from fastapi import WebSocket
@@ -50,25 +51,26 @@ class RoomHub:
         """Return whether a player still has at least one live WebSocket."""
         return player_id in set(self._rooms.get(room_id, {}).values())
 
+    async def _broadcast_text(self, room_id: str, payload: dict) -> None:
+        """Serialize one payload once and send it to every socket in a room."""
+        # send_json re-serializes per socket; serializing once here matters because
+        # the room snapshot can carry many large base64 avatar data URLs.
+        message = json.dumps(payload)
+        for websocket in list(self._rooms.get(room_id, {})):
+            try:
+                await websocket.send_text(message)
+            except RuntimeError:
+                self.disconnect(room_id, websocket)
+
     async def broadcast_state(self, room: RoomState) -> None:
         """Send a persisted room snapshot to every connected browser."""
         # Sends the current room snapshot to all connected clients in that room.
-        payload = {"type": "game.updated", "payload": room.model_dump(mode="json")}
-        for websocket in list(self._rooms.get(room.id, {})):
-            try:
-                await websocket.send_json(payload)
-            except RuntimeError:
-                self.disconnect(room.id, websocket)
+        await self._broadcast_text(room.id, {"type": "game.updated", "payload": room.model_dump(mode="json")})
 
     async def broadcast_deleted(self, room_id: str) -> None:
         """Notify clients that a room was deleted and clear its ephemeral state."""
         # Tells connected clients that the current room no longer exists.
-        payload = {"type": "room.deleted", "payload": {"roomId": room_id}}
-        for websocket in list(self._rooms.get(room_id, {})):
-            try:
-                await websocket.send_json(payload)
-            except RuntimeError:
-                self.disconnect(room_id, websocket)
+        await self._broadcast_text(room_id, {"type": "room.deleted", "payload": {"roomId": room_id}})
         self._raised_hands.pop(room_id, None)
         self._voice_rooms.pop(room_id, None)
         self._timers.pop(room_id, None)
@@ -77,11 +79,12 @@ class RoomHub:
     async def send_to_players(self, room_id: str, player_ids: set[str], payload: dict) -> None:
         """Send one event only to WebSockets owned by selected players."""
         # Sends private events only to the browsers owned by the addressed players.
+        message = json.dumps(payload)
         for websocket, connected_player_id in list(self._rooms.get(room_id, {}).items()):
             if connected_player_id not in player_ids:
                 continue
             try:
-                await websocket.send_json(payload)
+                await websocket.send_text(message)
             except RuntimeError:
                 self.disconnect(room_id, websocket)
 
@@ -119,11 +122,7 @@ class RoomHub:
     async def broadcast_room_event(self, room_id: str, payload: dict) -> None:
         """Send a lightweight realtime event to every connection in a room."""
         # Sends a lightweight event to every connected browser in the room.
-        for websocket in list(self._rooms.get(room_id, {})):
-            try:
-                await websocket.send_json(payload)
-            except RuntimeError:
-                self.disconnect(room_id, websocket)
+        await self._broadcast_text(room_id, payload)
 
     async def set_voice_room(self, room_id: str, player_id: str, voice_room: str | None) -> None:
         """Track which voice room a player joined and broadcast voice presence."""

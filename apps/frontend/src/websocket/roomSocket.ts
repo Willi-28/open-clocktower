@@ -5,6 +5,7 @@
  * counting, and WebRTC signaling between the frontend and backend.
  */
 
+import { getActivePlayerSecret } from '../api/client';
 import type { RoomState } from '../api/client';
 
 // Events the backend can currently send via WebSocket.
@@ -29,7 +30,13 @@ export type RoomSocketEvent =
 export function openRoomSocket(roomId: string, playerId: string, onEvent: (event: RoomSocketEvent) => void) {
   // Automatically choose the WebSocket protocol based on http/https.
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const params = playerId ? `?player_id=${encodeURIComponent(playerId)}` : '';
+  // Browsers cannot set headers on a WebSocket, so the bearer secret rides in the
+  // query string (encrypted under wss). The server downgrades to a spectator if
+  // the id and secret do not match.
+  const secret = getActivePlayerSecret();
+  const params = playerId
+    ? `?player_id=${encodeURIComponent(playerId)}${secret ? `&secret=${encodeURIComponent(secret)}` : ''}`
+    : '';
   const socket = new WebSocket(`${protocol}://${window.location.host}/ws/rooms/${roomId}${params}`);
   const pendingMessages: string[] = [];
 
@@ -58,7 +65,14 @@ export function openRoomSocket(roomId: string, playerId: string, onEvent: (event
 
   socket.addEventListener('message', (message) => {
     // The backend sends JSON events. The app mostly reacts to game.updated.
-    onEvent(JSON.parse(message.data));
+    // A malformed frame must be ignored rather than throw inside the handler.
+    let event: RoomSocketEvent;
+    try {
+      event = JSON.parse(message.data);
+    } catch {
+      return;
+    }
+    onEvent(event);
   });
 
   return {

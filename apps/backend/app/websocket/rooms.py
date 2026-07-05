@@ -18,11 +18,14 @@ async def room_socket(websocket: WebSocket, room_id: str):
     """Handle one browser's live connection to a room."""
     # Keeps the room connection open and handles lightweight private chat and voice events.
     player_id = websocket.query_params.get("player_id")
+    secret = websocket.query_params.get("secret")
     room = room_store.get_room(room_id)
     if room is None:
         await websocket.close(code=1008)
         return
-    if player_id and find_player(room.players, player_id) is None:
+    # An identity is only accepted when the bearer secret matches; otherwise the
+    # connection is downgraded to a read-only spectator that cannot act as anyone.
+    if player_id and not room_store.authenticate_player(room_id, player_id, secret):
         player_id = None
     await room_hub.connect(room_id, websocket, player_id)
     if player_id:
@@ -32,34 +35,23 @@ async def room_socket(websocket: WebSocket, room_id: str):
     await websocket.send_json({"type": "connected", "payload": {"roomId": room_id}})
     try:
         while True:
-            message = await websocket.receive_json()
-            if message.get("type") == "chat.send" and player_id:
-                await _handle_chat_message(room_id, player_id, message.get("payload", {}))
-            if message.get("type") == "hand.set" and player_id:
-                payload = message.get("payload", {})
-                await room_hub.set_hand_raised(room_id, player_id, bool(payload.get("isRaised")))
-            if message.get("type") == "voice.join" and player_id:
-                payload = message.get("payload", {})
-                voice_room = str(payload.get("voiceRoom", "")).strip() or None
-                if _can_join_voice_room(room_id, player_id, voice_room):
-                    await room_hub.set_voice_room(room_id, player_id, voice_room)
-            if message.get("type") == "voice.leave" and player_id:
-                await room_hub.set_voice_room(room_id, player_id, None)
-            if message.get("type") == "voice.call.request" and player_id:
-                await _forward_voice_call(room_id, player_id, message.get("payload", {}), "voice.call.request")
-            if message.get("type") == "voice.call.accept" and player_id:
-                await _forward_voice_call(room_id, player_id, message.get("payload", {}), "voice.call.accept")
-            if message.get("type") == "voice.call.reject" and player_id:
-                await _forward_voice_reject(room_id, player_id, message.get("payload", {}))
-            if message.get("type") == "voice.signal" and player_id:
-                await _forward_voice_signal(room_id, player_id, message.get("payload", {}))
-            if message.get("type") == "timer.set" and player_id:
-                await _handle_timer(room_id, player_id, message.get("payload", {}))
-            if message.get("type") == "bell.ring" and player_id:
-                await _handle_bell(room_id, player_id)
-            if message.get("type") == "vote_count.set" and player_id:
-                await _handle_vote_count(room_id, player_id, message.get("payload", {}))
+            try:
+                message = await websocket.receive_json()
+            except (ValueError, TypeError, KeyError):
+                # Ignore malformed or non-JSON frames instead of dropping the socket.
+                continue
+            if not isinstance(message, dict):
+                continue
+            try:
+                await _dispatch_message(room_id, player_id, message)
+            except (ValueError, TypeError):
+                # A single bad payload must never tear down the whole connection.
+                continue
     except WebSocketDisconnect:
+        pass
+    finally:
+        # Cleanup must run on every exit path so a room never keeps a stale
+        # socket or a permanently is_connected=True player after a crash.
         room_hub.disconnect(room_id, websocket)
         if player_id and not room_hub.has_player_connection(room_id, player_id):
             await room_hub.set_hand_raised(room_id, player_id, False)
@@ -67,6 +59,40 @@ async def room_socket(websocket: WebSocket, room_id: str):
             room = room_store.set_player_connection(room_id, player_id, False)
             if room is not None:
                 await room_hub.broadcast_state(room)
+
+
+async def _dispatch_message(room_id: str, player_id: str | None, message: dict) -> None:
+    """Route one validated WebSocket message from a known player to its handler."""
+    if not player_id:
+        return
+    payload = message.get("payload", {})
+    if not isinstance(payload, dict):
+        payload = {}
+    message_type = message.get("type")
+    if message_type == "chat.send":
+        await _handle_chat_message(room_id, player_id, payload)
+    elif message_type == "hand.set":
+        await room_hub.set_hand_raised(room_id, player_id, bool(payload.get("isRaised")))
+    elif message_type == "voice.join":
+        voice_room = str(payload.get("voiceRoom", "")).strip() or None
+        if _can_join_voice_room(room_id, player_id, voice_room):
+            await room_hub.set_voice_room(room_id, player_id, voice_room)
+    elif message_type == "voice.leave":
+        await room_hub.set_voice_room(room_id, player_id, None)
+    elif message_type == "voice.call.request":
+        await _forward_voice_call(room_id, player_id, payload, "voice.call.request")
+    elif message_type == "voice.call.accept":
+        await _forward_voice_call(room_id, player_id, payload, "voice.call.accept")
+    elif message_type == "voice.call.reject":
+        await _forward_voice_reject(room_id, player_id, payload)
+    elif message_type == "voice.signal":
+        await _forward_voice_signal(room_id, player_id, payload)
+    elif message_type == "timer.set":
+        await _handle_timer(room_id, player_id, payload)
+    elif message_type == "bell.ring":
+        await _handle_bell(room_id, player_id)
+    elif message_type == "vote_count.set":
+        await _handle_vote_count(room_id, player_id, payload)
 
 
 async def _handle_chat_message(room_id: str, player_id: str, payload: dict) -> None:
@@ -153,17 +179,14 @@ async def _handle_vote_count(room_id: str, player_id: str, payload: dict) -> Non
 
 def _is_storyteller(room_id: str, player_id: str) -> bool:
     """Return whether a connected player is currently the room storyteller."""
-    room = room_store.get_room(room_id)
-    sender = find_player(room.players, player_id) if room else None
-    return bool(sender and sender.is_storyteller)
+    return room_store.is_storyteller(room_id, player_id)
 
 
 def _players_are_in_room(room_id: str, player_id: str, target_player_id: str) -> bool:
     """Check that both voice signaling participants still belong to the room."""
-    room = room_store.get_room(room_id)
-    if room is None:
-        return False
-    return find_player(room.players, player_id) is not None and find_player(room.players, target_player_id) is not None
+    # Uses a single membership query so frequent WebRTC signaling never loads the
+    # full room snapshot (which includes every player's base64 avatar).
+    return room_store.players_in_room(room_id, {player_id, target_player_id})
 
 
 def _can_join_voice_room(room_id: str, player_id: str, voice_room: str | None) -> bool:

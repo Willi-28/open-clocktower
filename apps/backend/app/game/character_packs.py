@@ -22,7 +22,7 @@ ICON_TYPE_NAMES = {
     "image/jpeg": "JPG/JPEG",
     "image/webp": "WEBP",
 }
-MAX_PACK_BYTES = 10 * 1024 * 1024
+MAX_PACK_BYTES = 15 * 1024 * 1024
 MAX_ICON_BYTES = 512 * 1024
 MAX_ARCHIVE_ENTRIES = 1000
 MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
@@ -93,8 +93,10 @@ def parse_character_pack(data: bytes) -> tuple[list[Character], list[ReminderTok
             raise ValueError("manifest must contain at least one character")
 
         seen_token_ids: set[str] = set()
+        seen_visible_tokens: set[tuple[str, str]] = set()
         reminder_tokens: list[ReminderTokenDefinition] = []
-        for raw_token in _raw_reminder_tokens(manifest):
+        raw_tokens = _raw_reminder_tokens(manifest)
+        for raw_token in raw_tokens:
             token_id = str(raw_token.get("id", "")).strip()
             if not token_id or token_id in seen_token_ids:
                 raise ValueError("reminder token ids must be present and unique")
@@ -110,6 +112,10 @@ def parse_character_pack(data: bytes) -> tuple[list[Character], list[ReminderTok
                 or raw_token.get("source_icon_file")
                 or _guess_reminder_token_icon(archive, token_id, raw_token.get("character"), label),
             )
+            visible_signature = _reminder_token_signature(label, icon)
+            if visible_signature in seen_visible_tokens:
+                continue
+            seen_visible_tokens.add(visible_signature)
             reminder_tokens.append(
                 ReminderTokenDefinition(
                     id=token_id,
@@ -121,8 +127,9 @@ def parse_character_pack(data: bytes) -> tuple[list[Character], list[ReminderTok
                     available_languages=supported_languages,
                 )
             )
-        for discovered_token in _discover_reminder_tokens_from_files(archive, seen_token_ids):
-            reminder_tokens.append(discovered_token)
+        if not raw_tokens:
+            for discovered_token in _discover_reminder_tokens_from_files(archive, seen_token_ids):
+                reminder_tokens.append(discovered_token)
         return characters, reminder_tokens
 
 
@@ -230,6 +237,11 @@ def _token_translations(raw_token: dict[str, object], supported_languages: list[
         if clean_translation:
             result[language] = clean_translation
     return result
+
+
+def _reminder_token_signature(label: str, icon: str | None) -> tuple[str, str]:
+    """Return the visible identity used to collapse duplicate token copies."""
+    return (_slug(label), icon or "")
 
 
 def _read_night_order(archive: ZipFile, manifest: dict[str, object]) -> dict[str, dict[str, int | str]]:

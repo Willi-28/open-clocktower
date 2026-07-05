@@ -10,14 +10,20 @@
       "type": "string",
       "enum": [
         "connected",
-        "player.joined",
-        "player.seated",
-        "phase.changed",
-        "nomination.started",
-        "vote.started",
-        "vote.cast",
         "game.updated",
-        "room.settings_updated"
+        "chat.message",
+        "hand.state",
+        "timer.state",
+        "vote_count.state",
+        "bell.ring",
+        "nomination.executed",
+        "voice.state",
+        "voice.call.request",
+        "voice.call.accept",
+        "voice.call.reject",
+        "voice.signal",
+        "room.kicked",
+        "room.deleted"
       ]
     },
     "payload": {

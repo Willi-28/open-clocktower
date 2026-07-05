@@ -6,7 +6,7 @@ changing game state, uploading assets, assigning roles, and broadcasting updates
 
 import base64
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
 
 from app.game.room_state import (
     AssignCharacterRequest,
@@ -26,7 +26,7 @@ from app.game.room_state import (
     VoteRequest,
 )
 from app.game.character_packs import MAX_PACK_BYTES, parse_character_pack
-from app.game.media_validation import validate_profile_image
+from app.game.media_validation import MAX_PROFILE_IMAGE_BYTES, validate_profile_image
 from app.game.store import room_store
 from app.websocket.room_hub import room_hub
 
@@ -34,13 +34,35 @@ from app.websocket.room_hub import room_hub
 # Every write action persists to PostgreSQL first, then broadcasts the new room state.
 router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 
+_UPLOAD_CHUNK_BYTES = 64 * 1024
+
+
+async def _read_upload_capped(file: UploadFile, max_bytes: int) -> bytes:
+    """Read an upload in chunks and abort once it exceeds the allowed size.
+
+    Starlette buffers multipart bodies without any global limit, so reading the
+    whole file first would let a huge POST exhaust memory. Streaming with a
+    running cap keeps memory bounded regardless of the declared Content-Length.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(_UPLOAD_CHUNK_BYTES)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(status_code=413, detail="Upload is too large")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
 
 @router.post("")
 async def create_room(request: CreateRoomRequest):
-    """Create a new room and broadcast its initial state."""
-    room = room_store.create_room(request)
-    await room_hub.broadcast_state(room)
-    return room
+    """Create a new room and return the founder's private session credentials."""
+    session = room_store.create_room(request)
+    await room_hub.broadcast_state(session.room)
+    return session
 
 
 @router.get("/{room_id}")
@@ -53,10 +75,10 @@ def get_room(room_id: str):
 
 
 @router.patch("/{room_id}")
-async def update_room(room_id: str, request: UpdateRoomRequest):
+async def update_room(room_id: str, request: UpdateRoomRequest, x_player_secret: str | None = Header(default=None)):
     """Apply storyteller-owned room setting changes."""
     try:
-        room = room_store.update_room(room_id, request)
+        room = room_store.update_room(room_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -69,22 +91,26 @@ async def update_room(room_id: str, request: UpdateRoomRequest):
 
 @router.post("/{room_id}/players")
 async def join_room(room_id: str, request: JoinRoomRequest):
-    """Join an existing room as a player or spectator."""
+    """Join an existing room and return the new player's private session credentials."""
     try:
-        room = room_store.join_room(room_id, request)
+        session = room_store.join_room(room_id, request)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    if room is None:
+    if session is None:
         raise HTTPException(status_code=404, detail="Room not found")
-    await room_hub.broadcast_state(room)
-    return room
+    await room_hub.broadcast_state(session.room)
+    return session
 
 
 @router.post("/{room_id}/storyteller")
-async def set_storyteller(room_id: str, request: SetStorytellerRequest):
+async def set_storyteller(
+    room_id: str,
+    request: SetStorytellerRequest,
+    x_player_secret: str | None = Header(default=None),
+):
     """Transfer the storyteller role to another player when allowed."""
     try:
-        room = room_store.set_storyteller(room_id, request)
+        room = room_store.set_storyteller(room_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -94,11 +120,18 @@ async def set_storyteller(room_id: str, request: SetStorytellerRequest):
 
 
 @router.patch("/{room_id}/players/{player_id}")
-async def update_player(room_id: str, player_id: str, request: UpdatePlayerRequest):
+async def update_player(
+    room_id: str,
+    player_id: str,
+    request: UpdatePlayerRequest,
+    x_player_secret: str | None = Header(default=None),
+):
     """Update one player's seat, status, or dead-vote state."""
     try:
-        room = room_store.update_player(room_id, player_id, request)
+        room = room_store.update_player(room_id, player_id, request, x_player_secret)
     except ValueError as error:
+        if str(error) == "seat changes are too frequent":
+            raise HTTPException(status_code=429, detail=str(error)) from error
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
         raise HTTPException(status_code=404, detail="Room or player not found")
@@ -107,11 +140,16 @@ async def update_player(room_id: str, player_id: str, request: UpdatePlayerReque
 
 
 @router.delete("/{room_id}/players/{player_id}")
-async def leave_room(room_id: str, player_id: str, request: LeaveRoomRequest):
+async def leave_room(
+    room_id: str,
+    player_id: str,
+    request: LeaveRoomRequest,
+    x_player_secret: str | None = Header(default=None),
+):
     """Remove a player from a room by self-leave or storyteller kick."""
     was_kick = request.actor_player_id != player_id
     try:
-        room = room_store.leave_room(room_id, player_id, request.actor_player_id)
+        room = room_store.leave_room(room_id, player_id, request.actor_player_id, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -128,9 +166,10 @@ async def upload_player_avatar(
     player_id: str,
     actor_player_id: str = Form(...),
     file: UploadFile = File(...),
+    x_player_secret: str | None = Header(default=None),
 ):
     """Validate and store one player's uploaded avatar image."""
-    data = await file.read()
+    data = await _read_upload_capped(file, MAX_PROFILE_IMAGE_BYTES)
     media_type = file.content_type or ""
     try:
         validate_profile_image(file.filename or "", media_type, data)
@@ -138,7 +177,9 @@ async def upload_player_avatar(
         raise HTTPException(status_code=400, detail=str(error)) from error
     encoded = base64.b64encode(data).decode("ascii")
     try:
-        room = room_store.set_player_avatar(room_id, player_id, actor_player_id, f"data:{media_type};base64,{encoded}")
+        room = room_store.set_player_avatar(
+            room_id, player_id, actor_player_id, x_player_secret, f"data:{media_type};base64,{encoded}"
+        )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -148,10 +189,10 @@ async def upload_player_avatar(
 
 
 @router.post("/{room_id}/phase")
-async def set_phase(room_id: str, request: PhaseRequest):
+async def set_phase(room_id: str, request: PhaseRequest, x_player_secret: str | None = Header(default=None)):
     """Move the room between lobby, day, and night phases."""
     try:
-        room = room_store.set_phase(room_id, request)
+        room = room_store.set_phase(room_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -163,10 +204,14 @@ async def set_phase(room_id: str, request: PhaseRequest):
 
 
 @router.post("/{room_id}/nominations")
-async def start_nomination(room_id: str, request: StartNominationRequest):
+async def start_nomination(
+    room_id: str,
+    request: StartNominationRequest,
+    x_player_secret: str | None = Header(default=None),
+):
     """Start a storyteller-approved nomination immediately."""
     try:
-        room = room_store.start_nomination(room_id, request)
+        room = room_store.start_nomination(room_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -176,10 +221,14 @@ async def start_nomination(room_id: str, request: StartNominationRequest):
 
 
 @router.post("/{room_id}/nomination-requests")
-async def request_nomination(room_id: str, request: PlayerNominationRequest):
+async def request_nomination(
+    room_id: str,
+    request: PlayerNominationRequest,
+    x_player_secret: str | None = Header(default=None),
+):
     """Create a player nomination request for storyteller approval."""
     try:
-        room = room_store.request_nomination(room_id, request)
+        room = room_store.request_nomination(room_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -189,10 +238,15 @@ async def request_nomination(room_id: str, request: PlayerNominationRequest):
 
 
 @router.delete("/{room_id}/nomination-requests/{request_id}")
-async def reject_nomination_request(room_id: str, request_id: str, request: StorytellerActionRequest):
+async def reject_nomination_request(
+    room_id: str,
+    request_id: str,
+    request: StorytellerActionRequest,
+    x_player_secret: str | None = Header(default=None),
+):
     """Reject and remove a pending nomination request."""
     try:
-        room = room_store.reject_nomination_request(room_id, request_id, request)
+        room = room_store.reject_nomination_request(room_id, request_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -202,10 +256,10 @@ async def reject_nomination_request(room_id: str, request_id: str, request: Stor
 
 
 @router.post("/{room_id}/votes")
-async def cast_vote(room_id: str, request: VoteRequest):
+async def cast_vote(room_id: str, request: VoteRequest, x_player_secret: str | None = Header(default=None)):
     """Record or replace one player's vote for the active nomination."""
     try:
-        room = room_store.cast_vote(room_id, request)
+        room = room_store.cast_vote(room_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -215,10 +269,10 @@ async def cast_vote(room_id: str, request: VoteRequest):
 
 
 @router.post("/{room_id}/votes/close")
-async def close_vote(room_id: str, request: StorytellerActionRequest):
+async def close_vote(room_id: str, request: StorytellerActionRequest, x_player_secret: str | None = Header(default=None)):
     """Close the active vote without executing the nominee."""
     try:
-        room = room_store.close_vote(room_id, request)
+        room = room_store.close_vote(room_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -228,10 +282,10 @@ async def close_vote(room_id: str, request: StorytellerActionRequest):
 
 
 @router.post("/{room_id}/executions")
-async def execute_nominee(room_id: str, request: ExecuteNomineeRequest):
+async def execute_nominee(room_id: str, request: ExecuteNomineeRequest, x_player_secret: str | None = Header(default=None)):
     """Execute the active nominee after the backend validates vote threshold."""
     try:
-        room = room_store.execute_nominee(room_id, request)
+        room = room_store.execute_nominee(room_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -242,10 +296,10 @@ async def execute_nominee(room_id: str, request: ExecuteNomineeRequest):
 
 
 @router.post("/{room_id}/reset")
-async def reset_game(room_id: str, request: StorytellerActionRequest):
+async def reset_game(room_id: str, request: StorytellerActionRequest, x_player_secret: str | None = Header(default=None)):
     """Reset gameplay state so the same room can start a fresh match."""
     try:
-        room = room_store.reset_game(room_id, request)
+        room = room_store.reset_game(room_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -255,10 +309,10 @@ async def reset_game(room_id: str, request: StorytellerActionRequest):
 
 
 @router.delete("/{room_id}")
-async def delete_room(room_id: str, request: StorytellerActionRequest):
+async def delete_room(room_id: str, request: StorytellerActionRequest, x_player_secret: str | None = Header(default=None)):
     """Delete a room when requested by the storyteller."""
     try:
-        deleted = room_store.delete_room(room_id, request.actor_player_id)
+        deleted = room_store.delete_room(room_id, request.actor_player_id, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if not deleted:
@@ -272,14 +326,13 @@ async def upload_characters(
     room_id: str,
     actor_player_id: str = Form(...),
     file: UploadFile = File(...),
+    x_player_secret: str | None = Header(default=None),
 ):
     """Parse and replace the room's character pack."""
-    data = await file.read()
-    if len(data) > MAX_PACK_BYTES:
-        raise HTTPException(status_code=400, detail="Character pack is too large")
+    data = await _read_upload_capped(file, MAX_PACK_BYTES)
     try:
         characters, reminder_tokens = parse_character_pack(data)
-        room = room_store.replace_pack(room_id, actor_player_id, characters, reminder_tokens)
+        room = room_store.replace_pack(room_id, actor_player_id, x_player_secret, characters, reminder_tokens)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -307,10 +360,14 @@ def list_reminder_tokens(room_id: str, language: str | None = None):
 
 
 @router.post("/{room_id}/character-assignments")
-async def assign_character(room_id: str, request: AssignCharacterRequest):
+async def assign_character(
+    room_id: str,
+    request: AssignCharacterRequest,
+    x_player_secret: str | None = Header(default=None),
+):
     """Assign one specific character to one player."""
     try:
-        assignments = room_store.assign_character(room_id, request)
+        assignments = room_store.assign_character(room_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if assignments is None:
@@ -322,10 +379,14 @@ async def assign_character(room_id: str, request: AssignCharacterRequest):
 
 
 @router.post("/{room_id}/character-assignments/random")
-async def assign_random_characters(room_id: str, request: RandomAssignCharactersRequest):
+async def assign_random_characters(
+    room_id: str,
+    request: RandomAssignCharactersRequest,
+    x_player_secret: str | None = Header(default=None),
+):
     """Shuffle selected characters across currently seated players."""
     try:
-        assignments = room_store.assign_random_characters(room_id, request)
+        assignments = room_store.assign_random_characters(room_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if assignments is None:
@@ -337,19 +398,30 @@ async def assign_random_characters(room_id: str, request: RandomAssignCharacters
 
 
 @router.get("/{room_id}/character-assignments")
-def list_character_assignments(room_id: str, viewer_player_id: str):
+def list_character_assignments(
+    room_id: str,
+    viewer_player_id: str,
+    x_player_secret: str | None = Header(default=None),
+):
     """Return character assignments visible to the requesting viewer."""
-    assignments = room_store.list_assignments(room_id, viewer_player_id)
+    try:
+        assignments = room_store.list_assignments(room_id, viewer_player_id, x_player_secret)
+    except ValueError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
     if assignments is None:
         raise HTTPException(status_code=404, detail="Room or viewer not found")
     return assignments
 
 
 @router.get("/{room_id}/demon-bluffs")
-def list_demon_bluffs(room_id: str, viewer_player_id: str):
+def list_demon_bluffs(
+    room_id: str,
+    viewer_player_id: str,
+    x_player_secret: str | None = Header(default=None),
+):
     """Return storyteller-only demon bluff character ids."""
     try:
-        bluffs = room_store.list_demon_bluffs(room_id, viewer_player_id)
+        bluffs = room_store.list_demon_bluffs(room_id, viewer_player_id, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=403, detail=str(error)) from error
     if bluffs is None:
@@ -358,10 +430,10 @@ def list_demon_bluffs(room_id: str, viewer_player_id: str):
 
 
 @router.post("/{room_id}/demon-bluffs")
-async def set_demon_bluffs(room_id: str, request: DemonBluffsRequest):
+async def set_demon_bluffs(room_id: str, request: DemonBluffsRequest, x_player_secret: str | None = Header(default=None)):
     """Replace the storyteller's selected demon bluff characters."""
     try:
-        bluffs = room_store.set_demon_bluffs(room_id, request)
+        bluffs = room_store.set_demon_bluffs(room_id, request, x_player_secret)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if bluffs is None:

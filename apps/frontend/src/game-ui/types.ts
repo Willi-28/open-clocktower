@@ -19,4 +19,6 @@ export type ChatMessage = {
   fromPlayerId: string;
   toPlayerId: string | null;
   text: string;
+  /** Local receive time (ms); stamped when the message is appended. */
+  at?: number;
 };

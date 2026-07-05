@@ -9,6 +9,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { RoomState, updatePlayer } from '../../api/client';
 
+const seatMoveFlushDelayMs = 450;
+const seatMoveRenderThrottleMs = 160;
+const seatRateLimitMessage = 'seat changes are too frequent';
+
 type PendingSeatMove = {
   playerId: string;
   roomId: string;
@@ -36,6 +40,9 @@ export function useOptimisticSeatMove({
   const [optimisticSeatIndex, setOptimisticSeatIndex] = useState<number | null | undefined>(undefined);
   const seatMoveInFlightRef = useRef(false);
   const seatMoveTimeoutRef = useRef<number | null>(null);
+  const optimisticSeatTimeoutRef = useRef<number | null>(null);
+  const pendingOptimisticSeatIndexRef = useRef<number | null | undefined>(undefined);
+  const nextOptimisticSeatUpdateAtRef = useRef(0);
   const pendingSeatMoveRef = useRef<PendingSeatMove | null>(null);
   const seatContextRef = useRef({ roomId: room?.id, playerId: currentPlayerId });
   seatContextRef.current = { roomId: room?.id, playerId: currentPlayerId };
@@ -57,6 +64,12 @@ export function useOptimisticSeatMove({
       window.clearTimeout(seatMoveTimeoutRef.current);
       seatMoveTimeoutRef.current = null;
     }
+    if (optimisticSeatTimeoutRef.current !== null) {
+      window.clearTimeout(optimisticSeatTimeoutRef.current);
+      optimisticSeatTimeoutRef.current = null;
+    }
+    pendingOptimisticSeatIndexRef.current = undefined;
+    nextOptimisticSeatUpdateAtRef.current = 0;
     pendingSeatMoveRef.current = null;
     setOptimisticSeatIndex(undefined);
   }, [room?.id, currentPlayerId]);
@@ -66,8 +79,40 @@ export function useOptimisticSeatMove({
       if (seatMoveTimeoutRef.current !== null) {
         window.clearTimeout(seatMoveTimeoutRef.current);
       }
+      if (optimisticSeatTimeoutRef.current !== null) {
+        window.clearTimeout(optimisticSeatTimeoutRef.current);
+      }
     };
   }, []);
+
+  /** Update the local seat preview at a capped rate during rapid clicks. */
+  function scheduleOptimisticSeatUpdate(seatIndex: number | null) {
+    const now = Date.now();
+    const remaining = nextOptimisticSeatUpdateAtRef.current - now;
+    pendingOptimisticSeatIndexRef.current = seatIndex;
+    if (remaining <= 0) {
+      if (optimisticSeatTimeoutRef.current !== null) {
+        window.clearTimeout(optimisticSeatTimeoutRef.current);
+        optimisticSeatTimeoutRef.current = null;
+      }
+      pendingOptimisticSeatIndexRef.current = undefined;
+      nextOptimisticSeatUpdateAtRef.current = now + seatMoveRenderThrottleMs;
+      setOptimisticSeatIndex(seatIndex);
+      return;
+    }
+    if (optimisticSeatTimeoutRef.current !== null) {
+      return;
+    }
+    optimisticSeatTimeoutRef.current = window.setTimeout(() => {
+      optimisticSeatTimeoutRef.current = null;
+      const pendingSeatIndex = pendingOptimisticSeatIndexRef.current;
+      pendingOptimisticSeatIndexRef.current = undefined;
+      if (pendingSeatIndex !== undefined) {
+        nextOptimisticSeatUpdateAtRef.current = Date.now() + seatMoveRenderThrottleMs;
+        setOptimisticSeatIndex(pendingSeatIndex);
+      }
+    }, remaining);
+  }
 
   /** Schedule the latest pending seat move after the rapid-click debounce window. */
   function scheduleSeatMoveFlush() {
@@ -79,7 +124,7 @@ export function useOptimisticSeatMove({
       if (!seatMoveInFlightRef.current) {
         void flushSeatMoves();
       }
-    }, 450);
+    }, seatMoveFlushDelayMs);
   }
 
   /** Persist queued seat moves one at a time and keep only the latest request. */
@@ -99,8 +144,12 @@ export function useOptimisticSeatMove({
           }
         } catch (caught) {
           if (!pendingSeatMoveRef.current) {
+            const message = caught instanceof Error ? caught.message : 'Could not change seat';
             setOptimisticSeatIndex(undefined);
-            setError(caught instanceof Error ? caught.message : 'Could not change seat');
+            pendingOptimisticSeatIndexRef.current = undefined;
+            if (message !== seatRateLimitMessage) {
+              setError(message);
+            }
           }
         }
       }
@@ -118,16 +167,17 @@ export function useOptimisticSeatMove({
     if (!room || !currentPlayerId || !canChangeSeats || currentPlayer?.is_storyteller) {
       return;
     }
-    if ((optimisticSeatIndex ?? currentPlayer?.seat_index ?? null) === seatIndex) {
+    const currentQueuedSeatIndex = pendingSeatMoveRef.current?.seatIndex ?? pendingOptimisticSeatIndexRef.current ?? optimisticSeatIndex ?? currentPlayer?.seat_index ?? null;
+    if (currentQueuedSeatIndex === seatIndex) {
       return;
     }
 
     // Seat clicks can happen much faster than the API and WebSocket broadcast
-    // path. Show the latest choice immediately, but persist only after a short
-    // pause so rapid seat-scrubbing does not flood the server or connected browsers.
+    // path. Preview at a capped rate and persist only after a short pause so
+    // rapid seat-scrubbing does not flood the browser, server, or other clients.
     setError('');
-    setOptimisticSeatIndex(seatIndex);
     pendingSeatMoveRef.current = { roomId: room.id, playerId: currentPlayerId, seatIndex };
+    scheduleOptimisticSeatUpdate(seatIndex);
     scheduleSeatMoveFlush();
   }
 

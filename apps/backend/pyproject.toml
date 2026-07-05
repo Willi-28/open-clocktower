@@ -4,12 +4,15 @@ version = "0.1.0"
 description = "Backend for Open Clocktower"
 requires-python = ">=3.12"
 dependencies = [
-  "fastapi",
-  "uvicorn[standard]",
-  "pydantic",
-  "sqlalchemy",
-  "psycopg[binary]",
-  "python-multipart"
+  # Compatible-release ranges: keep production builds reproducible and prevent a
+  # silent major-version jump on a fresh image build. The code targets Pydantic v2
+  # (model_dump) and SQLAlchemy 2.0 (Mapped/mapped_column).
+  "fastapi>=0.110,<1.0",
+  "uvicorn[standard]>=0.29,<1.0",
+  "pydantic>=2.6,<3.0",
+  "sqlalchemy>=2.0,<3.0",
+  "psycopg[binary]>=3.1,<4.0",
+  "python-multipart>=0.0.9"
 ]
 
 [tool.setuptools.packages.find]

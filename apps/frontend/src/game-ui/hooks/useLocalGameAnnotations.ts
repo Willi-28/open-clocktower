@@ -12,6 +12,25 @@ import type { ReminderToken } from '../types';
 import { guessKey, reminderKey } from '../sessionStorage';
 import type { ReminderTokenOption } from '../reminderTokens';
 
+/** Read and validate one JSON localStorage entry, returning a fallback on any error. */
+function readStoredJson<T>(key: string, isValid: (value: unknown) => boolean, fallback: T): T {
+  const raw = localStorage.getItem(key);
+  if (!raw) {
+    return fallback;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isValid(parsed) ? (parsed as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Return whether a parsed value is a plain object usable as the guesses map. */
+function isGuessMap(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 type UseLocalGameAnnotationsOptions = {
   currentPlayerId: string;
   reminderTokenOptions: ReminderTokenOption[];
@@ -38,10 +57,10 @@ export function useLocalGameAnnotations({
 
   useEffect(() => {
     if (room && currentPlayerId) {
-      const savedGuesses = localStorage.getItem(guessKey(room.id, currentPlayerId));
-      setGuesses(savedGuesses ? JSON.parse(savedGuesses) : {});
-      const savedReminders = localStorage.getItem(reminderKey(room.id, currentPlayerId));
-      setReminders(savedReminders ? JSON.parse(savedReminders) : []);
+      // A single corrupted localStorage entry must not throw and crash the app
+      // on room load, so parsing falls back to empty defaults on any error.
+      setGuesses(readStoredJson<Record<string, string>>(guessKey(room.id, currentPlayerId), isGuessMap, {}));
+      setReminders(readStoredJson<ReminderToken[]>(reminderKey(room.id, currentPlayerId), Array.isArray, []));
     }
   }, [room?.id, currentPlayerId]);
 

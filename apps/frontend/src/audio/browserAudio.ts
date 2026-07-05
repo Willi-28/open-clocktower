@@ -10,6 +10,7 @@ import churchBellUrl from './church_bell.mp3';
 import nominateKillUrl from './nominate_kill.mp3';
 
 let soundEffectsVolume = 1;
+let sharedAudioContext: AudioContext | null = null;
 
 export type AudioElementWithSink = HTMLAudioElement & {
   setSinkId?: (sinkId: string) => Promise<void>;
@@ -22,6 +23,26 @@ export type MediaDevicesWithOutputPicker = MediaDevices & {
 /** Store the global sound-effects volume after clamping it to a safe range. */
 export function setSoundEffectsVolume(volume: number) {
   soundEffectsVolume = Math.max(0, Math.min(2, volume));
+}
+
+/**
+ * Return a single lazily-created AudioContext, resumed on demand.
+ *
+ * Browsers cap how many AudioContexts a page may open, so every short tone
+ * and the per-player voice volume boost reuse this one instead of creating
+ * (and leaking) a fresh context each time.
+ */
+export function getSharedAudioContext(): AudioContext | null {
+  const AudioContextClass =
+    window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) {
+    return null;
+  }
+  if (sharedAudioContext === null || sharedAudioContext.state === 'closed') {
+    sharedAudioContext = new AudioContextClass();
+  }
+  void sharedAudioContext.resume?.();
+  return sharedAudioContext;
 }
 
 /** Connect an audio node through the shared sound-effects gain control. */
@@ -45,12 +66,10 @@ export async function setAudioSink(audio: HTMLAudioElement, sinkId: string): Pro
 
 /** Play a short tone for joining, leaving, or receiving a voice call. */
 export function playVoiceTone(kind: 'join' | 'leave' | 'call') {
-  const AudioContextClass =
-    window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextClass) {
+  const audioContext = getSharedAudioContext();
+  if (!audioContext) {
     return;
   }
-  const audioContext = new AudioContextClass();
   const gain = audioContext.createGain();
   const oscillator = audioContext.createOscillator();
   const frequency = kind === 'join' ? 720 : kind === 'leave' ? 360 : 560;
@@ -70,13 +89,10 @@ export function playVoiceTone(kind: 'join' | 'leave' | 'call') {
 
 /** Play the two-note text chat notification tone. */
 export function playMessageTone() {
-  const AudioContextClass =
-    window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextClass) {
+  const audioContext = getSharedAudioContext();
+  if (!audioContext) {
     return;
   }
-  const audioContext = new AudioContextClass();
-  void audioContext.resume?.();
 
   [0, 0.09].forEach((offset, index) => {
     const gain = audioContext.createGain();
@@ -95,13 +111,10 @@ export function playMessageTone() {
 
 /** Play a small ascending or descending tone for mute state changes. */
 export function playMuteToggleTone(isMuted: boolean) {
-  const AudioContextClass =
-    window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextClass) {
+  const audioContext = getSharedAudioContext();
+  if (!audioContext) {
     return;
   }
-  const audioContext = new AudioContextClass();
-  void audioContext.resume?.();
   const frequencies = isMuted ? [520, 330] : [330, 520];
   frequencies.forEach((frequency, index) => {
     const offset = index * 0.075;
@@ -135,14 +148,14 @@ export function playTickTone() {
 /** Play the church bell used by timer alarms and manual bell rings. */
 export function playTimerAlarm() {
   const audio = new Audio(churchBellUrl);
-  audio.volume = Math.min(1, 0.72 * soundEffectsVolume);
+  audio.volume = Math.min(1, 0.6 * soundEffectsVolume);
   audio.play().catch(() => undefined);
 }
 
 /** Play the execution sound after a nominee is successfully killed. */
 export function playNominationKillSound() {
   const audio = new Audio(nominateKillUrl);
-  audio.volume = Math.min(1, 0.78 * soundEffectsVolume);
+  audio.volume = Math.min(1, 0.5 * soundEffectsVolume);
   audio.play().catch(() => undefined);
 }
 

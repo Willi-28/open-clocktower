@@ -10,6 +10,11 @@ export function sessionKey(roomId: string) {
   return `open-clocktower:${roomId}:player`;
 }
 
+/** Build the room-local key that stores the current player's bearer secret. */
+export function secretKey(roomId: string) {
+  return `open-clocktower:${roomId}:secret`;
+}
+
 /** Build the key that stores the last room/player session pointer. */
 export function lastSessionKey() {
   return 'open-clocktower:last-session';

@@ -9,9 +9,10 @@ import { useEffect, useRef } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 
 import { playMessageTone, playNominationKillSound, playVoiceTone, ringBell } from '../../audio/browserAudio';
+import { setActivePlayerSecret } from '../../api/client';
 import type { RoomState } from '../../api/client';
 import { openRoomSocket } from '../../websocket/roomSocket';
-import { lastSessionKey, sessionKey } from '../sessionStorage';
+import { lastSessionKey, secretKey, sessionKey } from '../sessionStorage';
 import type { VoiceParticipant } from '../voiceRooms';
 
 type RoomSocketRef = MutableRefObject<ReturnType<typeof openRoomSocket> | null>;
@@ -189,7 +190,9 @@ export function useRoomSocketEvents({
       if (event.type === 'room.deleted') {
         handlers.endVoiceSession({ notifyServer: false, playTone: true });
         localStorage.removeItem(sessionKey(event.payload.roomId));
+        localStorage.removeItem(secretKey(event.payload.roomId));
         localStorage.removeItem(lastSessionKey());
+        setActivePlayerSecret(null);
         handlers.setVoiceParticipants([]);
         handlers.setIncomingVoiceCall(null);
         handlers.setRaisedHandPlayerIds([]);
@@ -199,7 +202,9 @@ export function useRoomSocketEvents({
       if (event.type === 'room.kicked') {
         handlers.endVoiceSession({ notifyServer: false, playTone: true });
         localStorage.removeItem(sessionKey(event.payload.roomId));
+        localStorage.removeItem(secretKey(event.payload.roomId));
         localStorage.removeItem(lastSessionKey());
+        setActivePlayerSecret(null);
         handlers.setVoiceParticipants([]);
         handlers.setIncomingVoiceCall(null);
         handlers.setRaisedHandPlayerIds([]);

@@ -17,14 +17,25 @@ export type ReminderTokenOption = {
 
 /** Convert imported reminder token definitions into selectable UI options. */
 export function buildReminderTokenOptions(tokens: ReminderTokenDefinition[]): ReminderTokenOption[] {
+  const seenVisibleTokens = new Set<string>();
   return tokens
     .filter((token) => token.icon)
-    .map((token) => ({
-      id: token.id,
-      label: token.label,
-      title: token.character ? `${token.character}: ${token.label}` : token.label,
-      icon: token.icon ?? '',
-    }));
+    .flatMap((token) => {
+      const icon = token.icon ?? '';
+      const signature = `${token.label.trim().toLocaleLowerCase()}\n${icon}`;
+      if (seenVisibleTokens.has(signature)) {
+        return [];
+      }
+      seenVisibleTokens.add(signature);
+      return [
+        {
+          id: token.id,
+          label: token.label,
+          title: token.character ? `${token.character}: ${token.label}` : token.label,
+          icon,
+        },
+      ];
+    });
 }
 
 /** Enrich placed reminders with the latest label and icon from token options. */

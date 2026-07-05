@@ -42,21 +42,24 @@ class RoomModel(Base):
         back_populates="room",
         cascade="all, delete-orphan",
         order_by="PlayerModel.created_at",
+        passive_deletes=True,
     )
-    nominations: Mapped[list["NominationModel"]] = relationship(back_populates="room", cascade="all, delete-orphan")
+    nominations: Mapped[list["NominationModel"]] = relationship(back_populates="room", cascade="all, delete-orphan", passive_deletes=True)
     nomination_requests: Mapped[list["NominationRequestModel"]] = relationship(
         back_populates="room",
         cascade="all, delete-orphan",
+        passive_deletes=True,
     )
-    characters: Mapped[list["CharacterModel"]] = relationship(back_populates="room", cascade="all, delete-orphan")
-    reminder_tokens: Mapped[list["ReminderTokenModel"]] = relationship(back_populates="room", cascade="all, delete-orphan")
+    characters: Mapped[list["CharacterModel"]] = relationship(back_populates="room", cascade="all, delete-orphan", passive_deletes=True)
+    reminder_tokens: Mapped[list["ReminderTokenModel"]] = relationship(back_populates="room", cascade="all, delete-orphan", passive_deletes=True)
     character_assignments: Mapped[list["CharacterAssignmentModel"]] = relationship(
         back_populates="room",
         cascade="all, delete-orphan",
+        passive_deletes=True,
     )
-    demon_bluffs: Mapped[list["DemonBluffModel"]] = relationship(back_populates="room", cascade="all, delete-orphan")
-    votes: Mapped[list["VoteModel"]] = relationship(back_populates="room", cascade="all, delete-orphan")
-    player_avatars: Mapped[list["PlayerAvatarModel"]] = relationship(back_populates="room", cascade="all, delete-orphan")
+    demon_bluffs: Mapped[list["DemonBluffModel"]] = relationship(back_populates="room", cascade="all, delete-orphan", passive_deletes=True)
+    votes: Mapped[list["VoteModel"]] = relationship(back_populates="room", cascade="all, delete-orphan", passive_deletes=True)
+    player_avatars: Mapped[list["PlayerAvatarModel"]] = relationship(back_populates="room", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class PlayerModel(Base):
@@ -75,6 +78,9 @@ class PlayerModel(Base):
     has_dead_vote: Mapped[bool] = mapped_column(Boolean, default=True)
     is_connected: Mapped[bool] = mapped_column(Boolean, default=True)
     is_storyteller: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Per-player bearer secret. Never included in the public RoomState snapshot;
+    # only the owning client learns it (at create/join) and presents it to act.
+    secret: Mapped[str] = mapped_column(String(64), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     room: Mapped[RoomModel] = relationship(back_populates="players")
@@ -158,6 +164,7 @@ class CharacterModel(Base):
     category: Mapped[str] = mapped_column(String(80))
     ability: Mapped[str] = mapped_column(Text)
     icon: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
     first_night: Mapped[int] = mapped_column(Integer, default=0)
     first_night_reminder: Mapped[str] = mapped_column(Text, default="")
     other_night: Mapped[int] = mapped_column(Integer, default=0)

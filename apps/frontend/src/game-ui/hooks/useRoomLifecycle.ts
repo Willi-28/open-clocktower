@@ -11,15 +11,17 @@ import type { Dispatch, SetStateAction } from 'react';
 import {
   createRoom,
   deleteRoom,
+  getActivePlayerSecret,
   getRoom,
   joinRoom,
   leaveRoom,
   RoomState,
+  setActivePlayerSecret,
   uploadCharacterPack,
 } from '../../api/client';
 import type { VoiceParticipant } from '../voiceRooms';
 import { defaultSeatCount } from '../gameConfig';
-import { lastSessionKey, sessionKey } from '../sessionStorage';
+import { lastSessionKey, secretKey, sessionKey } from '../sessionStorage';
 
 type UseRoomLifecycleOptions = {
   characterPackFile: File | null;
@@ -65,8 +67,15 @@ export function useRoomLifecycle({
       return;
     }
     try {
-      const parsed = JSON.parse(savedSession) as { roomId?: string; playerId?: string };
+      const parsed = JSON.parse(savedSession) as { roomId?: string; playerId?: string; secret?: string };
       if (!parsed.roomId || !parsed.playerId) {
+        return;
+      }
+      const savedSecret = parsed.secret || localStorage.getItem(secretKey(parsed.roomId)) || '';
+      if (!savedSecret) {
+        // A session without credentials cannot act on the server, so drop it and
+        // let the player rejoin cleanly instead of restoring a dead identity.
+        localStorage.removeItem(lastSessionKey());
         return;
       }
       void getRoom(parsed.roomId).then((savedRoom) => {
@@ -74,6 +83,7 @@ export function useRoomLifecycle({
           localStorage.removeItem(lastSessionKey());
           return;
         }
+        setActivePlayerSecret(savedSecret);
         setRoom(savedRoom);
         setCurrentPlayerId(parsed.playerId ?? '');
         setSelectedPlayerId(parsed.playerId ?? '');
@@ -85,8 +95,15 @@ export function useRoomLifecycle({
 
   useEffect(() => {
     if (room && currentPlayerId) {
+      const secret = getActivePlayerSecret();
       localStorage.setItem(sessionKey(room.id), currentPlayerId);
-      localStorage.setItem(lastSessionKey(), JSON.stringify({ roomId: room.id, playerId: currentPlayerId }));
+      if (secret) {
+        localStorage.setItem(secretKey(room.id), secret);
+      }
+      localStorage.setItem(
+        lastSessionKey(),
+        JSON.stringify({ roomId: room.id, playerId: currentPlayerId, secret: secret ?? undefined }),
+      );
     }
   }, [room?.id, currentPlayerId]);
 
@@ -116,17 +133,13 @@ export function useRoomLifecycle({
       return;
     }
     try {
-      const nextRoom = await createRoom(roomName, displayName, defaultSeatCount);
-      const founder = nextRoom.players.find((player) => player.is_storyteller);
-      if (founder) {
-        await uploadCharacterPack(nextRoom.id, founder.id, characterPackFile);
-        const hydratedRoom = await getRoom(nextRoom.id);
-        setRoom(hydratedRoom);
-        setCurrentPlayerId(founder.id);
-        setSelectedPlayerId(founder.id);
-      } else {
-        setRoom(nextRoom);
-      }
+      const session = await createRoom(roomName, displayName, defaultSeatCount);
+      setActivePlayerSecret(session.player_secret);
+      await uploadCharacterPack(session.room.id, session.player_id, characterPackFile);
+      const hydratedRoom = await getRoom(session.room.id);
+      setRoom(hydratedRoom);
+      setCurrentPlayerId(session.player_id);
+      setSelectedPlayerId(session.player_id);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Action failed');
     }
@@ -144,22 +157,25 @@ export function useRoomLifecycle({
     try {
       const openedRoom = await getRoom(roomId);
       const rememberedPlayerId = localStorage.getItem(sessionKey(openedRoom.id));
-      if (rememberedPlayerId && openedRoom.players.some((player) => player.id === rememberedPlayerId)) {
+      const rememberedSecret = localStorage.getItem(secretKey(openedRoom.id));
+      if (
+        rememberedPlayerId &&
+        rememberedSecret &&
+        openedRoom.players.some((player) => player.id === rememberedPlayerId)
+      ) {
+        setActivePlayerSecret(rememberedSecret);
         setRoom(openedRoom);
         setCurrentPlayerId(rememberedPlayerId);
         setSelectedPlayerId(rememberedPlayerId);
         return;
       }
 
-      const previousIds = new Set(openedRoom.players.map((player) => player.id));
-      const nextRoom = await joinRoom(openedRoom.id, displayName, null);
+      const session = await joinRoom(openedRoom.id, displayName, null);
+      setActivePlayerSecret(session.player_secret);
       const hydratedRoom = await getRoom(openedRoom.id);
-      const joined = nextRoom.players.find((player) => !previousIds.has(player.id));
       setRoom(hydratedRoom);
-      if (joined) {
-        setCurrentPlayerId(joined.id);
-        setSelectedPlayerId(joined.id);
-      }
+      setCurrentPlayerId(session.player_id);
+      setSelectedPlayerId(session.player_id);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Action failed');
     }
@@ -178,7 +194,9 @@ export function useRoomLifecycle({
       await leaveRoom(room.id, currentPlayer.id, currentPlayer.id);
       endVoiceSession({ notifyServer: true, playTone: true, returnToDefault: false });
       localStorage.removeItem(sessionKey(room.id));
+      localStorage.removeItem(secretKey(room.id));
       localStorage.removeItem(lastSessionKey());
+      setActivePlayerSecret(null);
       setRoom(null);
       setCurrentPlayerId('');
       setSelectedPlayerId('');
@@ -217,7 +235,9 @@ export function useRoomLifecycle({
       await deleteRoom(room.id, currentPlayerId);
       endVoiceSession({ notifyServer: false, playTone: true });
       localStorage.removeItem(sessionKey(room.id));
+      localStorage.removeItem(secretKey(room.id));
       localStorage.removeItem(lastSessionKey());
+      setActivePlayerSecret(null);
       setVoiceParticipants([]);
       resetRealtimeUi();
       setRoom(null);

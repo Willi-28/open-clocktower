@@ -8,10 +8,25 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 
+import { getSharedAudioContext } from '../../audio/browserAudio';
 import type { VoiceParticipant } from '../voiceRooms';
 import type { openRoomSocket } from '../../websocket/roomSocket';
 
 type RoomSocketRef = MutableRefObject<ReturnType<typeof openRoomSocket> | null>;
+
+type RemoteBoostChain = {
+  source: MediaStreamAudioSourceNode;
+  gain: GainNode;
+  destination: MediaStreamAudioDestinationNode;
+  /** Chrome only feeds WebAudio from a remote WebRTC stream while some media
+   * element plays it, so the boost keeps a muted element on the raw stream. */
+  keepAlive: HTMLAudioElement;
+};
+
+/** Clamp a per-player volume to the supported 0-200% range. */
+function clampRemoteVolume(volume: number) {
+  return Math.max(0, Math.min(2, volume));
+}
 
 type UseVoicePeersOptions = {
   applyAudioSink: (audio: HTMLAudioElement) => Promise<void>;
@@ -44,17 +59,18 @@ export function useVoicePeers({
   const peerConnectionsRef = useRef<Record<string, RTCPeerConnection>>({});
   const pendingIceCandidatesRef = useRef<Record<string, RTCIceCandidateInit[]>>({});
   const remoteAudioRef = useRef<Record<string, HTMLAudioElement>>({});
-  const remoteAudioContextRef = useRef<Record<string, AudioContext>>({});
-  const remoteGainRef = useRef<Record<string, GainNode>>({});
+  const remoteStreamRef = useRef<Record<string, MediaStream>>({});
+  const remoteBoostRef = useRef<Record<string, RemoteBoostChain>>({});
   const joinedVoiceRoomRef = useRef<string | null>(null);
+  const [blockedRemoteAudioPlayerIds, setBlockedRemoteAudioPlayerIds] = useState<string[]>([]);
   const [remoteVolumes, setRemoteVolumes] = useState<Record<string, number>>({});
   const [voiceDiagnostics, setVoiceDiagnostics] = useState<Record<string, string>>({});
+  const remoteVolumesRef = useRef(remoteVolumes);
+  remoteVolumesRef.current = remoteVolumes;
 
   useEffect(() => {
     Object.entries(remoteAudioRef.current).forEach(([playerId, audio]) => {
-      const volume = remoteVolumes[playerId] ?? 1;
-      audio.volume = Math.min(1, Math.max(0, volume));
-      remoteGainRef.current[playerId]?.gain.setTargetAtTime(Math.max(0, Math.min(2, volume)), remoteAudioContextRef.current[playerId]?.currentTime ?? 0, 0.01);
+      applyRemoteVolume(playerId, audio);
     });
   }, [remoteVolumes]);
 
@@ -74,7 +90,9 @@ export function useVoicePeers({
 
   useEffect(() => {
     /** Retry autoplay-blocked remote audio after any user interaction. */
-    const retryPlayback = () => retryRemoteAudioPlayback();
+    const retryPlayback = () => {
+      void enableVoiceAudio();
+    };
     window.addEventListener('pointerdown', retryPlayback, true);
     window.addEventListener('keydown', retryPlayback, true);
     window.addEventListener('touchend', retryPlayback, true);
@@ -103,7 +121,9 @@ export function useVoicePeers({
 
     sameRoomPlayers.forEach((playerId) => {
       if (!peerConnectionsRef.current[playerId] && currentPlayerId < playerId) {
-        void createVoicePeer(playerId, true);
+        void createVoicePeer(playerId, true).catch((caught) => {
+          setVoiceDiagnostics((current) => ({ ...current, [playerId]: `connection error - ${voiceErrorMessage(caught)}` }));
+        });
       }
     });
   }, [voiceParticipants, joinedVoiceRoom, currentPlayerId]);
@@ -139,44 +159,37 @@ export function useVoicePeers({
       }
     };
     peer.onconnectionstatechange = () => {
-      setVoiceDiagnostics((current) => ({ ...current, [playerId]: peer.connectionState }));
+      const connectionStateLabel =
+        peer.connectionState === 'failed'
+          ? 'connection failed - TURN may be needed'
+          : peer.connectionState === 'disconnected'
+            ? 'disconnected - retrying'
+            : peer.connectionState;
+      setVoiceDiagnostics((current) => ({ ...current, [playerId]: connectionStateLabel }));
       if (peer.connectionState === 'connected') {
-        retryRemoteAudioPlayback();
+        void enableVoiceAudio();
       }
     };
     peer.oniceconnectionstatechange = () => {
       if (peer.iceConnectionState === 'failed') {
-        setVoiceDiagnostics((current) => ({ ...current, [playerId]: 'ice failed' }));
+        setVoiceDiagnostics((current) => ({ ...current, [playerId]: 'ICE failed - TURN may be needed' }));
+      }
+      if (peer.iceConnectionState === 'disconnected') {
+        setVoiceDiagnostics((current) => ({ ...current, [playerId]: 'ICE disconnected - network changed' }));
       }
     };
     peer.ontrack = (event) => {
-      const [remoteStream] = event.streams;
-      const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      let audioStream = remoteStream;
-      let audioContext: AudioContext | null = null;
-      let gain: GainNode | null = null;
-      if (AudioContextClass) {
-        void remoteAudioContextRef.current[playerId]?.close().catch(() => undefined);
-        audioContext = new AudioContextClass();
-        void audioContext.resume().catch(() => undefined);
-        const source = audioContext.createMediaStreamSource(remoteStream);
-        gain = audioContext.createGain();
-        const destination = audioContext.createMediaStreamDestination();
-        source.connect(gain);
-        gain.connect(destination);
-        audioStream = destination.stream;
-        remoteAudioContextRef.current[playerId] = audioContext;
-        remoteGainRef.current[playerId] = gain;
-      }
+      const remoteStream = event.streams[0] ?? new MediaStream([event.track]);
+      remoteStreamRef.current[playerId] = remoteStream;
+      disconnectRemoteBoostChain(playerId);
       const audio = remoteAudioRef.current[playerId] ?? new Audio();
       audio.autoplay = true;
       audio.controls = false;
       audio.muted = false;
+      audio.preload = 'auto';
       audio.setAttribute('playsinline', 'true');
-      audio.srcObject = audioStream;
-      const volume = remoteVolumes[playerId] ?? 1;
-      audio.volume = Math.min(1, Math.max(0, volume));
-      gain?.gain.setValueAtTime(Math.max(0, Math.min(2, volume)), audioContext?.currentTime ?? 0);
+      audio.srcObject = remoteStream;
+      applyRemoteVolume(playerId, audio);
       void applyAudioSink(audio);
       remoteAudioRef.current[playerId] = audio;
       startVoiceLevelMonitor(playerId, remoteStream);
@@ -185,7 +198,7 @@ export function useVoicePeers({
         audio.style.display = 'none';
         document.body.appendChild(audio);
       }
-      playRemoteAudio(playerId, audio);
+      void playRemoteAudio(playerId, audio);
     };
 
     if (shouldOffer) {
@@ -224,35 +237,39 @@ export function useVoicePeers({
    * Applies offer, answer, and ICE signaling messages from the room socket.
    */
   async function handleVoiceSignal(fromPlayerId: string, rawSignal: unknown) {
-    if (!joinedVoiceRoomRef.current) {
-      return;
-    }
-    const signal = rawSignal as {
-      kind?: 'offer' | 'answer' | 'candidate';
-      description?: RTCSessionDescriptionInit;
-      candidate?: RTCIceCandidateInit;
-    };
-    const peer = await createVoicePeer(fromPlayerId, false);
-    if (signal.kind === 'offer' && signal.description) {
-      await peer.setRemoteDescription(signal.description);
-      await flushPendingIceCandidates(fromPlayerId, peer);
-      const answer = await peer.createAnswer();
-      await peer.setLocalDescription(answer);
-      roomSocketRef.current?.sendVoiceSignal(fromPlayerId, { kind: 'answer', description: answer });
-    }
-    if (signal.kind === 'answer' && signal.description) {
-      await peer.setRemoteDescription(signal.description);
-      await flushPendingIceCandidates(fromPlayerId, peer);
-    }
-    if (signal.kind === 'candidate' && signal.candidate) {
-      if (peer.remoteDescription) {
-        await peer.addIceCandidate(signal.candidate).catch(() => undefined);
-      } else {
-        pendingIceCandidatesRef.current[fromPlayerId] = [
-          ...(pendingIceCandidatesRef.current[fromPlayerId] ?? []),
-          signal.candidate,
-        ];
+    try {
+      if (!joinedVoiceRoomRef.current) {
+        return;
       }
+      const signal = rawSignal as {
+        kind?: 'offer' | 'answer' | 'candidate';
+        description?: RTCSessionDescriptionInit;
+        candidate?: RTCIceCandidateInit;
+      };
+      const peer = await createVoicePeer(fromPlayerId, false);
+      if (signal.kind === 'offer' && signal.description) {
+        await peer.setRemoteDescription(signal.description);
+        await flushPendingIceCandidates(fromPlayerId, peer);
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        roomSocketRef.current?.sendVoiceSignal(fromPlayerId, { kind: 'answer', description: answer });
+      }
+      if (signal.kind === 'answer' && signal.description) {
+        await peer.setRemoteDescription(signal.description);
+        await flushPendingIceCandidates(fromPlayerId, peer);
+      }
+      if (signal.kind === 'candidate' && signal.candidate) {
+        if (peer.remoteDescription) {
+          await peer.addIceCandidate(signal.candidate).catch(() => undefined);
+        } else {
+          pendingIceCandidatesRef.current[fromPlayerId] = [
+            ...(pendingIceCandidatesRef.current[fromPlayerId] ?? []),
+            signal.candidate,
+          ];
+        }
+      }
+    } catch (caught) {
+      setVoiceDiagnostics((current) => ({ ...current, [fromPlayerId]: `signal error - ${voiceErrorMessage(caught)}` }));
     }
   }
 
@@ -267,26 +284,152 @@ export function useVoicePeers({
     }
   }
 
-  /** Resume remote audio contexts and retry every remote audio element. */
-  function retryRemoteAudioPlayback() {
-    Object.values(remoteAudioContextRef.current).forEach((audioContext) => {
-      if (audioContext.state !== 'closed') {
-        void audioContext.resume().catch(() => undefined);
+  /**
+   * Apply one player's volume to their audio element.
+   *
+   * Up to 100% the element plays the raw WebRTC stream directly - the most
+   * reliable path in every browser. Only above 100% is the stream routed
+   * through a GainNode on the shared AudioContext; if that boost cannot be
+   * built the element keeps playing the raw stream capped at 100%.
+   */
+  function applyRemoteVolume(playerId: string, audio: HTMLAudioElement) {
+    const volume = clampRemoteVolume(remoteVolumesRef.current[playerId] ?? 1);
+    const rawStream = remoteStreamRef.current[playerId];
+    if (volume > 1 && rawStream) {
+      const chain = ensureRemoteBoostChain(playerId, rawStream);
+      if (chain) {
+        chain.gain.gain.setTargetAtTime(volume, chain.gain.context.currentTime, 0.02);
+        if (audio.srcObject !== chain.destination.stream) {
+          audio.srcObject = chain.destination.stream;
+          void playRemoteAudio(playerId, audio);
+        }
+        audio.volume = 1;
+        return;
       }
-    });
-    Object.entries(remoteAudioRef.current).forEach(([playerId, audio]) => {
-      if (audio.srcObject) {
-        playRemoteAudio(playerId, audio);
+    }
+    if (remoteBoostRef.current[playerId]) {
+      disconnectRemoteBoostChain(playerId);
+      if (rawStream && audio.srcObject !== rawStream) {
+        audio.srcObject = rawStream;
+        void playRemoteAudio(playerId, audio);
       }
+    }
+    audio.volume = Math.min(1, volume);
+  }
+
+  /** Create (or reuse) the WebAudio chain that lifts a remote stream above 100%. */
+  function ensureRemoteBoostChain(playerId: string, rawStream: MediaStream) {
+    const existing = remoteBoostRef.current[playerId];
+    if (existing && existing.source.mediaStream === rawStream) {
+      return existing;
+    }
+    disconnectRemoteBoostChain(playerId);
+    try {
+      const audioContext = getSharedAudioContext();
+      if (!audioContext) {
+        return null;
+      }
+      const source = audioContext.createMediaStreamSource(rawStream);
+      const gain = audioContext.createGain();
+      const destination = audioContext.createMediaStreamDestination();
+      source.connect(gain);
+      gain.connect(destination);
+      // Chrome workaround: WebAudio only receives remote WebRTC audio while
+      // some media element plays the raw stream, so park it on a muted one.
+      const keepAlive = new Audio();
+      keepAlive.autoplay = true;
+      keepAlive.muted = true;
+      keepAlive.setAttribute('playsinline', 'true');
+      keepAlive.srcObject = rawStream;
+      void keepAlive.play().catch(() => undefined);
+      const chain = { source, gain, destination, keepAlive };
+      remoteBoostRef.current[playerId] = chain;
+      return chain;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Detach one player's boost chain from the shared AudioContext. */
+  function disconnectRemoteBoostChain(playerId: string) {
+    const chain = remoteBoostRef.current[playerId];
+    if (chain) {
+      chain.source.disconnect();
+      chain.gain.disconnect();
+      chain.keepAlive.pause();
+      chain.keepAlive.srcObject = null;
+      delete remoteBoostRef.current[playerId];
+    }
+  }
+
+  /** Track whether Chrome/Brave need an explicit user gesture for remote audio. */
+  function setRemoteAudioBlocked(playerId: string, isBlocked: boolean) {
+    setBlockedRemoteAudioPlayerIds((current) => {
+      const alreadyBlocked = current.includes(playerId);
+      if (isBlocked === alreadyBlocked) {
+        return current;
+      }
+      return isBlocked ? [...current, playerId] : current.filter((id) => id !== playerId);
     });
   }
 
+  /** Retry every remote audio element from a user click or trusted browser event. */
+  async function enableVoiceAudio() {
+    // Also resumes the shared AudioContext the volume boost chains run on.
+    getSharedAudioContext();
+    const entries = Object.entries(remoteAudioRef.current).filter(([, audio]) => audio.srcObject);
+    if (entries.length === 0) {
+      setBlockedRemoteAudioPlayerIds([]);
+      return true;
+    }
+    const results = await Promise.all(entries.map(([playerId, audio]) => playRemoteAudio(playerId, audio)));
+    return results.every(Boolean);
+  }
+
   /** Play one remote audio element and update diagnostics for autoplay failures. */
-  function playRemoteAudio(playerId: string, audio: HTMLAudioElement) {
-    void audio
-      .play()
-      .then(() => setVoiceDiagnostics((current) => ({ ...current, [playerId]: 'audio playing' })))
-      .catch(() => setVoiceDiagnostics((current) => ({ ...current, [playerId]: 'audio blocked - click anywhere' })));
+  async function playRemoteAudio(playerId: string, audio: HTMLAudioElement) {
+    try {
+      await audio.play();
+      setRemoteAudioBlocked(playerId, false);
+      setVoiceDiagnostics((current) => ({ ...current, [playerId]: 'audio playing' }));
+      return true;
+    } catch (caught) {
+      const isBlocked = isAutoplayBlocked(caught);
+      setRemoteAudioBlocked(playerId, isBlocked);
+      setVoiceDiagnostics((current) => ({
+        ...current,
+        [playerId]: isBlocked
+          ? 'audio blocked - click Enable voice audio'
+          : `audio playback error - ${voiceErrorMessage(caught)}`,
+      }));
+      return false;
+    }
+  }
+
+  /** Detect browser autoplay blocking errors without treating every playback error as user-action related. */
+  function isAutoplayBlocked(caught: unknown) {
+    if (caught instanceof DOMException && caught.name === 'NotAllowedError') {
+      return true;
+    }
+    const message = voiceErrorMessage(caught).toLowerCase();
+    return (
+      message.includes('notallowed') ||
+      message.includes('not allowed') ||
+      message.includes('user gesture') ||
+      message.includes("user didn't interact") ||
+      message.includes('autoplay')
+    );
+  }
+
+  /** Convert WebRTC and media errors into short diagnostics for the settings UI. */
+  function voiceErrorMessage(caught: unknown) {
+    if (caught instanceof DOMException) {
+      return caught.name;
+    }
+    if (caught instanceof Error) {
+      return caught.message || caught.name;
+    }
+    return 'unknown error';
   }
 
   /**
@@ -297,6 +440,10 @@ export function useVoicePeers({
     delete peerConnectionsRef.current[playerId];
     delete pendingIceCandidatesRef.current[playerId];
     stopVoiceLevelMonitor(playerId);
+    // The element may play the boosted stream, so stop the raw remote tracks too.
+    remoteStreamRef.current[playerId]?.getTracks().forEach((track) => track.stop());
+    delete remoteStreamRef.current[playerId];
+    disconnectRemoteBoostChain(playerId);
     const audio = remoteAudioRef.current[playerId];
     if (audio) {
       const stream = audio.srcObject instanceof MediaStream ? audio.srcObject : null;
@@ -306,9 +453,7 @@ export function useVoicePeers({
       audio.remove();
       delete remoteAudioRef.current[playerId];
     }
-    void remoteAudioContextRef.current[playerId]?.close().catch(() => undefined);
-    delete remoteAudioContextRef.current[playerId];
-    delete remoteGainRef.current[playerId];
+    setRemoteAudioBlocked(playerId, false);
     setVoiceDiagnostics((current) => {
       const next = { ...current };
       delete next[playerId];
@@ -325,7 +470,9 @@ export function useVoicePeers({
 
   return {
     closeAllVoicePeers,
+    enableVoiceAudio,
     handleVoiceSignal,
+    needsVoiceAudioUnlock: blockedRemoteAudioPlayerIds.length > 0,
     remoteVolumes,
     setRemoteVolumes,
     setVoiceDiagnostics,

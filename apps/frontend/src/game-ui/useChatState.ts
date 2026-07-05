@@ -9,6 +9,9 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { ChatMessage } from './types';
 
+// Chat history is session-only; cap it so a long game cannot grow it without bound.
+const MAX_CHAT_MESSAGES = 500;
+
 type UseChatStateOptions = {
   allowedPrivateChatIds: Set<string>;
   allowedPrivateChatKey: string;
@@ -58,7 +61,11 @@ export function useChatState({ allowedPrivateChatIds, allowedPrivateChatKey, cur
 
   /** Append a socket-delivered chat message and open/mark its private tab if needed. */
   function appendChatMessage(message: ChatMessage, tabId?: string) {
-    setChatMessages((current) => [...current, message]);
+    const stamped = message.at === undefined ? { ...message, at: Date.now() } : message;
+    setChatMessages((current) => {
+      const next = [...current, stamped];
+      return next.length > MAX_CHAT_MESSAGES ? next.slice(next.length - MAX_CHAT_MESSAGES) : next;
+    });
     if (tabId) {
       setOpenChatTabs((current) => (current.includes(tabId) ? current : [...current, tabId]));
       if (message.fromPlayerId !== currentPlayerId && tabId !== activeChatTab) {

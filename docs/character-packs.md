@@ -6,7 +6,7 @@ Open Clocktower imports custom characters per room. The app does not ship protec
 
 Upload a single `.zip` file.
 
-Maximum pack size: 10 MB.
+Maximum pack size: 15 MB.
 
 Required structure:
 

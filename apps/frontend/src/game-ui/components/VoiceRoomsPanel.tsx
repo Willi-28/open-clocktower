@@ -10,7 +10,9 @@ import type { GamePhase } from '../../api/client';
 type VoiceRoomsPanelProps = {
   isStoryteller: boolean;
   isVoiceSwitching: boolean;
+  needsVoiceAudioUnlock: boolean;
   joinedVoiceRoom: string | null;
+  onEnableVoiceAudio: () => void;
   onJoinVoiceRoom: (voiceRoom: string) => void;
   onLeaveVoiceRoom: () => void;
   publicVoiceOccupants: (voiceRoom: string) => string[];
@@ -24,7 +26,9 @@ type VoiceRoomsPanelProps = {
 export function VoiceRoomsPanel({
   isStoryteller,
   isVoiceSwitching,
+  needsVoiceAudioUnlock,
   joinedVoiceRoom,
+  onEnableVoiceAudio,
   onJoinVoiceRoom,
   onLeaveVoiceRoom,
   publicVoiceOccupants,
@@ -75,6 +79,14 @@ export function VoiceRoomsPanel({
               x
             </button>
           ) : null}
+        </div>
+      ) : null}
+      {needsVoiceAudioUnlock ? (
+        <div className="voice-audio-unlock" role="alert">
+          <p className="helper-text">Your browser blocked incoming voice audio.</p>
+          <button onClick={onEnableVoiceAudio} type="button">
+            Enable voice audio
+          </button>
         </div>
       ) : null}
       {isPublicVoiceClosed && !joinedVoiceRoom ? (

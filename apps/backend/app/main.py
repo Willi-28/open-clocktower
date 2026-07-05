@@ -5,7 +5,8 @@ and the production static frontend mount into one ASGI app.
 """
 
 import asyncio
-from contextlib import suppress
+import logging
+from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
@@ -19,9 +20,29 @@ from app.game.store import room_store
 from app.websocket.room_hub import room_hub
 from app.websocket.rooms import router as websocket_router
 
+logger = logging.getLogger("open_clocktower")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Prepare database state on boot and cancel background work on shutdown."""
+    # Creates database tables automatically until proper migrations exist.
+    create_db_schema()
+    room_store.mark_all_players_disconnected()
+    for room_id in room_store.delete_inactive_rooms(settings.room_idle_ttl_seconds):
+        await room_hub.broadcast_deleted(room_id)
+    cleanup_task = asyncio.create_task(cleanup_inactive_rooms())
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await cleanup_task
+
+
 # FastAPI backend entry point. This wires together global settings,
 # HTTP routes, WebSocket routes, and the built frontend files.
-app = FastAPI(title="Open Clocktower")
+app = FastAPI(title="Open Clocktower", lifespan=lifespan)
 
 
 def cache_control_for_path(path: str) -> str | None:
@@ -79,27 +100,6 @@ def client_config():
     return {"iceServers": settings.ice_servers()}
 
 
-@app.on_event("startup")
-async def startup() -> None:
-    """Prepare database state and start background cleanup when the app boots."""
-    # Creates database tables automatically until proper migrations exist.
-    create_db_schema()
-    room_store.mark_all_players_disconnected()
-    for room_id in room_store.delete_inactive_rooms(settings.room_idle_ttl_seconds):
-        await room_hub.broadcast_deleted(room_id)
-    app.state.cleanup_task = asyncio.create_task(cleanup_inactive_rooms())
-
-
-@app.on_event("shutdown")
-async def shutdown() -> None:
-    """Cancel the background cleanup task during graceful shutdown."""
-    cleanup_task = getattr(app.state, "cleanup_task", None)
-    if cleanup_task is not None:
-        cleanup_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await cleanup_task
-
-
 async def cleanup_inactive_rooms() -> None:
     """Periodically delete abandoned rooms and notify any stale browser clients."""
     # Deletes fully empty rooms in the background. This keeps abandoned lobbies
@@ -107,9 +107,14 @@ async def cleanup_inactive_rooms() -> None:
     interval = max(60, settings.room_cleanup_interval_seconds)
     while True:
         await asyncio.sleep(interval)
-        deleted_room_ids = room_store.delete_inactive_rooms(settings.room_idle_ttl_seconds)
-        for room_id in deleted_room_ids:
-            await room_hub.broadcast_deleted(room_id)
+        # One failed sweep (for example a transient DB error) must not kill the
+        # loop for the rest of the process lifetime.
+        try:
+            deleted_room_ids = room_store.delete_inactive_rooms(settings.room_idle_ttl_seconds)
+            for room_id in deleted_room_ids:
+                await room_hub.broadcast_deleted(room_id)
+        except Exception:
+            logger.exception("Room cleanup sweep failed; retrying next interval")
 
 
 # Register the room/gameplay API and WebSockets for live updates.

@@ -5,8 +5,8 @@
  * storyteller position, nominations, and the animated vote-counting hand.
  */
 
-import { useMemo } from 'react';
-import type { CSSProperties } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, MouseEvent } from 'react';
 
 import type { Character, CharacterAssignment, Player, RoomState } from '../../api/client';
 import { voiceRooms } from '../gameConfig';
@@ -43,6 +43,95 @@ type GameTableProps = {
   storytellerVoiceLabel?: string;
 };
 
+type TableSeatButtonProps = {
+  avatarUrl: string | null;
+  canSeeCharacter: boolean;
+  characterIcon: string | null;
+  characterName: string;
+  className: string;
+  guessedCharacterIcon: string | null;
+  guessedCharacterName: string;
+  hasDeadVote: boolean;
+  hasRaisedHand: boolean;
+  isNominee: boolean;
+  isNominator: boolean;
+  left: number;
+  onSeatClick: (seatIndex: number) => void;
+  playerName: string;
+  playerStatus: Player['status'] | null;
+  seatIndex: number;
+  seatScale: number;
+  top: number;
+};
+
+/** Render one seat and avoid re-rendering unchanged seats during rapid moves. */
+const TableSeatButton = memo(function TableSeatButton({
+  avatarUrl,
+  canSeeCharacter,
+  characterIcon,
+  characterName,
+  className,
+  guessedCharacterIcon,
+  guessedCharacterName,
+  hasDeadVote,
+  hasRaisedHand,
+  isNominee,
+  isNominator,
+  left,
+  onSeatClick,
+  playerName,
+  playerStatus,
+  seatIndex,
+  seatScale,
+  top,
+}: TableSeatButtonProps) {
+  const seatStyle = useMemo(
+    () =>
+      ({
+        // Offsets from table centre, consumed by the seat transform (in cqw
+        // units) so position changes glide instead of jumping.
+        '--seat-x': left - 50,
+        '--seat-y': top - 50,
+        '--seat-scale': seatScale,
+      }) as CSSProperties,
+    [left, seatScale, top],
+  );
+  const handleClick = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      onSeatClick(seatIndex);
+    },
+    [onSeatClick, seatIndex],
+  );
+
+  return (
+    <button className={className} onClick={handleClick} style={seatStyle} type="button">
+      {isNominator ? <span className="nomination-role">Accuser</span> : null}
+      {isNominee ? <span className="nomination-role accused">Accused</span> : null}
+      {hasRaisedHand ? <span className="raised-hand-indicator">Hand</span> : null}
+      {playerStatus === 'dead' ? (
+        <span className={hasDeadVote ? 'dead-vote-token available' : 'dead-vote-token spent'}>
+          {hasDeadVote ? 'Dead Vote' : 'Spent'}
+        </span>
+      ) : null}
+      {avatarUrl ? <img className="seat-avatar" alt="" src={avatarUrl} /> : null}
+      <strong>{playerName}</strong>
+      {canSeeCharacter && characterName ? (
+        <span className="seat-character-token">
+          {characterIcon ? <img alt="" src={characterIcon} /> : <span className="character-fallback" />}
+          <small>{characterName}</small>
+        </span>
+      ) : null}
+      {guessedCharacterName ? (
+        <span className="seat-suspicion-token">
+          {guessedCharacterIcon ? <img alt="" src={guessedCharacterIcon} /> : <span className="character-fallback" />}
+          <small>{guessedCharacterName}</small>
+        </span>
+      ) : null}
+    </button>
+  );
+});
+
 /** Render the central table and all seat-level interaction targets. */
 export function GameTable({
   assignments,
@@ -72,9 +161,60 @@ export function GameTable({
   storyteller,
   storytellerVoiceLabel,
 }: GameTableProps) {
-  const seats = useMemo(() => calculateCircularSeats(room.seat_count, 46.5), [room.seat_count]);
+  const onSeatClickRef = useRef(onSeatClick);
+  onSeatClickRef.current = onSeatClick;
+  const handleSeatButtonClick = useCallback((seatIndex: number) => {
+    onSeatClickRef.current(seatIndex);
+  }, []);
+  // Added seats spawn from the top seat slot and glide to their place; removed
+  // seats glide back into it before unmounting. `spawnBoundary` pins every seat
+  // with index >= boundary to the spawn slot, `lingerCount` keeps removed seats
+  // mounted while they animate away.
+  const targetSeatCount = room.seat_count;
+  const [prevSeatCount, setPrevSeatCount] = useState(targetSeatCount);
+  const [spawnBoundary, setSpawnBoundary] = useState(targetSeatCount);
+  const [lingerCount, setLingerCount] = useState(targetSeatCount);
+  if (targetSeatCount !== prevSeatCount) {
+    // Adjust during render so newly added seats paint at the spawn slot first.
+    setPrevSeatCount(targetSeatCount);
+    setSpawnBoundary(
+      targetSeatCount > prevSeatCount ? Math.min(spawnBoundary, prevSeatCount) : targetSeatCount,
+    );
+  }
+  useEffect(() => {
+    if (spawnBoundary >= targetSeatCount) {
+      return;
+    }
+    // Release fresh seats one painted frame later so the transition can glide them out.
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setSpawnBoundary(targetSeatCount));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [spawnBoundary, targetSeatCount]);
+  useEffect(() => {
+    if (lingerCount === targetSeatCount) {
+      return;
+    }
+    if (lingerCount < targetSeatCount) {
+      setLingerCount(targetSeatCount);
+      return;
+    }
+    const timer = window.setTimeout(() => setLingerCount(targetSeatCount), 240);
+    return () => window.clearTimeout(timer);
+  }, [lingerCount, targetSeatCount]);
+  const renderedSeatCount = Math.max(targetSeatCount, lingerCount);
+  const seats = useMemo(() => {
+    const layout = calculateCircularSeats(targetSeatCount, 46.5);
+    // Seats being removed linger at the spawn slot until their exit finishes.
+    for (let index = targetSeatCount; index < renderedSeatCount; index += 1) {
+      layout.push({ index, angle: -Math.PI / 2, x: 0, y: -46.5 });
+    }
+    return layout;
+  }, [targetSeatCount, renderedSeatCount]);
   const seatScale = Math.max(0.58, Math.min(1.08, 1.1 - Math.max(0, room.seat_count - 5) * 0.035));
   const isFocusedVoiceRoom = Boolean(joinedVoiceRoom && joinedVoiceRoom !== voiceRooms[0]);
+  const playerById = useMemo(() => new Map(room.players.map((player) => [player.id, player])), [room.players]);
+  const playerCount = useMemo(() => room.players.filter((player) => !player.is_storyteller).length, [room.players]);
   const characterById = useMemo(
     () => new Map(characters.map((character) => [character.id, character])),
     [characters],
@@ -150,6 +290,9 @@ export function GameTable({
           length: 42,
         }
       : null;
+  const activeNomination = room.active_nomination;
+  const nominatorName = activeNomination ? playerById.get(activeNomination.nominator_id)?.display_name : undefined;
+  const nomineeName = activeNomination ? playerById.get(activeNomination.nominee_id)?.display_name : undefined;
 
   /** Keep clock-hand rotation moving clockwise when angles wrap around the circle. */
   function normalizedClockAngle(angle: number, startAngle: number) {
@@ -177,7 +320,7 @@ export function GameTable({
       >
         <div className="table-center">
           <span>{phaseLabels[room.phase]}</span>
-          <strong>{room.players.filter((player) => !player.is_storyteller).length} players</strong>
+          <strong>{playerCount} players</strong>
           {isStoryteller ? <small>Random character setup</small> : null}
           {voteCountIndex >= 0 ? (
             <div className="table-vote-counter">
@@ -188,11 +331,11 @@ export function GameTable({
           ) : null}
         </div>
 
-        {room.active_nomination ? (
+        {activeNomination ? (
           <div className="nomination-display">
-            <span>{room.players.find((player) => player.id === room.active_nomination?.nominator_id)?.display_name}</span>
+            <span>{nominatorName}</span>
             <strong>accuses</strong>
-            <span>{room.players.find((player) => player.id === room.active_nomination?.nominee_id)?.display_name}</span>
+            <span>{nomineeName}</span>
           </div>
         ) : null}
 
@@ -269,8 +412,8 @@ export function GameTable({
                 onStorytellerClick();
               }}
               style={{
-                left: `${seatPosition.x}%`,
-                top: `${seatPosition.y}%`,
+                '--seat-x': seatPosition.x - 50,
+                '--seat-y': seatPosition.y - 50,
                 '--seat-scale': isInFocusedVoiceRoom ? voiceFocusSeatScale : seatScale,
               } as CSSProperties}
               type="button"
@@ -297,14 +440,19 @@ export function GameTable({
           const isNominee = Boolean(player && player.id === room.active_nomination?.nominee_id);
           const isInFocusedVoiceRoom = Boolean(player && voiceFocusPlayerIdSet.has(player.id));
           const isSpeaking = Boolean(player && speakingPlayerIdSet.has(player.id));
-          const seatPosition = player
-            ? voiceFocusPosition(player.id, 50 + seat.x, 50 + seat.y)
-            : { x: 50 + seat.x, y: 50 + seat.y };
+          // Staged seats (entering or leaving) sit faded in the top seat slot.
+          const isStaged = seat.index >= spawnBoundary;
+          const seatPosition = isStaged
+            ? { x: 50, y: 3.5 }
+            : player
+              ? voiceFocusPosition(player.id, 50 + seat.x, 50 + seat.y)
+              : { x: 50 + seat.x, y: 50 + seat.y };
 
           return (
-            <button
+            <TableSeatButton
               className={[
                 player ? `seat occupied ${player.status}` : 'seat',
+                isStaged ? 'seat-staged' : '',
                 canSeeCharacter ? 'has-character' : '',
                 hasRaisedHand ? 'hand-raised' : '',
                 isNominator ? 'nominator-seat' : '',
@@ -314,41 +462,25 @@ export function GameTable({
                 isSpeaking ? 'speaking-seat' : '',
                 player?.id === highlightedPlayerId ? 'vote-highlight' : '',
               ].join(' ')}
+              avatarUrl={player?.avatar_url ?? null}
+              canSeeCharacter={canSeeCharacter}
+              characterIcon={character?.icon ?? null}
+              characterName={character?.name ?? ''}
+              guessedCharacterIcon={guessedCharacter?.icon ?? null}
+              guessedCharacterName={guessedCharacter?.name ?? ''}
+              hasDeadVote={Boolean(player?.has_dead_vote)}
+              hasRaisedHand={hasRaisedHand}
+              isNominee={isNominee}
+              isNominator={isNominator}
               key={seat.index}
-              onClick={(event) => {
-                event.stopPropagation();
-                onSeatClick(seat.index);
-              }}
-              style={{
-                left: `${seatPosition.x}%`,
-                top: `${seatPosition.y}%`,
-                '--seat-scale': isInFocusedVoiceRoom ? voiceFocusSeatScale : seatScale,
-              } as CSSProperties}
-              type="button"
-            >
-              {isNominator ? <span className="nomination-role">Accuser</span> : null}
-              {isNominee ? <span className="nomination-role accused">Accused</span> : null}
-              {hasRaisedHand ? <span className="raised-hand-indicator">Hand</span> : null}
-              {player?.status === 'dead' ? (
-                <span className={player.has_dead_vote ? 'dead-vote-token available' : 'dead-vote-token spent'}>
-                  {player.has_dead_vote ? 'Dead Vote' : 'Spent'}
-                </span>
-              ) : null}
-              {player?.avatar_url ? <img className="seat-avatar" alt="" src={player.avatar_url} /> : null}
-              <strong>{player?.display_name ?? 'Open'}</strong>
-              {canSeeCharacter && character ? (
-                <span className="seat-character-token">
-                  {character.icon ? <img alt="" src={character.icon} /> : <span className="character-fallback" />}
-                  <small>{character.name}</small>
-                </span>
-              ) : null}
-              {guessedCharacter ? (
-                <span className="seat-suspicion-token">
-                  {guessedCharacter.icon ? <img alt="" src={guessedCharacter.icon} /> : <span className="character-fallback" />}
-                  <small>{guessedCharacter.name}</small>
-                </span>
-              ) : null}
-            </button>
+              left={seatPosition.x}
+              onSeatClick={handleSeatButtonClick}
+              playerName={player?.display_name ?? 'Open'}
+              playerStatus={player?.status ?? null}
+              seatIndex={seat.index}
+              seatScale={isInFocusedVoiceRoom ? voiceFocusSeatScale : seatScale}
+              top={seatPosition.y}
+            />
           );
         })}
       </div>

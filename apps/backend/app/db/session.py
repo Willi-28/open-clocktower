@@ -68,12 +68,19 @@ def _add_missing_columns() -> None:
             connection.execute(text("ALTER TABLE rooms ADD COLUMN shared_grimoire_reminders TEXT NOT NULL DEFAULT '[]'"))
 
     player_columns = {column["name"] for column in inspector.get_columns("players")}
-    if "has_dead_vote" not in player_columns:
-        with engine.begin() as connection:
+    with engine.begin() as connection:
+        if "has_dead_vote" not in player_columns:
             connection.execute(text("ALTER TABLE players ADD COLUMN has_dead_vote BOOLEAN NOT NULL DEFAULT TRUE"))
+        if "secret" not in player_columns:
+            # Existing rows get an empty secret and can no longer authenticate, so
+            # in-flight sessions must rejoin. Rooms are ephemeral, so this is a
+            # one-time disruption rather than data loss.
+            connection.execute(text("ALTER TABLE players ADD COLUMN secret VARCHAR(64) NOT NULL DEFAULT ''"))
 
     character_columns = {column["name"] for column in inspector.get_columns("characters")}
     with engine.begin() as connection:
+        if "sort_order" not in character_columns:
+            connection.execute(text("ALTER TABLE characters ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"))
         if "first_night" not in character_columns:
             connection.execute(text("ALTER TABLE characters ADD COLUMN first_night INTEGER NOT NULL DEFAULT 0"))
         if "first_night_reminder" not in character_columns:

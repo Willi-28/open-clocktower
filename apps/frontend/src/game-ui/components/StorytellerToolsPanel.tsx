@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Character, Player, RoomState } from '../../api/client';
 import { characterRole } from '../gameText';
 import { formatTimer } from '../timer';
+import { RoleDistribution } from './RoleDistribution';
 
 export type StorytellerToolsPanelProps = {
   activeNomination: RoomState['active_nomination'] | undefined;
@@ -128,8 +129,7 @@ export function StorytellerToolsPanel({
   }
 
   return (
-    <details className="panel compact storyteller-drawer">
-      <summary>Storyteller Tools</summary>
+    <div className="storyteller-tools">
       <div className="button-row">
         <button disabled={!isLobby && !room.show_board} onClick={onStartGame} type="button">
           Start Game
@@ -167,6 +167,7 @@ export function StorytellerToolsPanel({
         </label>
 
         <h3 className="tool-section-heading">Character Setup</h3>
+        <RoleDistribution playerCount={seatedPlayerCount} />
         {characters.length === 0 ? <p className="helper-text">No character pack is loaded. Choose a pack before creating the next room.</p> : null}
         <p className="helper-text">Select the in-play characters, then assign them randomly to seated players.</p>
         <div className="character-pool">
@@ -334,7 +335,7 @@ export function StorytellerToolsPanel({
           </button>
         </div>
       </details>
-    </details>
+    </div>
   );
 }
 

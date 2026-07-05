@@ -91,6 +91,7 @@ export function App() {
   const [error, setError] = useState<string>('');
   const [mobileWorkspaceView, setMobileWorkspaceView] = useState<MobileWorkspaceView>('table');
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const tableUi = useTableUiState();
   const storyteller = room?.players.find((player) => player.is_storyteller);
@@ -131,6 +132,16 @@ export function App() {
     }, 3200);
     return () => window.clearTimeout(timeoutId);
   }, [error]);
+
+  useEffect(() => {
+    /** Keep the dashboard icon in sync with browser fullscreen changes. */
+    function handleFullscreenChange() {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    }
+    handleFullscreenChange();
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   /** Resolve a player id into the display name from the latest room snapshot. */
   const playerName = (playerId: string | undefined) => playerNameInRoom(room, playerId);
@@ -341,6 +352,24 @@ export function App() {
     }
   }
 
+  /** Enter or leave browser fullscreen from an explicit dashboard button click. */
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+      // navigationUI: 'hide' asks for the most immersive fullscreen the browser
+      // allows. The browser's own "press Esc to exit" overlay is enforced by the
+      // browser for security and cannot be suppressed from a web page.
+      await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+    } catch {
+      // Fullscreen is a non-critical convenience. If the browser blocks it there
+      // is nothing for the player to fix, so fail silently rather than showing a
+      // notification banner.
+    }
+  }
+
   /** Handle clicks on seats, including open-seat movement and player selection. */
   function handleSeatClick(seatIndex: number) {
     if (!room) {
@@ -445,6 +474,22 @@ export function App() {
     });
   }
 
+  /** Ask for confirmation before the current player leaves this room. */
+  function confirmLeaveLobby() {
+    if (!currentPlayer || currentPlayer.is_storyteller) {
+      return;
+    }
+    setPendingConfirmation({
+      confirmLabel: 'Leave Lobby',
+      message: 'Leave this room and return to the setup screen? Your voice connection will be closed.',
+      onConfirm: () => {
+        setPendingConfirmation(null);
+        void lifecycle.leaveCurrentLobby();
+      },
+      title: 'Leave lobby?',
+    });
+  }
+
   /** Ask for confirmation before removing a player from the room. */
   function confirmKickPlayer(playerToKick: RoomState['players'][number]) {
     setPendingConfirmation({
@@ -527,14 +572,15 @@ export function App() {
             <LobbyInfoPanel
               currentPlayer={displayedCurrentPlayer}
               canChangeSeats={canChangeSeats}
-              isLobby={isLobby}
+              isFullscreen={isFullscreen}
               isMuted={isMuted}
               isStoryteller={isStoryteller}
               joinedVoiceRoom={voiceSession.joinedVoiceRoom}
               onCopyRoomCode={() => void copyRoomCode()}
-              onLeaveLobby={() => void lifecycle.leaveCurrentLobby()}
+              onLeaveLobby={confirmLeaveLobby}
               onLeaveSeat={() => seatMove.queueSeatMove(null)}
               onOpenSettings={() => tableUi.setIsSettingsOpen(true)}
+              onToggleFullscreen={() => void toggleFullscreen()}
               onToggleMuted={toggleMuted}
               phaseLabel={room.show_board ? 'Game ended' : room.phase === 'lobby' ? 'Game not started yet' : phaseLabels[room.phase]}
               room={displayedRoom ?? room}
@@ -545,6 +591,7 @@ export function App() {
               attentionChatTabs={chat.attentionChatTabs}
               chatDraft={chat.chatDraft}
               closeChatTab={chat.closeChatTab}
+              currentPlayerId={currentPlayerId}
               messages={chat.visibleChatMessages}
               onSendMessage={submitChatMessage}
               openChatTabs={chat.openChatTabs}
@@ -557,6 +604,8 @@ export function App() {
               isStoryteller={isStoryteller}
               isVoiceSwitching={voiceSession.isVoiceSwitching}
               joinedVoiceRoom={voiceSession.joinedVoiceRoom}
+              needsVoiceAudioUnlock={voicePeers.needsVoiceAudioUnlock}
+              onEnableVoiceAudio={() => void voicePeers.enableVoiceAudio()}
               onJoinVoiceRoom={(voiceRoom) => void voiceSession.joinSelectedVoiceRoom(voiceRoom)}
               onLeaveVoiceRoom={() => voiceSession.leaveVoiceRoom(true)}
               publicVoiceOccupants={publicVoiceOccupants}

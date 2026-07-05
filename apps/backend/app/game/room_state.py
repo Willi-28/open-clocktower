@@ -132,6 +132,19 @@ class RoomState(BaseModel):
     updated_at: str
 
 
+class PlayerSession(BaseModel):
+    """Room snapshot plus the private credentials handed to one joining player.
+
+    player_secret is a per-player bearer token. It is returned only to the player
+    it belongs to (at create/join time) and is never part of the broadcast
+    RoomState, so other room members cannot learn it and act on this player's behalf.
+    """
+
+    room: RoomState
+    player_id: str
+    player_secret: str
+
+
 class CreateRoomRequest(BaseModel):
     """Data the frontend sends when creating a room."""
 
