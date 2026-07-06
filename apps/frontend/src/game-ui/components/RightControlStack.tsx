@@ -7,9 +7,9 @@
  * room. Night order and storyteller tools are storyteller-only.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-import type { Character, RoomState } from '../../api/client';
+import type { Character, CharacterAssignment, RoomState } from '../../api/client';
 import type { PackNightOrder } from '../nightOrder';
 import type { ReminderTokenOption } from '../reminderTokens';
 import { seatedPlayerCount } from '../voting';
@@ -21,6 +21,7 @@ import type { StorytellerToolsPanelProps } from './StorytellerToolsPanel';
 
 type RightControlStackProps = StorytellerToolsPanelProps & {
   activeNightOrderTab: 'first' | 'other';
+  assignments: CharacterAssignment[];
   characters: Character[];
   isStoryteller: boolean;
   packNightOrder: PackNightOrder;
@@ -44,6 +45,17 @@ export function RightControlStack(props: RightControlStackProps) {
   ];
   const [activeTab, setActiveTab] = useState<DashboardTabId>('characters');
   const [isMinimized, setIsMinimized] = useState(false);
+
+  // Character names currently assigned to a player, for the night order panel
+  // to highlight which roles the storyteller actually has to wake.
+  const inPlayCharacterNames = useMemo(() => {
+    const nameById = new Map(props.characters.map((character) => [character.id, character.name]));
+    return new Set(
+      props.assignments
+        .map((assignment) => nameById.get(assignment.character_id))
+        .filter((name): name is string => Boolean(name)),
+    );
+  }, [props.assignments, props.characters]);
 
   // When the storyteller role changes the available tabs change too; fall back to
   // the always-present Characters tab if the active one is no longer offered.
@@ -87,31 +99,39 @@ export function RightControlStack(props: RightControlStackProps) {
           </button>
         </div>
 
-        {!isMinimized ? (
-          <div className="dashboard-body">
-            {activeTab === 'characters' ? (
-              <CharacterSheetPanel characters={props.characters} seatedPlayerCount={seatedPlayerCount(props.room)} />
-            ) : null}
+        <div className="dashboard-body" hidden={isMinimized}>
+          {/* All panels stay mounted and only hide, so per-panel state such as
+            * opened <details> sections survives switching tabs and minimizing
+            * the dashboard. */}
+          <div hidden={activeTab !== 'characters'}>
+            <CharacterSheetPanel characters={props.characters} seatedPlayerCount={seatedPlayerCount(props.room)} />
+          </div>
 
-            {activeTab === 'night' && isStoryteller ? (
+          {isStoryteller ? (
+            <div hidden={activeTab !== 'night'}>
               <NightOrderPanel
                 activeTab={props.activeNightOrderTab}
+                inPlayCharacterNames={inPlayCharacterNames}
                 packNightOrder={props.packNightOrder}
                 onSetTab={props.onSetNightOrderTab}
               />
-            ) : null}
+            </div>
+          ) : null}
 
-            {activeTab === 'reminders' ? (
-              <ReminderTokenPanel
-                reminderTokenOptions={props.reminderTokenOptions}
-                selectedReminderLabel={props.selectedReminderLabel}
-                onToggleReminderToken={props.onToggleReminderToken}
-              />
-            ) : null}
-
-            {activeTab === 'tools' && isStoryteller ? <StorytellerToolsPanel {...props} /> : null}
+          <div hidden={activeTab !== 'reminders'}>
+            <ReminderTokenPanel
+              reminderTokenOptions={props.reminderTokenOptions}
+              selectedReminderLabel={props.selectedReminderLabel}
+              onToggleReminderToken={props.onToggleReminderToken}
+            />
           </div>
-        ) : null}
+
+          {isStoryteller ? (
+            <div hidden={activeTab !== 'tools'}>
+              <StorytellerToolsPanel {...props} />
+            </div>
+          ) : null}
+        </div>
       </section>
     </aside>
   );

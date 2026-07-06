@@ -41,12 +41,12 @@ Characters, reminders & bluffs:
 - `GET /api/rooms/{room_id}/demon-bluffs?viewer_player_id=...`
 - `POST /api/rooms/{room_id}/demon-bluffs`
 
-Players join by name and room code, without accounts. The lobby must select exactly one storyteller before switching from lobby to day/night. After that, joining and storyteller selection are locked until the storyteller resets the room to lobby.
+Players join by name and room code, without accounts. The lobby must select exactly one storyteller before switching from lobby to day/night. After that, storyteller selection and seat-to-seat swaps are locked until the storyteller resets the room to lobby - but travelers can still join mid-game: an unseated player may sit down on a free seat, any player may leave their seat, the storyteller may resize the table, and single-character assignment stays available (random assignment is lobby/post-board only, since it would reshuffle every role).
 
 ## WebSocket
 
 Clients connect to `WS /ws/rooms/{room_id}?player_id=...`.
 
-`game.updated` carries the full room snapshot after any persisted change. Alongside it the server emits several smaller realtime events; the full set a client can receive is enumerated in `shared/schemas/events.schema.json` and mirrored by the `RoomSocketEvent` union in `apps/frontend/src/websocket/roomSocket.ts`: `connected`, `chat.message`, `hand.state`, `timer.state`, `vote_count.state`, `bell.ring`, `nomination.executed`, `voice.state`, `voice.call.request`, `voice.call.accept`, `voice.call.reject`, `voice.signal`, `room.kicked`, and `room.deleted`.
+`game.updated` carries the full room snapshot after any persisted change. Alongside it the server emits several smaller realtime events; the full set a client can receive is enumerated in `shared/schemas/events.schema.json` and mirrored by the `RoomSocketEvent` union in `apps/frontend/src/websocket/roomSocket.ts`: `connected`, `chat.message`, `chat.private.notice` (broadcast to the whole room when two non-storyteller players exchange a private message; carries only the sender/recipient ids, never the text), `hand.state`, `timer.state`, `vote_count.state`, `bell.ring`, `nomination.executed`, `voice.state`, `voice.call.request`, `voice.call.accept`, `voice.call.reject`, `voice.signal`, `room.kicked`, and `room.deleted`.
 
 Clients send: `chat.send`, `hand.set`, `voice.join`, `voice.leave`, `voice.call.request`, `voice.call.accept`, `voice.call.reject`, `voice.signal`, `timer.set`, `bell.ring`, and `vote_count.set`.

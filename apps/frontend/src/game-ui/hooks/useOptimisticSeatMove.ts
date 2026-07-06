@@ -164,7 +164,10 @@ export function useOptimisticSeatMove({
 
   /** Optimistically move to a seat or spectator state if seat changes are allowed. */
   function queueSeatMove(seatIndex: number | null) {
-    if (!room || !currentPlayerId || !canChangeSeats || currentPlayer?.is_storyteller) {
+    // Mid-game only traveler moves are allowed: sitting down while unseated,
+    // or standing up. Seat-to-seat swaps need the pre-game/post-board window.
+    const isTravelerMove = currentPlayer?.seat_index === null || seatIndex === null;
+    if (!room || !currentPlayerId || (!canChangeSeats && !isTravelerMove) || currentPlayer?.is_storyteller) {
       return;
     }
     const currentQueuedSeatIndex = pendingSeatMoveRef.current?.seatIndex ?? pendingOptimisticSeatIndexRef.current ?? optimisticSeatIndex ?? currentPlayer?.seat_index ?? null;

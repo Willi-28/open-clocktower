@@ -25,6 +25,7 @@ type ChatMessage = {
 };
 
 type UseRoomSocketEventsOptions = {
+  addChatFlight: (fromPlayerId: string, toPlayerId: string) => void;
   appendChatMessage: (message: ChatMessage, tabId?: string) => void;
   applyTimerState: (durationSeconds: number, remainingSeconds: number, isRunning: boolean, startedAt?: string | null) => void;
   applyVoiceParticipants: (participants: VoiceParticipant[]) => void;
@@ -37,7 +38,7 @@ type UseRoomSocketEventsOptions = {
   room: RoomState | null;
   roomSocketRef: RoomSocketRef;
   setCurrentPlayerId: (playerId: string) => void;
-  setError: (message: string) => void;
+  setError: Dispatch<SetStateAction<string>>;
   setIncomingVoiceCall: (call: { fromPlayerId: string; voiceRoom: string } | null) => void;
   setIsVoteCountRunning: (isRunning: boolean) => void;
   setRaisedHandPlayerIds: Dispatch<SetStateAction<string[]>>;
@@ -51,6 +52,7 @@ type UseRoomSocketEventsOptions = {
  * Synchronizes room updates and realtime player events from the room socket.
  */
 export function useRoomSocketEvents({
+  addChatFlight,
   appendChatMessage,
   applyTimerState,
   applyVoiceParticipants,
@@ -73,6 +75,7 @@ export function useRoomSocketEvents({
   setVoiceParticipants,
 }: UseRoomSocketEventsOptions) {
   const latestHandlersRef = useRef({
+    addChatFlight,
     appendChatMessage,
     applyTimerState,
     applyVoiceParticipants,
@@ -94,6 +97,7 @@ export function useRoomSocketEvents({
 
   useEffect(() => {
     latestHandlersRef.current = {
+      addChatFlight,
       appendChatMessage,
       applyTimerState,
       applyVoiceParticipants,
@@ -134,6 +138,9 @@ export function useRoomSocketEvents({
       if (event.type === 'game.updated') {
         handlers.setRoom(event.payload);
       }
+      if (event.type === 'chat.private.notice') {
+        handlers.addChatFlight(event.payload.fromPlayerId, event.payload.toPlayerId);
+      }
       if (event.type === 'chat.message') {
         const tabId = event.payload.toPlayerId === null ? 'public' : event.payload.fromPlayerId === currentPlayerId ? event.payload.toPlayerId : event.payload.fromPlayerId;
         if (event.payload.fromPlayerId !== currentPlayerId) {
@@ -164,7 +171,13 @@ export function useRoomSocketEvents({
         void handlers.joinSelectedVoiceRoom(event.payload.voiceRoom);
       }
       if (event.type === 'voice.call.reject') {
-        handlers.setError(`${handlers.playerName(event.payload.fromPlayerId)} declined the call.`);
+        const message = `${handlers.playerName(event.payload.fromPlayerId)} declined the call.`;
+        handlers.setError(message);
+        // The notice is informational; clear it after a moment unless a newer
+        // message has replaced it in the meantime.
+        window.setTimeout(() => {
+          handlers.setError((current) => (current === message ? '' : current));
+        }, 5000);
       }
       if (event.type === 'timer.state') {
         handlers.applyTimerState(

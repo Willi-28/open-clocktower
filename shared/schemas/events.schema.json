@@ -12,6 +12,7 @@
         "connected",
         "game.updated",
         "chat.message",
+        "chat.private.notice",
         "hand.state",
         "timer.state",
         "vote_count.state",

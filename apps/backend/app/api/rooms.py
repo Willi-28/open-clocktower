@@ -5,8 +5,9 @@ changing game state, uploading assets, assigning roles, and broadcasting updates
 """
 
 import base64
+from time import monotonic
 
-from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, Request, UploadFile
 
 from app.game.room_state import (
     AssignCharacterRequest,
@@ -36,6 +37,27 @@ router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 
 _UPLOAD_CHUNK_BYTES = 64 * 1024
 
+# Brute-force and spam protection (CWE-307) for the two endpoints that mint
+# credentials without authentication: sliding per-IP windows keep room-code
+# guessing and room/player spam infeasible without hurting normal use.
+_CREATE_ATTEMPT_LIMIT = 5
+_JOIN_ATTEMPT_LIMIT = 12
+_ATTEMPT_WINDOW_SECONDS = 60.0
+_attempt_times: dict[tuple[str, str], list[float]] = {}
+
+
+def _require_attempt_budget(kind: str, http_request: Request, limit: int) -> None:
+    """Raise 429 when one client IP exceeds its create/join attempt budget."""
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    now = monotonic()
+    key = (kind, client_ip)
+    recent = [stamp for stamp in _attempt_times.get(key, []) if now - stamp < _ATTEMPT_WINDOW_SECONDS]
+    if len(recent) >= limit:
+        _attempt_times[key] = recent
+        raise HTTPException(status_code=429, detail="Too many attempts - wait a moment and try again")
+    recent.append(now)
+    _attempt_times[key] = recent
+
 
 async def _read_upload_capped(file: UploadFile, max_bytes: int) -> bytes:
     """Read an upload in chunks and abort once it exceeds the allowed size.
@@ -58,8 +80,9 @@ async def _read_upload_capped(file: UploadFile, max_bytes: int) -> bytes:
 
 
 @router.post("")
-async def create_room(request: CreateRoomRequest):
+async def create_room(request: CreateRoomRequest, http_request: Request):
     """Create a new room and return the founder's private session credentials."""
+    _require_attempt_budget("create", http_request, _CREATE_ATTEMPT_LIMIT)
     session = room_store.create_room(request)
     await room_hub.broadcast_state(session.room)
     return session
@@ -90,8 +113,9 @@ async def update_room(room_id: str, request: UpdateRoomRequest, x_player_secret:
 
 
 @router.post("/{room_id}/players")
-async def join_room(room_id: str, request: JoinRoomRequest):
+async def join_room(room_id: str, request: JoinRoomRequest, http_request: Request):
     """Join an existing room and return the new player's private session credentials."""
+    _require_attempt_budget("join", http_request, _JOIN_ATTEMPT_LIMIT)
     try:
         session = room_store.join_room(room_id, request)
     except ValueError as error:
@@ -199,6 +223,8 @@ async def set_phase(room_id: str, request: PhaseRequest, x_player_secret: str | 
         raise HTTPException(status_code=404, detail="Room not found")
     if room.phase == "night" and not room.allow_public_voice_during_night:
         await room_hub.close_public_voice_rooms(room_id)
+    # Day/night flips change what voice presence each player may see.
+    await room_hub.broadcast_voice_state(room_id)
     await room_hub.broadcast_state(room)
     return room
 

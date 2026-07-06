@@ -16,7 +16,6 @@ type VoiceRoomsPanelProps = {
   onJoinVoiceRoom: (voiceRoom: string) => void;
   onLeaveVoiceRoom: () => void;
   publicVoiceOccupants: (voiceRoom: string) => string[];
-  publicVoiceDuringNight: boolean;
   roomPhase: GamePhase;
   voiceRoomLabel: (voiceRoom: string) => string;
   voiceRooms: string[];
@@ -32,12 +31,13 @@ export function VoiceRoomsPanel({
   onJoinVoiceRoom,
   onLeaveVoiceRoom,
   publicVoiceOccupants,
-  publicVoiceDuringNight,
   roomPhase,
   voiceRoomLabel,
   voiceRooms,
 }: VoiceRoomsPanelProps) {
-  const isPublicVoiceClosed = roomPhase === 'night' && !isStoryteller && !publicVoiceDuringNight;
+  // At night players stay where they are: no self-initiated switching at all.
+  // Only a storyteller call can move them (handled via the incoming-call flow).
+  const isNightLocked = roomPhase === 'night' && !isStoryteller;
 
   return (
     <details open>
@@ -49,7 +49,7 @@ export function VoiceRoomsPanel({
           return (
             <button
               className={isJoined ? 'voice-room active' : 'voice-room'}
-              disabled={isVoiceSwitching || isPublicVoiceClosed}
+              disabled={isVoiceSwitching || isNightLocked}
               key={voiceRoom}
               onClick={() => {
                 if (!isJoined) {
@@ -89,8 +89,8 @@ export function VoiceRoomsPanel({
           </button>
         </div>
       ) : null}
-      {isPublicVoiceClosed && !joinedVoiceRoom ? (
-        <p className="helper-text">Public voice is closed during night.</p>
+      {isNightLocked ? (
+        <p className="helper-text">Voice rooms are locked during night.</p>
       ) : null}
     </details>
   );

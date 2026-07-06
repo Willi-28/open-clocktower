@@ -6,7 +6,7 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent } from 'react';
+import type { CSSProperties, MouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 
 import type { Character, CharacterAssignment, Player, RoomState } from '../../api/client';
 import { voiceRooms } from '../gameConfig';
@@ -17,6 +17,7 @@ import type { ReminderToken } from '../types';
 type GameTableProps = {
   assignments: CharacterAssignment[];
   characters: Character[];
+  chatFlights: Array<{ id: string; fromPlayerId: string; toPlayerId: string }>;
   currentPlayerId: string;
   guesses: Record<string, string>;
   highlightedPlayerId?: string;
@@ -136,6 +137,7 @@ const TableSeatButton = memo(function TableSeatButton({
 export function GameTable({
   assignments,
   characters,
+  chatFlights,
   currentPlayerId,
   guesses,
   highlightedPlayerId,
@@ -166,6 +168,45 @@ export function GameTable({
   const handleSeatButtonClick = useCallback((seatIndex: number) => {
     onSeatClickRef.current(seatIndex);
   }, []);
+
+  // Reminder tokens are dragged with pointer capture: the token moves by the
+  // pointer's delta from where it was grabbed, so it lands exactly where it
+  // was dropped (HTML5 drag-and-drop reported unreliable end coordinates and
+  // ignored the grab offset).
+  const reminderDragRef = useRef<{
+    id: string;
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    originX: number;
+    originY: number;
+    hasMoved: boolean;
+  } | null>(null);
+  const suppressReminderClickRef = useRef(false);
+  const [reminderDrag, setReminderDrag] = useState<{ id: string; x: number; y: number } | null>(null);
+
+  /** Resolve the dragged token's live table position, or null when not dragging. */
+  function draggedReminderPosition(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = reminderDragRef.current;
+    if (!drag || event.pointerId !== drag.pointerId) {
+      return null;
+    }
+    const table = event.currentTarget.closest('.table-surface');
+    if (!(table instanceof HTMLElement)) {
+      return null;
+    }
+    // A small threshold keeps plain clicks from registering as micro-drags.
+    if (!drag.hasMoved && Math.abs(event.clientX - drag.startClientX) < 3 && Math.abs(event.clientY - drag.startClientY) < 3) {
+      return null;
+    }
+    drag.hasMoved = true;
+    const bounds = table.getBoundingClientRect();
+    return {
+      id: drag.id,
+      x: Math.min(100, Math.max(0, drag.originX + ((event.clientX - drag.startClientX) / bounds.width) * 100)),
+      y: Math.min(100, Math.max(0, drag.originY + ((event.clientY - drag.startClientY) / bounds.height) * 100)),
+    };
+  }
   // Added seats spawn from the top seat slot and glide to their place; removed
   // seats glide back into it before unmounting. `spawnBoundary` pins every seat
   // with index >= boundary to the spawn slot, `lingerCount` keeps removed seats
@@ -280,6 +321,12 @@ export function GameTable({
     };
   }
 
+  /** Return a seated player's table position (in percent), if they are seated. */
+  function seatPositionForPlayer(playerId: string) {
+    const seat = seats.find((candidate) => seatedPlayers.get(candidate.index)?.id === playerId);
+    return seat ? { x: 50 + seat.x, y: 50 + seat.y } : null;
+  }
+
   const highlightedSeat = seats.find((seat) => seatedPlayers.get(seat.index)?.id === highlightedPlayerId);
   const highlightedSeatPlayer = highlightedSeat ? seatedPlayers.get(highlightedSeat.index) : undefined;
   const firstVoteSeat = seats.find((seat) => seatedPlayers.get(seat.index)?.id === voteOrderPlayerIds[0]);
@@ -352,41 +399,94 @@ export function GameTable({
           />
         ) : null}
 
-        {reminders.filter((reminder) => reminder.icon).map((reminder) => (
-          <button
-            className="reminder-token image-token"
-            draggable
-            key={reminder.id}
-            onDragStart={(event) => {
-              event.stopPropagation();
-            }}
-            onDragEnd={(event) => {
-              event.stopPropagation();
-              const table = event.currentTarget.closest('.table-surface');
-              if (!(table instanceof HTMLElement)) {
-                return;
-              }
-              const bounds = table.getBoundingClientRect();
-              onReminderMove(
-                reminder.id,
-                Math.min(100, Math.max(0, ((event.clientX - bounds.left) / bounds.width) * 100)),
-                Math.min(100, Math.max(0, ((event.clientY - bounds.top) / bounds.height) * 100)),
-              );
-            }}
-            onClick={(event) => {
-              event.stopPropagation();
-              onReminderClick(reminder.id);
-            }}
-            style={{
-              left: `${reminder.x}%`,
-              top: `${reminder.y}%`,
-            }}
-            type="button"
-          >
-            <img alt="" src={reminder.icon ?? ''} />
-            <span className="reminder-token-label">{reminder.label}</span>
-          </button>
-        ))}
+        {chatFlights.map((flight) => {
+          const from = seatPositionForPlayer(flight.fromPlayerId);
+          const to = seatPositionForPlayer(flight.toPlayerId);
+          if (!from || !to) {
+            return null;
+          }
+          return (
+            <span
+              aria-hidden="true"
+              className="chat-flight"
+              key={flight.id}
+              style={{
+                '--flight-from-x': from.x - 50,
+                '--flight-from-y': from.y - 50,
+                '--flight-to-x': to.x - 50,
+                '--flight-to-y': to.y - 50,
+              } as CSSProperties}
+            >
+              <svg fill="none" focusable="false" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+                <rect x="2.5" y="5" width="19" height="14" rx="2.8" />
+                <path d="m4 6.5 8 6.8 8-6.8" />
+              </svg>
+            </span>
+          );
+        })}
+
+        {reminders.filter((reminder) => reminder.icon).map((reminder) => {
+          const dragPosition = reminderDrag?.id === reminder.id ? reminderDrag : null;
+          return (
+            <button
+              className={dragPosition ? 'reminder-token image-token reminder-dragging' : 'reminder-token image-token'}
+              key={reminder.id}
+              onPointerDown={(event) => {
+                if (event.button !== 0) {
+                  return;
+                }
+                event.currentTarget.setPointerCapture(event.pointerId);
+                reminderDragRef.current = {
+                  id: reminder.id,
+                  pointerId: event.pointerId,
+                  startClientX: event.clientX,
+                  startClientY: event.clientY,
+                  originX: reminder.x,
+                  originY: reminder.y,
+                  hasMoved: false,
+                };
+              }}
+              onPointerMove={(event) => {
+                const position = draggedReminderPosition(event);
+                if (position) {
+                  setReminderDrag({ id: position.id, x: position.x, y: position.y });
+                }
+              }}
+              onPointerUp={(event) => {
+                const drag = reminderDragRef.current;
+                const position = draggedReminderPosition(event);
+                reminderDragRef.current = null;
+                setReminderDrag(null);
+                if (drag && event.pointerId === drag.pointerId) {
+                  suppressReminderClickRef.current = drag.hasMoved;
+                }
+                if (position) {
+                  onReminderMove(position.id, position.x, position.y);
+                }
+              }}
+              onPointerCancel={() => {
+                reminderDragRef.current = null;
+                setReminderDrag(null);
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (suppressReminderClickRef.current) {
+                  suppressReminderClickRef.current = false;
+                  return;
+                }
+                onReminderClick(reminder.id);
+              }}
+              style={{
+                left: `${dragPosition ? dragPosition.x : reminder.x}%`,
+                top: `${dragPosition ? dragPosition.y : reminder.y}%`,
+              }}
+              type="button"
+            >
+              <img alt="" draggable={false} src={reminder.icon ?? ''} />
+              <span className="reminder-token-label">{reminder.label}</span>
+            </button>
+          );
+        })}
 
         {storyteller ? (() => {
           const isInFocusedVoiceRoom = voiceFocusPlayerIdSet.has(storyteller.id);

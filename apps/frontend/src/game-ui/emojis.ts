@@ -18,8 +18,6 @@ export type EmojiSegment =
   | { type: 'text'; value: string }
   | { type: 'emoji'; emoji: string; shortcode: string };
 
-const twemojiBaseUrl = 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg';
-
 export const emojiDefinitions: EmojiDefinition[] = [
   { shortcode: 'grinning', emoji: '😀', category: 'Smileys', keywords: ['happy', 'face'] },
   { shortcode: 'smiley', emoji: '😃', category: 'Smileys', keywords: ['happy', 'face'] },
@@ -193,14 +191,13 @@ export function isEmojiOnlyMessage(text: string) {
     segments.every((segment) => segment.type === 'emoji' || segment.value.trim().length === 0);
 }
 
-/** Build the Twemoji SVG asset URL that matches Discord-style emoji rendering. */
-export function twemojiUrl(emoji: string) {
-  const codepoints = Array.from(emoji)
+/** Build the Twemoji-style codepoint file stem for one emoji (e.g. "1f60f"). */
+export function emojiCodepoints(emoji: string) {
+  return Array.from(emoji)
     .map((character) => character.codePointAt(0))
     .filter((codepoint): codepoint is number => Boolean(codepoint) && codepoint !== 0xfe0e && codepoint !== 0xfe0f)
     .map((codepoint) => codepoint.toString(16))
     .join('-');
-  return `${twemojiBaseUrl}/${codepoints}.svg`;
 }
 
 /** Insert the picked emoji character at the current textarea selection. */

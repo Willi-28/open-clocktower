@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { Script } from 'node:vm';
 import ts from 'typescript';
 
@@ -17,7 +17,7 @@ function loadEmojis() {
   return module.exports;
 }
 
-const { emojiForShortcode, insertEmoji, isEmojiOnlyMessage, searchEmojis, tokenizeEmojiShortcodes, twemojiUrl } = loadEmojis();
+const { emojiCodepoints, emojiDefinitions, emojiForShortcode, insertEmoji, isEmojiOnlyMessage, searchEmojis, tokenizeEmojiShortcodes } = loadEmojis();
 
 assert.equal(emojiForShortcode('smirk').emoji, '😏');
 assert.equal(emojiForShortcode('SMIRK').emoji, '😏');
@@ -52,9 +52,16 @@ assert.equal(searchEmojis('hankey')[0].shortcode, 'poop');
 assert.equal(isEmojiOnlyMessage(':smirk: :heart:'), true);
 assert.equal(isEmojiOnlyMessage(':smirk: hello'), false);
 assert.equal(isEmojiOnlyMessage(':unknown:'), false);
-assert.ok(twemojiUrl('😏').endsWith('/1f60f.svg'));
-assert.ok(twemojiUrl('❤️').endsWith('/2764.svg'));
-assert.ok(twemojiUrl('☠️').endsWith('/2620.svg'));
+assert.equal(emojiCodepoints('😏'), '1f60f');
+assert.equal(emojiCodepoints('❤️'), '2764');
+assert.equal(emojiCodepoints('☠️'), '2620');
+
+// Every emoji in the bounded list must ship as a bundled local SVG, so chat
+// rendering never depends on an external CDN.
+for (const definition of emojiDefinitions) {
+  const asset = new URL(`../src/assets/twemoji/${emojiCodepoints(definition.emoji)}.svg`, import.meta.url);
+  assert.ok(existsSync(asset), `missing bundled twemoji asset for :${definition.shortcode}:`);
+}
 
 assert.equal(JSON.stringify(insertEmoji('hello', 'joy', 5, 5)), JSON.stringify({
   nextDraft: 'hello😂',

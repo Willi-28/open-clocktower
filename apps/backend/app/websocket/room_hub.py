@@ -32,8 +32,12 @@ class RoomHub:
         # Accepts a browser connection for a specific room.
         await websocket.accept()
         self._rooms.setdefault(room_id, {})[websocket] = player_id
+        is_night, storyteller_id = room_store.night_voice_info(room_id)
+        participants = self._voice_participants(room_id)
+        if is_night:
+            participants = self._night_visible_participants(room_id, participants, player_id, storyteller_id)
         await websocket.send_json({"type": "hand.state", "payload": {"playerIds": sorted(self._raised_hands.get(room_id, set()))}})
-        await websocket.send_json({"type": "voice.state", "payload": {"participants": self._voice_participants(room_id)}})
+        await websocket.send_json({"type": "voice.state", "payload": {"participants": participants}})
         await websocket.send_json({"type": "timer.state", "payload": self._timer_state(room_id)})
         await websocket.send_json({"type": "vote_count.state", "payload": self._vote_count_state(room_id)})
 
@@ -101,10 +105,7 @@ class RoomHub:
             room_id,
             {"type": "hand.state", "payload": {"playerIds": sorted(self._raised_hands.get(room_id, set()))}},
         )
-        await self.broadcast_room_event(
-            room_id,
-            {"type": "voice.state", "payload": {"participants": self._voice_participants(room_id)}},
-        )
+        await self.broadcast_voice_state(room_id)
 
     async def set_hand_raised(self, room_id: str, player_id: str, is_raised: bool) -> None:
         """Update a player's raised-hand status and broadcast the hand list."""
@@ -134,10 +135,7 @@ class RoomHub:
             room_voice[player_id] = voice_room
         else:
             room_voice.pop(player_id, None)
-        await self.broadcast_room_event(
-            room_id,
-            {"type": "voice.state", "payload": {"participants": self._voice_participants(room_id)}},
-        )
+        await self.broadcast_voice_state(room_id)
 
     async def close_public_voice_rooms(self, room_id: str) -> None:
         """Remove players from public voice rooms when night restrictions apply."""
@@ -152,14 +150,45 @@ class RoomHub:
             return
         for player_id in public_player_ids:
             room_voice.pop(player_id, None)
-        await self.broadcast_room_event(
-            room_id,
-            {"type": "voice.state", "payload": {"participants": self._voice_participants(room_id)}},
-        )
+        await self.broadcast_voice_state(room_id)
 
     async def send_voice_signal(self, room_id: str, target_player_id: str, payload: dict) -> None:
         """Forward one WebRTC signaling payload to a target player."""
         await self.send_to_players(room_id, {target_player_id}, payload)
+
+    async def broadcast_voice_state(self, room_id: str) -> None:
+        """Send voice presence; at night each player only learns their own room.
+
+        Day (and the storyteller at any time) gets the full participant list.
+        At night everyone else must not be able to tell who is absent from a
+        room or privately calling - not even on the wire.
+        """
+        is_night, storyteller_id = room_store.night_voice_info(room_id)
+        participants = self._voice_participants(room_id)
+        if not is_night:
+            await self.broadcast_room_event(room_id, {"type": "voice.state", "payload": {"participants": participants}})
+            return
+        for websocket, player_id in list(self._rooms.get(room_id, {}).items()):
+            visible = self._night_visible_participants(room_id, participants, player_id, storyteller_id)
+            try:
+                await websocket.send_text(json.dumps({"type": "voice.state", "payload": {"participants": visible}}))
+            except RuntimeError:
+                self.disconnect(room_id, websocket)
+
+    def _night_visible_participants(
+        self,
+        room_id: str,
+        participants: list[dict[str, str]],
+        viewer_id: str | None,
+        storyteller_id: str | None,
+    ) -> list[dict[str, str]]:
+        """Reduce voice presence to what one viewer may see during night."""
+        if viewer_id is not None and viewer_id == storyteller_id:
+            return participants
+        own_room = self._voice_rooms.get(room_id, {}).get(viewer_id) if viewer_id else None
+        if own_room is None:
+            return []
+        return [participant for participant in participants if participant["voiceRoom"] == own_room]
 
     async def set_timer(self, room_id: str, duration_seconds: int, remaining_seconds: int, is_running: bool) -> None:
         """Store and broadcast the storyteller-controlled discussion timer."""

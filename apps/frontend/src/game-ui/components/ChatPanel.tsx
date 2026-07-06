@@ -16,9 +16,9 @@ import {
   isEmojiOnlyMessage,
   searchEmojis,
   tokenizeEmojiShortcodes,
-  twemojiUrl,
 } from '../emojis';
 import type { EmojiDefinition } from '../emojis';
+import { twemojiUrl } from '../twemoji';
 import type { ChatMessage } from '../types';
 
 type ChatPanelProps = {
@@ -232,7 +232,8 @@ export function ChatPanel({
     const selectionEnd = textarea?.selectionEnd ?? selectionStart;
     const { nextCursor, nextDraft } = insertEmoji(chatDraft, shortcode, selectionStart, selectionEnd);
     setChatDraft(nextDraft);
-    setIsEmojiPickerOpen(false);
+    // The picker stays open so several emoji can be picked in a row; it closes
+    // via the toggle button, Escape, or clicking anywhere outside.
     window.requestAnimationFrame(() => {
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(nextCursor, nextCursor);

@@ -31,6 +31,7 @@ export type StorytellerToolsPanelProps = {
   timerRemaining: number;
   voteCount: number;
   voteCountIndex: number;
+  onAssignCharacter: (playerId: string, characterId: string) => void;
   onAssignRandomCharacters: () => void;
   onCancelVote: () => void;
   onExecutePlayer: (playerId: string) => void;
@@ -73,6 +74,7 @@ export function StorytellerToolsPanel({
   timerRemaining,
   voteCount,
   voteCountIndex,
+  onAssignCharacter,
   onAssignRandomCharacters,
   onCancelVote,
   onExecutePlayer,
@@ -96,6 +98,7 @@ export function StorytellerToolsPanel({
 }: StorytellerToolsPanelProps) {
   const shareablePlayers = useMemo(() => room.players.filter((player) => !player.is_storyteller), [room.players]);
   const [selectedGrimoirePlayerId, setSelectedGrimoirePlayerId] = useState('');
+  const [singleAssignCharacterId, setSingleAssignCharacterId] = useState('');
   const [isEditingTimer, setIsEditingTimer] = useState(false);
   const [timerDraft, setTimerDraft] = useState(formatTimer(timerRemaining));
   const selectedGrimoirePlayer = shareablePlayers.find((player) => player.id === selectedGrimoirePlayerId);
@@ -148,7 +151,6 @@ export function StorytellerToolsPanel({
         <label>
           Seats
           <input
-            disabled={!isLobby && !room.show_board}
             min="5"
             max="20"
             type="number"
@@ -156,7 +158,6 @@ export function StorytellerToolsPanel({
             onChange={(event) => onSetSeatCount(Number(event.target.value))}
           />
         </label>
-        {!isLobby && !room.show_board ? <p className="helper-text">Seat count is locked while the game is running.</p> : null}
         <label className="checkbox-row">
           <input
             checked={room.allow_public_voice_during_night}
@@ -182,8 +183,38 @@ export function StorytellerToolsPanel({
             </label>
           ))}
         </div>
-        <button disabled={randomCharacterIds.length !== seatedPlayerCount} onClick={onAssignRandomCharacters} type="button">
+        <button
+          disabled={randomCharacterIds.length !== seatedPlayerCount || (!isLobby && !room.show_board)}
+          onClick={onAssignRandomCharacters}
+          type="button"
+        >
           Randomly Assign {randomCharacterIds.length}/{seatedPlayerCount}
+        </button>
+        {!isLobby && !room.show_board ? (
+          <p className="helper-text">Random assignment is locked mid-game - it would reshuffle every role. Use the single assignment below for travelers.</p>
+        ) : null}
+
+        <h3 className="tool-section-heading">Assign Single Character</h3>
+        <p className="helper-text">
+          Give one player a role without touching anyone else - e.g. a traveler joining mid-game. Select the player in the list below first.
+        </p>
+        <label>
+          Character
+          <select value={singleAssignCharacterId} onChange={(event) => setSingleAssignCharacterId(event.target.value)}>
+            <option value="">Choose a character...</option>
+            {characters.map((character) => (
+              <option key={character.id} value={character.id}>
+                {characterRole(character)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          disabled={!singleAssignCharacterId || !selectedPlayer || selectedPlayer.is_storyteller}
+          onClick={() => onAssignCharacter(selectedPlayerId, singleAssignCharacterId)}
+          type="button"
+        >
+          Assign to {selectedPlayer && !selectedPlayer.is_storyteller ? selectedPlayer.display_name : 'selected player'}
         </button>
 
         <h3 className="tool-section-heading">{isLobby ? 'Lobby Players' : 'Room Players'}</h3>

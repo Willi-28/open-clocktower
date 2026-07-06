@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 
 import {
+  assignCharacter,
   assignRandomCharacters,
   Character,
   CharacterAssignment,
@@ -113,6 +114,23 @@ export function useGameData({ characterLanguage, currentPlayerId, isStoryteller,
   }
 
   /**
+   * Assigns one character to one player (e.g. a traveler joining mid-game)
+   * without touching anyone else's role.
+   */
+  async function assignCharacterToPlayer(playerId: string, characterId: string) {
+    if (!room) {
+      return;
+    }
+    setError('');
+    try {
+      setAssignments(await assignCharacter(room.id, currentPlayerId, playerId, characterId));
+      setRoom(await getRoom(room.id));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Action failed');
+    }
+  }
+
+  /**
    * Tracks which script characters are eligible for random assignment.
    */
   function toggleRandomCharacter(characterId: string) {
@@ -154,6 +172,7 @@ export function useGameData({ characterLanguage, currentPlayerId, isStoryteller,
   }
 
   return {
+    assignCharacterToPlayer,
     assignSelectedCharactersRandomly,
     assignments,
     characters,

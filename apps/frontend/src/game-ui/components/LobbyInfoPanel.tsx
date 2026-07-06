@@ -12,7 +12,6 @@ import type { Player, RoomState } from '../../api/client';
 import { VoiceMuteIcon } from './VoiceMuteIcon';
 
 type LobbyInfoPanelProps = {
-  canChangeSeats: boolean;
   currentPlayer: Player | undefined;
   isFullscreen: boolean;
   isMuted: boolean;
@@ -30,7 +29,6 @@ type LobbyInfoPanelProps = {
 
 /** Render the top-left dashboard for the current room and player. */
 export function LobbyInfoPanel({
-  canChangeSeats,
   currentPlayer,
   isFullscreen,
   isMuted,
@@ -88,7 +86,7 @@ export function LobbyInfoPanel({
         {currentPlayer && !isStoryteller ? (
           <button
             className="secondary"
-            disabled={!canChangeSeats || currentPlayer.seat_index === null}
+            disabled={currentPlayer.seat_index === null}
             onClick={onLeaveSeat}
             type="button"
           >

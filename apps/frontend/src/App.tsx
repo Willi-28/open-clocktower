@@ -266,7 +266,25 @@ export function App() {
     void updateRoom(room.id, currentPlayerId, { shared_grimoire_reminders: sharedGrimoireReminders }).catch(() => undefined);
   }, [currentPlayerId, isStoryteller, room?.id, sharedGrimoirePlayerKey, sharedGrimoireReminders]);
 
+  // Envelope flights: everyone sees THAT two players exchanged a private
+  // message (never its content); each notice glides an icon between the seats.
+  const [chatFlights, setChatFlights] = useState<Array<{ id: string; fromPlayerId: string; toPlayerId: string }>>([]);
+
+  /** Queue one envelope flight and drop it again once its animation is over. */
+  function addChatFlight(fromPlayerId: string, toPlayerId: string) {
+    const id = crypto.randomUUID();
+    setChatFlights((current) =>
+      current.some((flight) => flight.fromPlayerId === fromPlayerId && flight.toPlayerId === toPlayerId)
+        ? current
+        : [...current, { id, fromPlayerId, toPlayerId }],
+    );
+    window.setTimeout(() => {
+      setChatFlights((current) => current.filter((flight) => flight.id !== id));
+    }, 1700);
+  }
+
   useRoomSocketEvents({
+    addChatFlight,
     appendChatMessage: chat.appendChatMessage,
     applyTimerState: timer.applyTimerState,
     applyVoiceParticipants: voiceSession.applyVoiceParticipants,
@@ -289,7 +307,14 @@ export function App() {
     setVoiceParticipants: voiceSession.setVoiceParticipants,
   });
 
-  const storytellerVoiceRoom = voiceSession.voiceParticipants.find((participant) => participant.playerId === storyteller?.id)?.voiceRoom;
+  // At night players must not see who is (or is not) in a voice room - that
+  // would reveal who is privately calling. Only presence in their own current
+  // voice room stays visible; the storyteller keeps full presence.
+  const hideNightVoicePresence = Boolean(room && room.phase === 'night' && !isStoryteller);
+  const visibleVoiceParticipants = hideNightVoicePresence
+    ? voiceSession.voiceParticipants.filter((participant) => participant.voiceRoom === voiceSession.joinedVoiceRoom)
+    : voiceSession.voiceParticipants;
+  const storytellerVoiceRoom = visibleVoiceParticipants.find((participant) => participant.playerId === storyteller?.id)?.voiceRoom;
   const seatedPlayerCounter = seatedPlayerCount(room);
   const isPlayerNightView = Boolean(room?.phase === 'night' && currentPlayer && !isStoryteller);
   const appShellClassName = [
@@ -378,7 +403,9 @@ export function App() {
     const clickedPlayer = seatedPlayers.get(seatIndex);
     if (!clickedPlayer) {
       tableUi.setSelectedSeatActionPlayerId('');
-      if (canChangeSeats && currentPlayer && !currentPlayer.is_storyteller) {
+      // Unseated players (travelers) may sit down on a free seat even mid-game.
+      const maySit = canChangeSeats || currentPlayer?.seat_index === null;
+      if (maySit && currentPlayer && !currentPlayer.is_storyteller) {
         seatMove.queueSeatMove(seatIndex);
       }
       return;
@@ -417,7 +444,12 @@ export function App() {
 
   /** Return current occupant display names for one public voice room. */
   function publicVoiceOccupants(voiceRoom: string) {
-    return publicVoiceOccupantNames(voiceSession.voiceParticipants, voiceRoom, playerName);
+    // At night the panel shows no occupant names at all - own-room presence
+    // data still exists locally (WebRTC needs it) but must not be displayed.
+    if (hideNightVoicePresence) {
+      return [];
+    }
+    return publicVoiceOccupantNames(visibleVoiceParticipants, voiceRoom, playerName);
   }
 
   /** Approve a pending nomination request and start that nomination. */
@@ -571,7 +603,6 @@ export function App() {
           <aside className="edge-panel left-edge">
             <LobbyInfoPanel
               currentPlayer={displayedCurrentPlayer}
-              canChangeSeats={canChangeSeats}
               isFullscreen={isFullscreen}
               isMuted={isMuted}
               isStoryteller={isStoryteller}
@@ -609,7 +640,6 @@ export function App() {
               onJoinVoiceRoom={(voiceRoom) => void voiceSession.joinSelectedVoiceRoom(voiceRoom)}
               onLeaveVoiceRoom={() => voiceSession.leaveVoiceRoom(true)}
               publicVoiceOccupants={publicVoiceOccupants}
-              publicVoiceDuringNight={room.allow_public_voice_during_night}
               roomPhase={room.phase}
               voiceRoomLabel={(voiceRoom) => voiceRoomLabel(voiceRoom, playerName)}
               voiceRooms={voiceRooms}
@@ -647,6 +677,7 @@ export function App() {
             <GameTable
               assignments={gameData.assignments}
               characters={gameData.characters}
+              chatFlights={chatFlights}
               currentPlayerId={currentPlayerId}
               isStoryteller={isStoryteller}
               isReminderMode={Boolean(tableUi.selectedReminderLabel)}
@@ -667,7 +698,7 @@ export function App() {
               voteOrderPlayerIds={voting.activeVoteOrder.map((player) => player.id)}
               voteScanTotal={voting.activeVoteOrder.length}
               joinedVoiceRoom={voiceSession.joinedVoiceRoom}
-              voiceParticipants={voiceSession.voiceParticipants}
+              voiceParticipants={visibleVoiceParticipants}
               showTable={clientSettings.showTable}
               storyteller={storyteller}
               storytellerVoiceLabel={storytellerVoiceLabel(storytellerVoiceRoom)}
@@ -736,6 +767,7 @@ export function App() {
             activeNightOrderTab={tableUi.activeNightOrderTab}
             activeNomination={voting.activeNomination}
             activeVoteOrderLength={voting.activeVoteOrder.length}
+            assignments={gameData.assignments}
             characters={gameData.characters}
             currentPlayerId={currentPlayerId}
             hasExecutionVotes={voting.hasExecutionVotes}
@@ -756,6 +788,7 @@ export function App() {
             timerRemaining={timer.timerRemaining}
             voteCount={voting.voteCount}
             voteCountIndex={voting.voteCountIndex}
+            onAssignCharacter={(playerId, characterId) => void gameData.assignCharacterToPlayer(playerId, characterId)}
             onAssignRandomCharacters={() => void gameData.assignSelectedCharactersRandomly()}
             onCancelVote={() => void voting.cancelVote()}
             onDeleteRoom={confirmDeleteRoom}

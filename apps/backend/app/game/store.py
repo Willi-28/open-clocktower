@@ -107,8 +107,8 @@ class RoomStore:
                 return None
             self._require_storyteller(session, room_id, request.actor_player_id, secret)
             if request.seat_count is not None:
-                if not self._can_change_seats(room):
-                    raise ValueError("room seats can only be changed before the game or after the board is shown")
+                # The storyteller may resize the table even mid-game so
+                # travelers can join a running round.
                 seated_players = [player for player in room.players if player.seat_index is not None]
                 if len(seated_players) > request.seat_count:
                     raise ValueError("No free seats available.")
@@ -233,7 +233,12 @@ class RoomStore:
             self._authenticate(session, room_id, request.actor_player_id, secret)
             if "seat_index" in fields_set:
                 if not self._can_change_seats(room):
-                    raise ValueError("seats can only be changed before the game or after the board is shown")
+                    # Mid-game, travelers may still sit down on a free seat or
+                    # stand up; seated players cannot swap seats mid-round.
+                    is_sitting_down = player.seat_index is None and request.seat_index is not None
+                    is_standing_up = request.seat_index is None
+                    if not is_sitting_down and not is_standing_up:
+                        raise ValueError("seats can only be swapped before the game or after the board is shown")
                 if request.actor_player_id != player_id:
                     raise ValueError("players can only change their own seat")
                 if player.is_storyteller and request.seat_index is not None:
@@ -431,23 +436,27 @@ class RoomStore:
             if room is None:
                 return None
             self._require_storyteller(session, room_id, request.actor_player_id, secret)
-            room.phase = GamePhase.LOBBY.value
-            room.day_count = 0
-            room.night_count = 0
-            room.show_board = False
-            room.shared_grimoire_player_ids = "[]"
-            room.shared_grimoire_reminders = "[]"
-            self._clear_active_nomination(session, room_id)
-            session.execute(delete(VoteModel).where(VoteModel.room_id == room_id))
-            session.execute(delete(NominationRequestModel).where(NominationRequestModel.room_id == room_id))
+            self._begin_new_round(session, room)
             session.execute(delete(CharacterAssignmentModel).where(CharacterAssignmentModel.room_id == room_id))
-            session.execute(delete(DemonBluffModel).where(DemonBluffModel.room_id == room_id))
-            for player in room.players:
-                player.status = PlayerStatus.ALIVE.value
-                player.has_dead_vote = True
             self._touch(room)
             session.commit()
             return self._to_state(session, room)
+
+    def _begin_new_round(self, session: Session, room: RoomModel) -> None:
+        """Roll the room back to a hidden pre-game lobby for the next round."""
+        room.phase = GamePhase.LOBBY.value
+        room.day_count = 0
+        room.night_count = 0
+        room.show_board = False
+        room.shared_grimoire_player_ids = "[]"
+        room.shared_grimoire_reminders = "[]"
+        self._clear_active_nomination(session, room.id)
+        session.execute(delete(VoteModel).where(VoteModel.room_id == room.id))
+        session.execute(delete(NominationRequestModel).where(NominationRequestModel.room_id == room.id))
+        session.execute(delete(DemonBluffModel).where(DemonBluffModel.room_id == room.id))
+        for player in room.players:
+            player.status = PlayerStatus.ALIVE.value
+            player.has_dead_vote = True
 
     def delete_room(self, room_id: str, actor_player_id: str | None, secret: str | None) -> bool:
         """Delete a room after storyteller authorization."""
@@ -598,6 +607,10 @@ class RoomStore:
             character = session.get(CharacterModel, request.character_id)
             if character is None or character.room_id != room_id:
                 return None
+            # Assigning after the board reveal starts the next round: hide the
+            # board again so only each player's own role is visible.
+            if room.show_board:
+                self._begin_new_round(session, room)
             session.execute(
                 delete(CharacterAssignmentModel).where(
                     CharacterAssignmentModel.room_id == room_id,
@@ -627,6 +640,10 @@ class RoomStore:
             if room is None:
                 return None
             self._require_storyteller(session, room_id, request.actor_player_id, secret)
+            if room.phase != GamePhase.LOBBY.value and not room.show_board:
+                raise ValueError(
+                    "random assignment would reshuffle every role mid-game; assign characters individually instead"
+                )
             players = [
                 player
                 for player in room.players
@@ -652,6 +669,10 @@ class RoomStore:
             shuffled_characters = list(characters)
             self._random.shuffle(shuffled_characters)
 
+            # Assigning after the board reveal starts the next round: hide the
+            # board again so only each player's own role is visible.
+            if room.show_board:
+                self._begin_new_round(session, room)
             session.execute(delete(CharacterAssignmentModel).where(CharacterAssignmentModel.room_id == room_id))
             for player, character in zip(ordered_players, shuffled_characters):
                 session.add(
@@ -773,10 +794,18 @@ class RoomStore:
             if room is None:
                 return None
             viewer = self._authenticate(session, room_id, viewer_player_id, secret)
-            query = select(CharacterAssignmentModel).where(CharacterAssignmentModel.room_id == room_id)
             shared_grimoire_player_ids = set(self._parse_shared_grimoire_player_ids(room))
             if not viewer.is_storyteller and not room.show_board and viewer_player_id not in shared_grimoire_player_ids:
-                query = query.where(CharacterAssignmentModel.player_id == viewer_player_id)
+                # Players see their own role only once the game has started;
+                # in the lobby the assignments stay storyteller-only.
+                if room.phase == GamePhase.LOBBY.value:
+                    return []
+                query = select(CharacterAssignmentModel).where(
+                    CharacterAssignmentModel.room_id == room_id,
+                    CharacterAssignmentModel.player_id == viewer_player_id,
+                )
+            else:
+                query = select(CharacterAssignmentModel).where(CharacterAssignmentModel.room_id == room_id)
             rows = session.scalars(query).all()
             return [
                 CharacterAssignment(player_id=row.player_id, character_id=row.character_id)
@@ -1005,6 +1034,21 @@ class RoomStore:
             if player.seat_index is not None and player.id != current_player_id
         }
         return claim_seat_index(seat_index, room.seat_count, occupied)
+
+    def night_voice_info(self, room_id: str) -> tuple[bool, str | None]:
+        """Return (is_night, storyteller_id) using cheap scalar queries.
+
+        The voice hub calls this on every presence broadcast, so it must not
+        load the full room snapshot (which carries base64 avatars).
+        """
+        with SessionLocal() as session:
+            phase = session.scalar(select(RoomModel.phase).where(RoomModel.id == room_id))
+            if phase is None:
+                return (False, None)
+            storyteller_id = session.scalar(
+                select(PlayerModel.id).where(PlayerModel.room_id == room_id, PlayerModel.is_storyteller.is_(True))
+            )
+            return (phase == GamePhase.NIGHT.value, storyteller_id)
 
     def _can_change_seats(self, room: RoomModel) -> bool:
         """Return whether the room currently allows seat changes."""

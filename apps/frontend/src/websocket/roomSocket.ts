@@ -12,6 +12,7 @@ import type { RoomState } from '../api/client';
 export type RoomSocketEvent =
   | { type: 'connected'; payload: { roomId: string } }
   | { type: 'chat.message'; payload: { fromPlayerId: string; toPlayerId: string | null; text: string } }
+  | { type: 'chat.private.notice'; payload: { fromPlayerId: string; toPlayerId: string } }
   | { type: 'game.updated'; payload: RoomState }
   | { type: 'hand.state'; payload: { playerIds: string[] } }
   | { type: 'timer.state'; payload: { durationSeconds: number; remainingSeconds: number; isRunning: boolean; startedAt?: string | null } }

@@ -341,6 +341,14 @@ export function listReminderTokens(roomId: string, language = '') {
   return request<ReminderTokenDefinition[]>(`/api/rooms/${roomId}/reminder-tokens${query}`);
 }
 
+/** Assign one character to one player without touching other assignments. */
+export function assignCharacter(roomId: string, actorPlayerId: string, playerId: string, characterId: string) {
+  return request<CharacterAssignment[]>(`/api/rooms/${roomId}/character-assignments`, {
+    method: 'POST',
+    body: JSON.stringify({ actor_player_id: actorPlayerId, player_id: playerId, character_id: characterId }),
+  });
+}
+
 /** Shuffle selected characters across seated players. */
 export function assignRandomCharacters(roomId: string, actorPlayerId: string, characterIds: string[]) {
   return request<CharacterAssignment[]>(`/api/rooms/${roomId}/character-assignments/random`, {

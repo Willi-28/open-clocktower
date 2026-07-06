@@ -61,11 +61,14 @@ def cache_control_for_path(path: str) -> str | None:
 
 @app.middleware("http")
 async def set_browser_cache_policy(request: Request, call_next):
-    """Attach cache headers to responses whose paths need explicit browser policy."""
+    """Attach cache and transport-security headers to every response."""
     response = await call_next(request)
     cache_control = cache_control_for_path(request.url.path)
     if cache_control is not None:
         response.headers["Cache-Control"] = cache_control
+    if settings.force_https:
+        # HTTPS-only deployments should pin browsers to HTTPS (HSTS).
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     return response
 
 

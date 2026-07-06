@@ -1284,34 +1284,130 @@ h2 {
   --table-zoom: 1;
 }
 
+/* Night-vision overlays span the whole workspace background (including the
+ * strip behind the side panels), but the dashboards themselves stay on top:
+ * .edge-panel (z-index 5) stacks above .table-wrap (z-index 1). They fade in
+ * and out slowly with the day/night change instead of popping. */
+.table-wrap::before,
 .table-wrap::after {
   content: "";
   inset: -28px -22vw;
   opacity: 0;
   pointer-events: none;
   position: absolute;
-  transition: opacity 240ms ease;
+  transition: opacity 5s ease;
   z-index: 7;
 }
 
-.app-shell.player-night.night-effect-subtle .table-wrap::after {
+/* The effect visuals hang on the (constant) effect setting alone; only the
+ * opacity is keyed to night, so the slow fade-out keeps its imagery. */
+
+/* Moonlight: a radiant blue moon disc high in one corner, a cold blue light
+ * shaft falling diagonally across the table, and blue-black darkness pooling
+ * at the far edge. */
+.app-shell.night-effect-subtle .table-wrap::after {
   background:
-    radial-gradient(ellipse at 24% 14%, rgba(232, 246, 255, 0.28), transparent 22rem),
-    radial-gradient(ellipse at 64% 60%, rgba(117, 169, 255, 0.18), transparent 40rem),
-    linear-gradient(128deg, rgba(197, 226, 255, 0.22), rgba(84, 129, 214, 0.12) 38%, transparent 68%),
-    linear-gradient(180deg, rgba(5, 18, 54, 0.36), rgba(1, 6, 22, 0.54));
-  mix-blend-mode: screen;
+    radial-gradient(circle at 16% 7%, rgba(226, 240, 255, 0.85), rgba(158, 200, 255, 0.45) 7%, rgba(96, 152, 245, 0.22) 17%, rgba(60, 110, 210, 0.08) 28%, transparent 40%),
+    linear-gradient(118deg, rgba(150, 195, 255, 0.34) 6%, rgba(100, 150, 240, 0.2) 30%, rgba(64, 110, 205, 0.09) 50%, transparent 64%),
+    radial-gradient(ellipse at 42% 46%, transparent 32%, rgba(6, 16, 48, 0.38) 66%, rgba(2, 7, 28, 0.6) 96%);
+}
+
+/* Fog: dense white banks that hug the table and drift slowly sideways - a
+ * milky haze rather than a blur. The ::before layer above adds cloud fronts
+ * that keep travelling across, so fresh fog keeps entering the scene. */
+.app-shell.night-effect-fog .table-wrap::after {
+  animation: fog-drift 44s ease-in-out infinite alternate;
+  background:
+    radial-gradient(ellipse 46rem 15rem at 22% 74%, rgba(245, 248, 251, 0.52), rgba(238, 242, 247, 0.22) 45%, transparent 70%),
+    radial-gradient(ellipse 52rem 17rem at 76% 42%, rgba(242, 245, 250, 0.42), rgba(235, 240, 246, 0.18) 42%, transparent 66%),
+    radial-gradient(ellipse 58rem 20rem at 46% 96%, rgba(248, 250, 252, 0.56), rgba(240, 244, 249, 0.24) 46%, transparent 72%),
+    radial-gradient(ellipse 48rem 15rem at 38% 22%, rgba(240, 244, 249, 0.3), transparent 62%),
+    radial-gradient(ellipse 40rem 13rem at 66% 60%, rgba(243, 246, 250, 0.28), transparent 60%),
+    linear-gradient(180deg, rgba(240, 244, 249, 0.12), rgba(238, 242, 248, 0.22) 72%, rgba(242, 246, 250, 0.32));
+  background-size: 220% 200%, 240% 220%, 260% 220%, 230% 200%, 250% 210%, 100% 100%;
+}
+
+@keyframes fog-drift {
+  from {
+    background-position: 0% 40%, 100% 55%, 15% 100%, 80% 0%, 30% 50%, 0 0;
+  }
+
+  to {
+    background-position: 100% 55%, 0% 35%, 85% 90%, 20% 12%, 70% 60%, 0 0;
+  }
+}
+
+/* Travelling cloud fronts: three repeating layers at different speeds slide
+ * one direction forever, so new fog banks keep floating into view. Each
+ * layer's travel distance is a whole multiple of its tile width, making the
+ * ~100s loop seamless. */
+.app-shell.night-effect-fog .table-wrap::before {
+  animation: fog-clouds 100s linear infinite;
+  background:
+    radial-gradient(ellipse 21rem 9rem at 30% 28%, rgba(246, 249, 252, 0.4), rgba(240, 244, 249, 0.15) 52%, transparent 74%),
+    radial-gradient(ellipse 27rem 11rem at 62% 66%, rgba(243, 247, 251, 0.36), rgba(236, 241, 247, 0.12) 48%, transparent 70%),
+    radial-gradient(ellipse 16rem 8rem at 18% 82%, rgba(248, 250, 253, 0.32), transparent 66%);
+  background-repeat: repeat-x;
+  background-size: 1200px 100%, 1500px 100%, 900px 100%;
+}
+
+@keyframes fog-clouds {
+  from {
+    background-position: 0 0, 0 0, 0 0;
+  }
+
+  to {
+    background-position: -2400px 0, -1500px 0, -1800px 0;
+  }
+}
+
+/* Only visibility is tied to night, so the 5s fade keeps its imagery while
+ * fading out at daybreak. */
+.app-shell.player-night.night-effect-subtle .table-wrap::after,
+.app-shell.player-night.night-effect-fog .table-wrap::after,
+.app-shell.player-night.night-effect-fog .table-wrap::before {
   opacity: 1;
 }
 
-.app-shell.player-night.night-effect-fog .table-wrap::after {
-  background:
-    radial-gradient(ellipse at 22% 78%, rgba(220, 235, 255, 0.18), transparent 36rem),
-    radial-gradient(ellipse at 78% 30%, rgba(190, 216, 255, 0.15), transparent 34rem),
-    linear-gradient(115deg, rgba(205, 226, 255, 0.1), transparent 28%, rgba(112, 132, 190, 0.12) 62%, transparent),
-    linear-gradient(180deg, rgba(3, 12, 34, 0.32), rgba(1, 5, 20, 0.46));
-  mix-blend-mode: screen;
-  opacity: 1;
+/* Envelope flight: glides from the sender's seat to the recipient's seat when
+ * two players whisper. Positions are cqw offsets from the table centre. */
+.chat-flight {
+  animation: chat-flight 1.5s ease-in-out forwards;
+  color: var(--gold-bright);
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  z-index: 9;
+}
+
+.chat-flight svg {
+  display: block;
+  height: auto;
+  width: clamp(20px, 3.4cqi, 34px);
+}
+
+@keyframes chat-flight {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--flight-from-x) * 1cqw), calc(-50% + var(--flight-from-y) * 1cqw)) scale(0.6);
+  }
+
+  15% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--flight-from-x) * 1cqw), calc(-50% + var(--flight-from-y) * 1cqw)) scale(1);
+  }
+
+  85% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--flight-to-x) * 1cqw), calc(-50% + var(--flight-to-y) * 1cqw)) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--flight-to-x) * 1cqw), calc(-50% + var(--flight-to-y) * 1cqw)) scale(0.6);
+  }
 }
 
 .table-timer {
@@ -1627,12 +1723,13 @@ h2 {
     inset 0 0 148px rgba(2, 8, 28, 0.62);
 }
 
+/* Fog nights swap the cold blue table sheen for a flat grey mist (the element
+ * blends with `screen`, so only the light layers matter here). */
 .app-shell.player-night.night-effect-fog .table-stage.phase-night .table-surface::before {
   background:
-    radial-gradient(ellipse at 24% 76%, rgba(223, 238, 255, 0.14), transparent 38%),
-    radial-gradient(ellipse at 78% 30%, rgba(190, 216, 255, 0.12), transparent 36%),
-    linear-gradient(115deg, rgba(205, 226, 255, 0.08), transparent 28%, rgba(112, 132, 190, 0.09) 62%, transparent),
-    linear-gradient(180deg, rgba(3, 12, 34, 0.42), rgba(1, 5, 20, 0.58));
+    radial-gradient(ellipse at 26% 80%, rgba(214, 222, 232, 0.16), transparent 44%),
+    radial-gradient(ellipse at 74% 26%, rgba(200, 208, 220, 0.12), transparent 42%),
+    linear-gradient(180deg, transparent 40%, rgba(206, 214, 226, 0.14));
   opacity: 0.9;
 }
 
@@ -2500,6 +2597,7 @@ h2 {
   border-radius: 8px;
   box-shadow: none;
   clip-path: none;
+  cursor: grab;
   display: grid;
   gap: 1px;
   grid-template-rows: var(--reminder-icon-size) minmax(20px, auto);
@@ -2508,7 +2606,13 @@ h2 {
   min-height: 0;
   overflow: visible;
   place-items: center;
+  touch-action: none;
   width: calc(var(--reminder-token-size) + 24px);
+}
+
+.reminder-token.reminder-dragging {
+  cursor: grabbing;
+  z-index: 12;
 }
 
 .reminder-token img {
@@ -3980,6 +4084,12 @@ h2 {
   --desktop-right-panel: 52px;
 }
 
+/* The explicit display would otherwise beat the UA's [hidden] rule, leaving
+ * the minimized dashboard body visible. */
+.dashboard-body[hidden] {
+  display: none;
+}
+
 .dashboard-body {
   align-content: start;
   display: grid;
@@ -4000,8 +4110,8 @@ h2 {
   border-radius: 999px;
 }
 
-.dashboard-body > .character-sheet,
-.dashboard-body > .reminder-symbol-grid {
+.dashboard-body .character-sheet,
+.dashboard-body .reminder-symbol-grid {
   margin: 0;
 }
 
@@ -4113,6 +4223,28 @@ h2 {
   position: absolute;
   top: 0;
   width: 21px;
+}
+
+/* Steps whose character is assigned to a player: a gold-washed row so the
+ * storyteller sees at a glance which roles to wake tonight. */
+.night-order-list li.night-step-in-play {
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold) 42%, transparent);
+  border-radius: var(--radius-inner);
+  margin-left: -6px;
+  padding: 5px 7px 5px 36px;
+}
+
+.night-order-list li.night-step-in-play::before {
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  border-color: var(--gold-bright);
+  color: #18080d;
+  left: 6px;
+  top: 5px;
+}
+
+.night-order-list li.night-step-in-play span {
+  color: color-mix(in srgb, var(--cream) 58%, var(--muted));
 }
 
 /* Reminder token palette: tactile tiles with a clearer picked state. */
