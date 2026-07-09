@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test:unit": "node tests/chatRules.test.mjs && node tests/emojiShortcodes.test.mjs && node tests/voiceRooms.test.mjs && node tests/gameUiRules.test.mjs",
+    "test:unit": "node tests/chatRules.test.mjs && node tests/emojiShortcodes.test.mjs && node tests/voiceRooms.test.mjs && node tests/opusSdp.test.mjs && node tests/gameUiRules.test.mjs",
     "analyze": "node ../../scripts/static-analysis.mjs",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run test:unit && npm run analyze",

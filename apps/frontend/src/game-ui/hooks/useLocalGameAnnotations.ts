@@ -108,6 +108,21 @@ export function useLocalGameAnnotations({
   }
 
   /**
+   * Places one specific reminder token at a position, regardless of selection.
+   * Used by the table right-click token menu.
+   */
+  function placeReminderToken(tokenId: string, x: number, y: number) {
+    const token = reminderTokenOptions.find((option) => option.id === tokenId);
+    if (!token) {
+      return;
+    }
+    setReminders((current) => [
+      ...current,
+      { id: crypto.randomUUID(), tokenId: token.id, label: token.label, x, y },
+    ]);
+  }
+
+  /**
    * Moves an existing reminder token without touching its identity or label.
    */
   function moveReminder(reminderId: string, x: number, y: number) {
@@ -130,6 +145,13 @@ export function useLocalGameAnnotations({
   }
 
   /**
+   * Removes a reminder token unconditionally (used by right-click on the token).
+   */
+  function deleteReminder(reminderId: string) {
+    setReminders((current) => current.filter((reminder) => reminder.id !== reminderId));
+  }
+
+  /**
    * Records a private character suspicion for one player.
    */
   function placeSuspicionOnPlayer(playerId: string) {
@@ -143,9 +165,11 @@ export function useLocalGameAnnotations({
   }
 
   return {
+    deleteReminder,
     guesses,
     moveReminder,
     placeReminder,
+    placeReminderToken,
     placeSuspicionOnPlayer,
     reminders,
     removeReminder,

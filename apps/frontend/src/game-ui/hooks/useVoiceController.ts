@@ -51,6 +51,9 @@ export function useVoiceController({
     closeAllVoicePeers: () => void;
     setVoiceDiagnostics: Dispatch<SetStateAction<Record<string, string>>>;
   } | null>(null);
+  // The devices hook needs to trigger a session restart (mic unplugged) but the
+  // session hook is created after it, so the call goes through a ref.
+  const restartVoiceInputRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     isMutedRef.current = isMuted;
@@ -61,6 +64,7 @@ export function useVoiceController({
     currentPlayerId,
     isMuted,
     onLocalSpeakingStopped: activity.setPlayerSpeaking,
+    onLocalTrackEnded: () => restartVoiceInputRef.current?.(),
     onStartVoiceLevelMonitor: activity.startVoiceLevelMonitor,
     soundFiltersEnabled,
   });
@@ -105,6 +109,9 @@ export function useVoiceController({
     closeAllVoicePeers: peers.closeAllVoicePeers,
     setVoiceDiagnostics: peers.setVoiceDiagnostics,
   };
+  // The dead device id was already dropped by the devices hook, so the restart
+  // captures whatever microphone is the current selection/default.
+  restartVoiceInputRef.current = () => void session.restartVoiceInput({});
 
   return {
     activity,

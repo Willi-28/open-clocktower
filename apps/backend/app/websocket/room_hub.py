@@ -23,6 +23,7 @@ class RoomHub:
         """Create empty realtime state maps for every live room."""
         self._rooms: dict[str, dict[WebSocket, str | None]] = {}
         self._raised_hands: dict[str, set[str]] = {}
+        self._muted_players: dict[str, set[str]] = {}
         self._voice_rooms: dict[str, dict[str, str]] = {}
         self._timers: dict[str, dict[str, int | bool | str | None]] = {}
         self._vote_counts: dict[str, dict[str, int | bool]] = {}
@@ -37,6 +38,7 @@ class RoomHub:
         if is_night:
             participants = self._night_visible_participants(room_id, participants, player_id, storyteller_id)
         await websocket.send_json({"type": "hand.state", "payload": {"playerIds": sorted(self._raised_hands.get(room_id, set()))}})
+        await websocket.send_json({"type": "mute.state", "payload": {"playerIds": sorted(self._muted_players.get(room_id, set()))}})
         await websocket.send_json({"type": "voice.state", "payload": {"participants": participants}})
         await websocket.send_json({"type": "timer.state", "payload": self._timer_state(room_id)})
         await websocket.send_json({"type": "vote_count.state", "payload": self._vote_count_state(room_id)})
@@ -76,6 +78,7 @@ class RoomHub:
         # Tells connected clients that the current room no longer exists.
         await self._broadcast_text(room_id, {"type": "room.deleted", "payload": {"roomId": room_id}})
         self._raised_hands.pop(room_id, None)
+        self._muted_players.pop(room_id, None)
         self._voice_rooms.pop(room_id, None)
         self._timers.pop(room_id, None)
         self._vote_counts.pop(room_id, None)
@@ -100,6 +103,7 @@ class RoomHub:
             {"type": "room.kicked", "payload": {"roomId": room_id, "reason": reason}},
         )
         self._raised_hands.setdefault(room_id, set()).discard(player_id)
+        self._muted_players.setdefault(room_id, set()).discard(player_id)
         self._voice_rooms.setdefault(room_id, {}).pop(player_id, None)
         await self.broadcast_room_event(
             room_id,
@@ -120,6 +124,18 @@ class RoomHub:
             raised_hands.discard(player_id)
         await self.broadcast_room_event(room_id, {"type": "hand.state", "payload": {"playerIds": sorted(raised_hands)}})
 
+    async def set_muted(self, room_id: str, player_id: str, is_muted: bool) -> None:
+        """Track a player's microphone-mute state and broadcast the muted list."""
+        room = room_store.get_room(room_id)
+        if room is None or find_player(room.players, player_id) is None:
+            return
+        muted = self._muted_players.setdefault(room_id, set())
+        if is_muted:
+            muted.add(player_id)
+        else:
+            muted.discard(player_id)
+        await self.broadcast_room_event(room_id, {"type": "mute.state", "payload": {"playerIds": sorted(muted)}})
+
     async def broadcast_room_event(self, room_id: str, payload: dict) -> None:
         """Send a lightweight realtime event to every connection in a room."""
         # Sends a lightweight event to every connected browser in the room.
@@ -135,6 +151,11 @@ class RoomHub:
             room_voice[player_id] = voice_room
         else:
             room_voice.pop(player_id, None)
+            # Mute status is only meaningful inside a voice room; clear it on exit.
+            muted = self._muted_players.get(room_id)
+            if muted and player_id in muted:
+                muted.discard(player_id)
+                await self.broadcast_room_event(room_id, {"type": "mute.state", "payload": {"playerIds": sorted(muted)}})
         await self.broadcast_voice_state(room_id)
 
     async def close_public_voice_rooms(self, room_id: str) -> None:

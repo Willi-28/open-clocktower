@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 
 import {
   castVote,
@@ -19,13 +20,14 @@ import {
   updatePlayer,
   updateRoom,
 } from './api/client';
-import { playMuteToggleTone, playTimerAlarm, setSoundEffectsVolume } from './audio/browserAudio';
+import { playDeafenToggleTone, playMuteToggleTone, playTimerAlarm, setSoundEffectsVolume } from './audio/browserAudio';
 import { ActiveVoteBar } from './game-ui/components/ActiveVoteBar';
 import { ChatPanel } from './game-ui/components/ChatPanel';
 import { ConfirmActionDialog } from './game-ui/components/ConfirmActionDialog';
 import { DemonBluffBar } from './game-ui/components/DemonBluffBar';
+import { FloatingCharacterSheet } from './game-ui/components/FloatingCharacterSheet';
 import { GameTable } from './game-ui/components/GameTable';
-import { LobbyInfoPanel } from './game-ui/components/LobbyInfoPanel';
+import { GameTopBar } from './game-ui/components/GameTopBar';
 import { MobileWorkspaceNav } from './game-ui/components/MobileWorkspaceNav';
 import type { MobileWorkspaceView } from './game-ui/components/MobileWorkspaceNav';
 import { NominationRequestPopup } from './game-ui/components/NominationRequestPopup';
@@ -57,11 +59,7 @@ import {
   seatedPlayerCount,
   voteForPlayer as getVoteForPlayer,
 } from './game-ui/voting';
-import {
-  publicVoiceOccupantNames,
-  storytellerVoiceLabel,
-  voiceRoomLabel,
-} from './game-ui/voiceRooms';
+import { voiceRoomLabel } from './game-ui/voiceRooms';
 import { openRoomSocket } from './websocket/roomSocket';
 
 const defaultVoiceRoom = voiceRooms[0];
@@ -87,7 +85,25 @@ export function App() {
   const [characterPackFile, setCharacterPackFile] = useState<File | null>(null);
   const [clientSettings, setClientSettings] = useState<ClientSettings>(loadClientSettings);
   const [isMuted, setIsMuted] = useState(false);
+  const [isDeafened, setIsDeafened] = useState(false);
   const [raisedHandPlayerIds, setRaisedHandPlayerIds] = useState<string[]>([]);
+  const [mutedPlayerIds, setMutedPlayerIds] = useState<string[]>([]);
+  // Viewport position of the seat the interaction menu should appear beside.
+  const [seatMenuAnchor, setSeatMenuAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [isTopBarOpen, setIsTopBarOpen] = useState(true);
+  const [isDashboardMinimized, setIsDashboardMinimized] = useState(false);
+  const [rightPanelWidth, setRightPanelWidth] = useState<number | null>(null);
+  // Which character card the Characters dashboard should scroll to + flash.
+  const [characterHighlight, setCharacterHighlight] = useState<{ id: string; nonce: number } | null>(null);
+  // Optimistic seat count so the stepper is instant while the server sync is
+  // debounced (rapid clicks coalesce into a single request instead of lagging).
+  const [optimisticSeatCount, setOptimisticSeatCount] = useState<number | null>(null);
+  const seatSyncTimerRef = useRef<number | null>(null);
+  // Right-click token picker: table position (x/y %) + viewport anchor.
+  const [tokenMenu, setTokenMenu] = useState<{ x: number; y: number; clientX: number; clientY: number } | null>(null);
+  // Floating character sheet position (null = docked in the right dashboard).
+  const [floatingSheetPos, setFloatingSheetPos] = useState<{ x: number; y: number } | null>(null);
+  const appShellRef = useRef<HTMLElement | null>(null);
   const [error, setError] = useState<string>('');
   const [mobileWorkspaceView, setMobileWorkspaceView] = useState<MobileWorkspaceView>('table');
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
@@ -108,6 +124,15 @@ export function App() {
     setRoom,
   });
   const displayedRoom = seatMove.displayedRoom;
+  // The table renders the optimistic seat count so the stepper feels instant;
+  // the server sync stays debounced (no lag when adding seats quickly).
+  const tableRoom = useMemo(() => {
+    const base = displayedRoom ?? room;
+    if (!base || optimisticSeatCount === null) {
+      return base;
+    }
+    return { ...base, seat_count: optimisticSeatCount };
+  }, [displayedRoom, room, optimisticSeatCount]);
   const displayedCurrentPlayer = displayedRoom?.players.find((player) => player.id === currentPlayerId);
   const selectedPlayer = room?.players.find((player) => player.id === tableUi.selectedPlayerId);
   const selectedSeatActionPlayer = room?.players.find((player) => player.id === tableUi.selectedSeatActionPlayerId);
@@ -172,6 +197,7 @@ export function App() {
     resetRealtimeUi: () => {
       voiceSession.setIncomingVoiceCall(null);
       setRaisedHandPlayerIds([]);
+      setMutedPlayerIds([]);
     },
     room,
     roomId,
@@ -269,15 +295,20 @@ export function App() {
   // Envelope flights: everyone sees THAT two players exchanged a private
   // message (never its content); each notice glides an icon between the seats.
   const [chatFlights, setChatFlights] = useState<Array<{ id: string; fromPlayerId: string; toPlayerId: string }>>([]);
+  // Per-pair throttle so a new flight can start while an old one is still in the
+  // air, but at most once per second (avoids a swarm of envelopes when spammed).
+  const chatFlightThrottleRef = useRef<Record<string, number>>({});
 
   /** Queue one envelope flight and drop it again once its animation is over. */
   function addChatFlight(fromPlayerId: string, toPlayerId: string) {
+    const key = `${fromPlayerId}->${toPlayerId}`;
+    const now = Date.now();
+    if (now - (chatFlightThrottleRef.current[key] ?? 0) < 1000) {
+      return;
+    }
+    chatFlightThrottleRef.current[key] = now;
     const id = crypto.randomUUID();
-    setChatFlights((current) =>
-      current.some((flight) => flight.fromPlayerId === fromPlayerId && flight.toPlayerId === toPlayerId)
-        ? current
-        : [...current, { id, fromPlayerId, toPlayerId }],
-    );
+    setChatFlights((current) => [...current, { id, fromPlayerId, toPlayerId }]);
     window.setTimeout(() => {
       setChatFlights((current) => current.filter((flight) => flight.id !== id));
     }, 1700);
@@ -301,30 +332,89 @@ export function App() {
     setIncomingVoiceCall: voiceSession.setIncomingVoiceCall,
     setIsVoteCountRunning: voting.setIsVoteCountRunning,
     setRaisedHandPlayerIds,
+    setMutedPlayerIds,
     setRoom,
     setSelectedPlayerId: tableUi.setSelectedPlayerId,
     setVoteCountIndex: voting.setVoteCountIndex,
     setVoiceParticipants: voiceSession.setVoiceParticipants,
   });
 
+  // Share the current mute state whenever this player (re)joins a voice room so
+  // others see the right mic icon from the start, not only after a toggle.
+  useEffect(() => {
+    if (voiceSession.joinedVoiceRoom) {
+      roomSocketRef.current?.setMuted(isMuted);
+    }
+  }, [voiceSession.joinedVoiceRoom, isMuted]);
+
+  // Drop the optimistic seat count once the server state has caught up.
+  useEffect(() => {
+    if (optimisticSeatCount !== null && room?.seat_count === optimisticSeatCount && seatSyncTimerRef.current === null) {
+      setOptimisticSeatCount(null);
+    }
+  }, [room?.seat_count, optimisticSeatCount]);
+
+  // Close the open seat menu when clicking anywhere outside it (another seat
+  // re-targets it, so seats are excluded from the outside-click check).
+  useEffect(() => {
+    if (!tableUi.selectedSeatActionPlayerId) {
+      return;
+    }
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && !target.closest('.seat-action-menu') && !target.closest('.seat')) {
+        tableUi.setSelectedSeatActionPlayerId('');
+        setSeatMenuAnchor(null);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [tableUi.selectedSeatActionPlayerId, tableUi.setSelectedSeatActionPlayerId]);
+
+  // Close the right-click token menu on any outside click or Escape.
+  useEffect(() => {
+    if (!tokenMenu) {
+      return;
+    }
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Element && !event.target.closest('.token-context-menu')) {
+        setTokenMenu(null);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setTokenMenu(null);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [tokenMenu]);
+
   // At night players must not see who is (or is not) in a voice room - that
   // would reveal who is privately calling. Only presence in their own current
   // voice room stays visible; the storyteller keeps full presence.
   const hideNightVoicePresence = Boolean(room && room.phase === 'night' && !isStoryteller);
+  const publicVoiceRoomsLocked = Boolean(room && room.phase === 'night' && !isStoryteller && !room.allow_public_voice_during_night);
   const visibleVoiceParticipants = hideNightVoicePresence
     ? voiceSession.voiceParticipants.filter((participant) => participant.voiceRoom === voiceSession.joinedVoiceRoom)
     : voiceSession.voiceParticipants;
-  const storytellerVoiceRoom = visibleVoiceParticipants.find((participant) => participant.playerId === storyteller?.id)?.voiceRoom;
   const seatedPlayerCounter = seatedPlayerCount(room);
   const isPlayerNightView = Boolean(room?.phase === 'night' && currentPlayer && !isStoryteller);
   const appShellClassName = [
     'app-shell',
+    room?.phase === 'night' ? 'room-night' : '',
     isPlayerNightView ? 'player-night' : '',
     `background-${clientSettings.appTheme === 'universe' ? 'space' : clientSettings.appTheme === 'magic' ? 'magic' : clientSettings.appTheme === 'island' ? 'island' : 'classic'}`,
     `theme-${clientSettings.appTheme}`,
     `night-effect-${clientSettings.nightEffect}`,
     clientSettings.showTable ? '' : 'table-hidden',
+    room ? (isTopBarOpen ? 'topbar-open' : 'topbar-collapsed') : '',
   ].filter(Boolean).join(' ');
+  const appPortalTarget = appShellRef.current ?? document.body;
 
   /** Send the current chat draft over the socket or append it locally if offline. */
   function submitChatMessage() {
@@ -345,11 +435,22 @@ export function App() {
     chat.setChatDraft('');
   }
 
-  /** Toggle microphone mute state and play the matching local feedback sound. */
+  /** Toggle microphone mute state, play feedback, and share it with the room. */
   function toggleMuted() {
     setIsMuted((value) => {
       const nextValue = !value;
       playMuteToggleTone(nextValue);
+      roomSocketRef.current?.setMuted(nextValue);
+      return nextValue;
+    });
+  }
+
+  /** Toggle deafen (mute all incoming voice audio, Discord-style). */
+  function toggleDeafened() {
+    setIsDeafened((value) => {
+      const nextValue = !value;
+      playDeafenToggleTone(nextValue);
+      voicePeers.setDeafened(nextValue);
       return nextValue;
     });
   }
@@ -395,31 +496,108 @@ export function App() {
     }
   }
 
-  /** Handle clicks on seats, including open-seat movement and player selection. */
-  function handleSeatClick(seatIndex: number) {
+  /** Open the interaction menu for a player beside the seat that was clicked. */
+  function openSeatMenu(playerId: string, clientX: number, clientY: number) {
+    setSeatMenuAnchor({ x: clientX, y: clientY });
+    tableUi.setSelectedSeatActionPlayerId(playerId);
+  }
+
+  /** Apply a seat-count change instantly (optimistic) and debounce the server sync. */
+  function requestSeatCount(nextCount: number) {
+    if (!room) {
+      return;
+    }
+    const clamped = Math.max(5, Math.min(20, nextCount));
+    setOptimisticSeatCount(clamped);
+    if (seatSyncTimerRef.current !== null) {
+      window.clearTimeout(seatSyncTimerRef.current);
+    }
+    seatSyncTimerRef.current = window.setTimeout(() => {
+      seatSyncTimerRef.current = null;
+      void lifecycle.run(() => updateRoom(room.id, currentPlayerId, { seat_count: clamped }));
+    }, 280);
+  }
+
+  /** Scroll+flash the clicked player's role in the Characters dashboard (if visible). */
+  function requestCharacterHighlight(playerId: string) {
+    if (!room) {
+      return;
+    }
+    const suspectedCharacterId = annotations.guesses[playerId];
+    const canSeeRole =
+      isStoryteller ||
+      room.show_board ||
+      room.shared_grimoire_player_ids.includes(currentPlayerId) ||
+      playerId === currentPlayerId;
+    const assignment = gameData.assignments.find((entry) => entry.player_id === playerId);
+    const characterId = canSeeRole && assignment ? assignment.character_id : suspectedCharacterId;
+    if (!characterId) {
+      return;
+    }
+    setCharacterHighlight((previous) => ({ id: characterId, nonce: (previous?.nonce ?? 0) + 1 }));
+  }
+
+  /** Position the seat menu beside the clicked seat on desktop; the mobile
+   * layout keeps the CSS bottom-sheet placement instead. */
+  function seatMenuAnchorStyle(): CSSProperties | undefined {
+    if (!seatMenuAnchor || window.innerWidth <= 980) {
+      return undefined;
+    }
+    const menuWidth = 300;
+    const menuHeight = 380;
+    return {
+      position: 'fixed',
+      left: Math.min(Math.max(12, seatMenuAnchor.x + 16), window.innerWidth - menuWidth - 12),
+      top: Math.min(Math.max(12, seatMenuAnchor.y - 24), window.innerHeight - menuHeight - 12),
+      bottom: 'auto',
+      transform: 'none',
+    };
+  }
+
+  /** Let an unseated player (traveler) sit down on a free seat. */
+  function trySitDown(seatIndex: number) {
+    const maySit = canChangeSeats || currentPlayer?.seat_index === null;
+    if (maySit && currentPlayer && !currentPlayer.is_storyteller) {
+      seatMove.queueSeatMove(seatIndex);
+    }
+  }
+
+  /** Left-click on a seat: select the player + highlight their role. No menu. */
+  function handleSeatSelect(seatIndex: number) {
     if (!room) {
       return;
     }
     const clickedPlayer = seatedPlayers.get(seatIndex);
     if (!clickedPlayer) {
-      tableUi.setSelectedSeatActionPlayerId('');
-      // Unseated players (travelers) may sit down on a free seat even mid-game.
-      const maySit = canChangeSeats || currentPlayer?.seat_index === null;
-      if (maySit && currentPlayer && !currentPlayer.is_storyteller) {
-        seatMove.queueSeatMove(seatIndex);
-      }
+      trySitDown(seatIndex);
       return;
     }
     tableUi.setSelectedPlayerId(clickedPlayer.id);
+    requestCharacterHighlight(clickedPlayer.id);
+  }
+
+  /** Right-click (or touch tap) on a seat: open the interaction menu. */
+  function handleSeatMenu(seatIndex: number, clientX: number, clientY: number) {
+    if (!room) {
+      return;
+    }
+    const clickedPlayer = seatedPlayers.get(seatIndex);
+    if (!clickedPlayer) {
+      trySitDown(seatIndex);
+      return;
+    }
+    tableUi.setSelectedPlayerId(clickedPlayer.id);
+    requestCharacterHighlight(clickedPlayer.id);
     if (isStoryteller) {
-      tableUi.setSelectedSeatActionPlayerId(clickedPlayer.is_storyteller ? '' : clickedPlayer.id);
+      if (!clickedPlayer.is_storyteller) {
+        openSeatMenu(clickedPlayer.id, clientX, clientY);
+      }
       return;
     }
     if (clickedPlayer.id === currentPlayerId || clickedPlayer.is_storyteller) {
-      tableUi.setSelectedSeatActionPlayerId('');
       return;
     }
-    tableUi.setSelectedSeatActionPlayerId(clickedPlayer.id);
+    openSeatMenu(clickedPlayer.id, clientX, clientY);
   }
 
   /** Place reminders on the table surface and clear any open seat menu. */
@@ -429,27 +607,38 @@ export function App() {
   }
 
   /** Select the storyteller when another player clicks the storyteller table token. */
-  function handleStorytellerClick() {
+  function handleStorytellerClick(clientX: number, clientY: number) {
     if (storyteller && storyteller.id !== currentPlayerId) {
-      tableUi.setSelectedSeatActionPlayerId(storyteller.id);
+      openSeatMenu(storyteller.id, clientX, clientY);
     }
   }
 
   /** Store a private suspicion marker for a player and close the seat menu. */
   function placeSuspicionOnPlayer(playerId: string) {
+    const suspectedCharacterId = annotations.suspectedCharacterId;
     if (annotations.placeSuspicionOnPlayer(playerId)) {
+      setCharacterHighlight((current) => ({ id: suspectedCharacterId, nonce: (current?.nonce ?? 0) + 1 }));
       tableUi.setSelectedSeatActionPlayerId('');
     }
   }
 
-  /** Return current occupant display names for one public voice room. */
+  /** Return current occupants (name + avatar) for one public voice room. */
   function publicVoiceOccupants(voiceRoom: string) {
     // At night the panel shows no occupant names at all - own-room presence
     // data still exists locally (WebRTC needs it) but must not be displayed.
     if (hideNightVoicePresence) {
       return [];
     }
-    return publicVoiceOccupantNames(visibleVoiceParticipants, voiceRoom, playerName);
+    return visibleVoiceParticipants
+      .filter((participant) => participant.voiceRoom === voiceRoom)
+      .map((participant) => {
+        const player = room?.players.find((candidate) => candidate.id === participant.playerId);
+        return {
+          id: participant.playerId,
+          name: playerName(participant.playerId),
+          avatarUrl: player?.avatar_url ?? null,
+        };
+      });
   }
 
   /** Approve a pending nomination request and start that nomination. */
@@ -584,7 +773,7 @@ export function App() {
   }
 
   return (
-    <main className={appShellClassName}>
+    <main className={appShellClassName} ref={appShellRef}>
       {!room ? (
         <SetupScreen
           characterPackFile={characterPackFile}
@@ -599,22 +788,50 @@ export function App() {
           roomName={roomName}
         />
       ) : (
-        <section className="workspace" data-mobile-view={mobileWorkspaceView}>
+        <>
+        <GameTopBar
+          currentPlayer={displayedCurrentPlayer}
+          isFullscreen={isFullscreen}
+          isOpen={isTopBarOpen}
+          isStoryteller={isStoryteller}
+          onCopyRoomCode={() => void copyRoomCode()}
+          onDeleteRoom={confirmDeleteRoom}
+          onLeaveLobby={confirmLeaveLobby}
+          onLeaveSeat={() => seatMove.queueSeatMove(null)}
+          onOpenSettings={() => tableUi.setIsSettingsOpen(true)}
+          onToggleFullscreen={() => void toggleFullscreen()}
+          onToggleOpen={() => setIsTopBarOpen((open) => !open)}
+          phaseLabel={room.show_board ? 'Game ended' : room.phase === 'lobby' ? 'Game not started yet' : phaseLabels[room.phase]}
+          room={displayedRoom ?? room}
+        />
+        <section
+          className="workspace"
+          data-mobile-view={mobileWorkspaceView}
+          style={{
+            '--desktop-right-panel': isDashboardMinimized ? '0px' : rightPanelWidth ? `${rightPanelWidth}px` : undefined,
+          } as CSSProperties}
+        >
           <aside className="edge-panel left-edge">
-            <LobbyInfoPanel
-              currentPlayer={displayedCurrentPlayer}
-              isFullscreen={isFullscreen}
+            <VoiceRoomsPanel
+              currentPlayerName={currentPlayer?.display_name ?? displayName ?? 'You'}
+              currentPlayerAvatarUrl={currentPlayer?.avatar_url ?? null}
+              isDeafened={isDeafened}
               isMuted={isMuted}
               isStoryteller={isStoryteller}
+              isVoiceSwitching={voiceSession.isVoiceSwitching}
               joinedVoiceRoom={voiceSession.joinedVoiceRoom}
-              onCopyRoomCode={() => void copyRoomCode()}
-              onLeaveLobby={confirmLeaveLobby}
-              onLeaveSeat={() => seatMove.queueSeatMove(null)}
-              onOpenSettings={() => tableUi.setIsSettingsOpen(true)}
-              onToggleFullscreen={() => void toggleFullscreen()}
+              needsVoiceAudioUnlock={voicePeers.needsVoiceAudioUnlock}
+              onEnableVoiceAudio={() => void voicePeers.enableVoiceAudio()}
+              onJoinVoiceRoom={(voiceRoom) => void voiceSession.joinSelectedVoiceRoom(voiceRoom)}
+              onLeaveVoiceRoom={(returnToDefault = true) => voiceSession.leaveVoiceRoom(returnToDefault)}
+              onToggleDeafened={toggleDeafened}
               onToggleMuted={toggleMuted}
-              phaseLabel={room.show_board ? 'Game ended' : room.phase === 'lobby' ? 'Game not started yet' : phaseLabels[room.phase]}
-              room={displayedRoom ?? room}
+              publicVoiceRoomsLocked={publicVoiceRoomsLocked}
+              publicVoiceOccupants={publicVoiceOccupants}
+              roomPhase={room.phase}
+              speakingPlayerIds={voiceActivity.speakingPlayerIds}
+              voiceRoomLabel={(voiceRoom) => voiceRoomLabel(voiceRoom, playerName)}
+              voiceRooms={voiceRooms}
             />
 
             <ChatPanel
@@ -626,23 +843,10 @@ export function App() {
               messages={chat.visibleChatMessages}
               onSendMessage={submitChatMessage}
               openChatTabs={chat.openChatTabs}
+              playerAvatarUrl={(id) => room?.players.find((player) => player.id === id)?.avatar_url ?? null}
               playerName={playerName}
               setActiveChatTab={chat.setActiveChatTab}
               setChatDraft={chat.setChatDraft}
-            />
-
-            <VoiceRoomsPanel
-              isStoryteller={isStoryteller}
-              isVoiceSwitching={voiceSession.isVoiceSwitching}
-              joinedVoiceRoom={voiceSession.joinedVoiceRoom}
-              needsVoiceAudioUnlock={voicePeers.needsVoiceAudioUnlock}
-              onEnableVoiceAudio={() => void voicePeers.enableVoiceAudio()}
-              onJoinVoiceRoom={(voiceRoom) => void voiceSession.joinSelectedVoiceRoom(voiceRoom)}
-              onLeaveVoiceRoom={() => voiceSession.leaveVoiceRoom(true)}
-              publicVoiceOccupants={publicVoiceOccupants}
-              roomPhase={room.phase}
-              voiceRoomLabel={(voiceRoom) => voiceRoomLabel(voiceRoom, playerName)}
-              voiceRooms={voiceRooms}
             />
           </aside>
 
@@ -682,14 +886,21 @@ export function App() {
               isStoryteller={isStoryteller}
               isReminderMode={Boolean(tableUi.selectedReminderLabel)}
               highlightedPlayerId={voting.highlightedVotePlayerId}
-              onSeatClick={handleSeatClick}
+              onSeatSelect={handleSeatSelect}
+              onSeatMenu={handleSeatMenu}
               onTableClick={handleTableClick}
+              onFieldContextMenu={(x, y, clientX, clientY) => {
+                tableUi.setSelectedSeatActionPlayerId('');
+                setTokenMenu({ x, y, clientX, clientY });
+              }}
               onReminderClick={annotations.removeReminder}
+              onReminderRemove={annotations.deleteReminder}
               onReminderMove={annotations.moveReminder}
               onStorytellerClick={handleStorytellerClick}
+              mutedPlayerIds={mutedPlayerIds}
               raisedHandPlayerIds={voting.voteRaisedHandPlayerIds}
               reminders={visibleReminders}
-              room={displayedRoom ?? room}
+              room={tableRoom ?? room}
               seatedPlayers={seatedPlayers}
               guesses={annotations.guesses}
               speakingPlayerIds={voiceActivity.speakingPlayerIds}
@@ -701,20 +912,25 @@ export function App() {
               voiceParticipants={visibleVoiceParticipants}
               showTable={clientSettings.showTable}
               storyteller={storyteller}
-              storytellerVoiceLabel={storytellerVoiceLabel(storytellerVoiceRoom)}
             />
             {selectedSeatActionPlayer && currentPlayer ? (
+              createPortal(
               <SeatActionMenu
                 activeNomination={voting.activeNomination}
+                anchorStyle={seatMenuAnchorStyle()}
                 characters={gameData.characters}
                 chatTargets={chatTargets}
                 currentPlayer={currentPlayer}
                 hasExecutionVotes={voting.hasExecutionVotes}
                 isStoryteller={isStoryteller}
                 player={selectedSeatActionPlayer}
+                playerVolume={voicePeers.remoteVolumes[selectedSeatActionPlayer.id] ?? 1}
                 roomPhase={room.phase}
                 suspectedCharacterId={annotations.suspectedCharacterId}
-                onClose={() => tableUi.setSelectedSeatActionPlayerId('')}
+                onClose={() => {
+                  tableUi.setSelectedSeatActionPlayerId('');
+                  setSeatMenuAnchor(null);
+                }}
                 onExecute={(playerId) => void voting.executePlayer(playerId)}
                 onRequestKick={confirmKickPlayer}
                 onMarkAlive={(playerId) =>
@@ -729,6 +945,9 @@ export function App() {
                   tableUi.setSelectedSeatActionPlayerId('');
                 }}
                 onPlaceSuspicion={placeSuspicionOnPlayer}
+                onSetPlayerVolume={(volume) =>
+                  voicePeers.setRemoteVolumes((current) => ({ ...current, [selectedSeatActionPlayer.id]: volume }))
+                }
                 onStartPrivateCall={(playerId) => {
                   tableUi.setSelectedSeatActionPlayerId('');
                   void voiceSession.startPrivateCall(playerId);
@@ -742,15 +961,50 @@ export function App() {
                     }),
                   )
                 }
-              />
+              />,
+              appPortalTarget,
+              )
             ) : null}
+            {tokenMenu
+              ? createPortal(
+                  <div
+                    className="token-context-menu"
+                    style={{
+                      position: 'fixed',
+                      left: Math.min(Math.max(12, tokenMenu.clientX), window.innerWidth - 268),
+                      top: Math.min(Math.max(12, tokenMenu.clientY), window.innerHeight - 320),
+                    }}
+                  >
+                    <strong>Place reminder</strong>
+                    <div className="token-context-grid">
+                      {reminderTokenOptions.length === 0 ? (
+                        <p className="helper-text">No reminder token PNGs loaded.</p>
+                      ) : null}
+                      {reminderTokenOptions.map((token) => (
+                        <button
+                          key={token.id}
+                          onClick={() => {
+                            annotations.placeReminderToken(token.id, tokenMenu.x, tokenMenu.y);
+                            setTokenMenu(null);
+                          }}
+                          title={token.title}
+                          type="button"
+                        >
+                          <img alt="" src={token.icon} />
+                          <small>{token.label}</small>
+                        </button>
+                      ))}
+                    </div>
+                  </div>,
+                  appPortalTarget,
+                )
+              : null}
             {isStoryteller ? (
               <DemonBluffBar
                 characters={gameData.characters}
                 demonBluffIds={gameData.demonBluffIds}
-                onSelectSlot={tableUi.setSelectedBluffSlot}
                 onSetDemonBluffSlot={gameData.setDemonBluffSlot}
-                selectedBluffSlot={tableUi.selectedBluffSlot}
+                portalTarget={appPortalTarget}
               />
             ) : null}
             {voting.activeNomination && currentPlayer && currentPlayer.seat_index !== null && !isStoryteller ? (
@@ -768,8 +1022,21 @@ export function App() {
             activeNomination={voting.activeNomination}
             activeVoteOrderLength={voting.activeVoteOrder.length}
             assignments={gameData.assignments}
+            characterHighlight={characterHighlight}
+            characterSheetFloating={floatingSheetPos !== null}
+            onDetachCharacterSheet={(clientX, clientY) =>
+              setFloatingSheetPos({
+                x: Math.max(8, Math.min(window.innerWidth - 336, clientX - 160)),
+                y: Math.max(8, Math.min(window.innerHeight - 456, clientY - 16)),
+              })
+            }
+            onReattachCharacterSheet={() => setFloatingSheetPos(null)}
+            isMinimized={isDashboardMinimized}
+            onToggleMinimized={() => setIsDashboardMinimized((value) => !value)}
+            onResizeDashboard={setRightPanelWidth}
             characters={gameData.characters}
             currentPlayerId={currentPlayerId}
+            displayedSeatCount={optimisticSeatCount ?? room.seat_count}
             hasExecutionVotes={voting.hasExecutionVotes}
             isLobby={Boolean(isLobby)}
             isStoryteller={isStoryteller}
@@ -791,7 +1058,6 @@ export function App() {
             onAssignCharacter={(playerId, characterId) => void gameData.assignCharacterToPlayer(playerId, characterId)}
             onAssignRandomCharacters={() => void gameData.assignSelectedCharactersRandomly()}
             onCancelVote={() => void voting.cancelVote()}
-            onDeleteRoom={confirmDeleteRoom}
             onExecutePlayer={(playerId) => void voting.executePlayer(playerId)}
             onKickPlayer={(playerId) => void lifecycle.kickPlayer(playerId)}
             onResetTimer={timer.resetTimer}
@@ -801,7 +1067,7 @@ export function App() {
             onSetDay={() => void lifecycle.run(() => setPhase(room.id, 'day', currentPlayerId))}
             onSetNight={() => void lifecycle.run(() => setPhase(room.id, 'night', currentPlayerId))}
             onSetNightOrderTab={tableUi.setActiveNightOrderTab}
-            onSetSeatCount={(seatCount) => void lifecycle.run(() => updateRoom(room.id, currentPlayerId, { seat_count: seatCount }))}
+            onSetSeatCount={requestSeatCount}
             onShowBoard={confirmShowBoard}
             onTogglePublicVoiceDuringNight={(isAllowed) =>
               void lifecycle.run(() => updateRoom(room.id, currentPlayerId, { allow_public_voice_during_night: isAllowed }))
@@ -817,6 +1083,18 @@ export function App() {
 
           <MobileWorkspaceNav activeView={mobileWorkspaceView} onSelectView={setMobileWorkspaceView} />
         </section>
+        {floatingSheetPos ? (
+          <FloatingCharacterSheet
+            characters={gameData.characters}
+            highlight={characterHighlight}
+            onMove={setFloatingSheetPos}
+            portalTarget={appPortalTarget}
+            onReattach={() => setFloatingSheetPos(null)}
+            position={floatingSheetPos}
+            seatedPlayerCount={seatedPlayerCounter}
+          />
+        ) : null}
+        </>
       )}
 
       {tableUi.isSettingsOpen ? (

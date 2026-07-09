@@ -94,6 +94,8 @@ async def _dispatch_message(room_id: str, player_id: str | None, message: dict) 
         await _handle_chat_message(room_id, player_id, payload)
     elif message_type == "hand.set":
         await room_hub.set_hand_raised(room_id, player_id, bool(payload.get("isRaised")))
+    elif message_type == "mute.set":
+        await room_hub.set_muted(room_id, player_id, bool(payload.get("isMuted")))
     elif message_type == "voice.join":
         voice_room = str(payload.get("voiceRoom", "")).strip() or None
         if _can_join_voice_room(room_id, player_id, voice_room):

@@ -8,6 +8,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 
+import { getSharedAudioContext } from '../../audio/browserAudio';
+
 type UseVoiceActivityOptions = {
   currentPlayerId: string;
   isMutedRef: MutableRefObject<boolean>;
@@ -55,19 +57,26 @@ export function useVoiceActivity({ currentPlayerId, isMutedRef }: UseVoiceActivi
 
   /**
    * Samples a media stream and classifies likely speech against an adaptive noise floor.
+   *
+   * All monitors share one AudioContext: browsers cap the number of contexts a
+   * page may open (~6 in Chrome), so per-player contexts silently broke the
+   * speaking indicators and volume boosts in fuller voice rooms.
    */
   function startVoiceLevelMonitor(playerId: string, stream: MediaStream) {
-    const AudioContextClass =
-      window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) {
-      return;
-    }
-
     stopVoiceLevelMonitor(playerId);
 
-    const audioContext = new AudioContextClass();
+    const audioContext = getSharedAudioContext();
+    if (!audioContext) {
+      return;
+    }
+    let source: MediaStreamAudioSourceNode;
+    try {
+      source = audioContext.createMediaStreamSource(stream);
+    } catch {
+      // A stream whose tracks already ended cannot be monitored.
+      return;
+    }
     const analyser = audioContext.createAnalyser();
-    const source = audioContext.createMediaStreamSource(stream);
     analyser.fftSize = 256;
     const samples = new Uint8Array(analyser.fftSize);
     let timeoutId = 0;
@@ -75,7 +84,6 @@ export function useVoiceActivity({ currentPlayerId, isMutedRef }: UseVoiceActivi
     let noiseFloor = 1.4;
 
     source.connect(analyser);
-    void audioContext.resume?.();
 
     /** Re-sample the analyser and update speaking state on a short interval. */
     const readLevel = () => {
@@ -106,7 +114,7 @@ export function useVoiceActivity({ currentPlayerId, isMutedRef }: UseVoiceActivi
       window.clearTimeout(timeoutId);
       source.disconnect();
       analyser.disconnect();
-      void audioContext.close().catch(() => undefined);
+      // The shared AudioContext stays open for tones and other monitors.
     };
   }
 

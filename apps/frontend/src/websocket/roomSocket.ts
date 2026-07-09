@@ -15,6 +15,7 @@ export type RoomSocketEvent =
   | { type: 'chat.private.notice'; payload: { fromPlayerId: string; toPlayerId: string } }
   | { type: 'game.updated'; payload: RoomState }
   | { type: 'hand.state'; payload: { playerIds: string[] } }
+  | { type: 'mute.state'; payload: { playerIds: string[] } }
   | { type: 'timer.state'; payload: { durationSeconds: number; remainingSeconds: number; isRunning: boolean; startedAt?: string | null } }
   | { type: 'bell.ring'; payload: { fromPlayerId: string } }
   | { type: 'nomination.executed'; payload: { roomId: string } }
@@ -83,6 +84,9 @@ export function openRoomSocket(roomId: string, playerId: string, onEvent: (event
     },
     setHandRaised: (isRaised: boolean) => {
       return sendJson({ type: 'hand.set', payload: { isRaised } });
+    },
+    setMuted: (isMuted: boolean) => {
+      return sendJson({ type: 'mute.set', payload: { isMuted } });
     },
     setTimer: (durationSeconds: number, remainingSeconds: number, isRunning: boolean) => {
       return sendJson({ type: 'timer.set', payload: { durationSeconds, remainingSeconds, isRunning } });

@@ -30,10 +30,21 @@ type ChatPanelProps = {
   messages: ChatMessage[];
   onSendMessage: () => void;
   openChatTabs: string[];
+  playerAvatarUrl: (playerId: string) => string | null;
   playerName: (playerId: string | undefined) => string;
   setActiveChatTab: (tabId: string) => void;
   setChatDraft: (draft: string) => void;
 };
+
+/** First one or two initials of a name for an avatar-less chat chip. */
+function chatInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
 
 type ChatMessageTextProps = {
   text: string;
@@ -190,6 +201,7 @@ export function ChatPanel({
   messages,
   onSendMessage,
   openChatTabs,
+  playerAvatarUrl,
   playerName,
   setActiveChatTab,
   setChatDraft,
@@ -252,35 +264,12 @@ export function ChatPanel({
 
   return (
     <section className="chat-panel">
-      <div className="chat-simple-targets">
-        <button className={activeChatTab === 'public' ? 'active' : ''} onClick={() => setActiveChatTab('public')} type="button">
-          <span>Public</span>
-        </button>
-        {privateTabs.map((tabId) => {
-          const isActive = activeChatTab === tabId;
-          const needsAttention = attentionChatTabs.includes(tabId);
-          return (
-            <button
-              className={[isActive ? 'active' : '', needsAttention ? 'chat-tab-attention' : ''].filter(Boolean).join(' ')}
-              key={tabId}
-              onClick={() => setActiveChatTab(tabId)}
-              type="button"
-            >
-              <span>{playerName(tabId)}</span>
-              <small
-                aria-label={`Close chat with ${playerName(tabId)}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  closeChatTab(tabId);
-                }}
-                role="button"
-              >
-                ×
-              </small>
-            </button>
-          );
-        })}
-        <button className="minimize" aria-label="Minimize chat" onClick={() => setIsOpen(false)} type="button">
+      <div className="chat-heading">
+        <span className="chat-heading-text">
+          <strong>{activeChatTab === 'public' ? 'Town Chat' : playerName(activeChatTab)}</strong>
+          <small>{activeChatTab === 'public' ? '#public' : 'private whisper'}</small>
+        </span>
+        <button className="chat-minimize" aria-label="Minimize chat" title="Minimize chat" onClick={() => setIsOpen(false)} type="button">
           <svg
             aria-hidden="true"
             fill="none"
@@ -299,6 +288,38 @@ export function ChatPanel({
         </button>
       </div>
 
+      {privateTabs.length > 0 ? (
+        <div className="chat-simple-targets">
+          <button className={activeChatTab === 'public' ? 'active' : ''} onClick={() => setActiveChatTab('public')} type="button">
+            <span>Public</span>
+          </button>
+          {privateTabs.map((tabId) => {
+            const isActive = activeChatTab === tabId;
+            const needsAttention = attentionChatTabs.includes(tabId);
+            return (
+              <button
+                className={[isActive ? 'active' : '', needsAttention ? 'chat-tab-attention' : ''].filter(Boolean).join(' ')}
+                key={tabId}
+                onClick={() => setActiveChatTab(tabId)}
+                type="button"
+              >
+                <span>{playerName(tabId)}</span>
+                <small
+                  aria-label={`Close chat with ${playerName(tabId)}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    closeChatTab(tabId);
+                  }}
+                  role="button"
+                >
+                  ×
+                </small>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       <div
         className="chat-log"
         ref={chatLogRef}
@@ -316,17 +337,26 @@ export function ChatPanel({
         ) : null}
         {messageGroups.map((group) => {
           const isOwn = group.fromPlayerId === currentPlayerId;
+          const senderName = isOwn ? 'You' : playerName(group.fromPlayerId);
+          const avatarUrl = playerAvatarUrl(group.fromPlayerId);
           return (
             <div className={isOwn ? 'chat-group own' : 'chat-group'} key={group.id}>
-              <header className="chat-group-header">
-                <strong>{isOwn ? 'You' : playerName(group.fromPlayerId)}</strong>
-                <time>{formatMessageTime(group.at)}</time>
-              </header>
-              {group.messages.map((message) => (
-                <div className="chat-bubble" key={message.id}>
-                  <ChatMessageText text={message.text} />
-                </div>
-              ))}
+              {avatarUrl ? (
+                <img className="chat-avatar" alt="" src={avatarUrl} />
+              ) : (
+                <span className="chat-avatar chat-avatar-fallback" aria-hidden="true">{chatInitials(senderName)}</span>
+              )}
+              <div className="chat-group-content">
+                <header className="chat-group-header">
+                  <strong>{senderName}</strong>
+                  <time>{formatMessageTime(group.at)}</time>
+                </header>
+                {group.messages.map((message) => (
+                  <div className="chat-bubble" key={message.id}>
+                    <ChatMessageText text={message.text} />
+                  </div>
+                ))}
+              </div>
             </div>
           );
         })}
@@ -355,7 +385,7 @@ export function ChatPanel({
         </button>
         <textarea
           aria-label={`Message ${activeChatLabel}`}
-          placeholder={activeChatTab === 'public' ? 'Message everyone…' : `Message ${playerName(activeChatTab)}…`}
+          placeholder={activeChatTab === 'public' ? 'Speak your mind…' : `Whisper to ${playerName(activeChatTab)}…`}
           ref={textareaRef}
           rows={1}
           value={chatDraft}

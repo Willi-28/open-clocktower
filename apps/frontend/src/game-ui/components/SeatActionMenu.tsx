@@ -5,20 +5,25 @@
  * nominations, status changes, execution, suspicion, and kick controls.
  */
 
+import type { CSSProperties } from 'react';
+
 import type { Character, Nomination, Player, RoomState } from '../../api/client';
 import { characterRole } from '../gameText';
 
 type SeatActionMenuProps = {
   activeNomination: Nomination | null | undefined;
+  anchorStyle?: CSSProperties;
   characters: Character[];
   chatTargets: Player[];
   currentPlayer: Player;
   hasExecutionVotes: boolean;
   isStoryteller: boolean;
   player: Player;
+  playerVolume: number;
   roomPhase: RoomState['phase'];
   suspectedCharacterId: string;
   onClose: () => void;
+  onSetPlayerVolume: (volume: number) => void;
   onExecute: (playerId: string) => void;
   onRequestKick: (player: Player) => void;
   onMarkAlive: (playerId: string) => void;
@@ -34,12 +39,14 @@ type SeatActionMenuProps = {
 /** Render contextual actions for the selected seat/player. */
 export function SeatActionMenu({
   activeNomination,
+  anchorStyle,
   characters,
   chatTargets,
   currentPlayer,
   hasExecutionVotes,
   isStoryteller,
   player,
+  playerVolume,
   roomPhase,
   suspectedCharacterId,
   onClose,
@@ -50,6 +57,7 @@ export function SeatActionMenu({
   onNominate,
   onOpenChat,
   onPlaceSuspicion,
+  onSetPlayerVolume,
   onStartPrivateCall,
   onSuspectedCharacterChange,
   onToggleDeadVote,
@@ -58,7 +66,7 @@ export function SeatActionMenu({
   const canNominatePlayer = roomPhase === 'day' && currentPlayer.status === 'alive' && player.status === 'alive';
 
   return (
-    <div className="seat-action-menu">
+    <div className="seat-action-menu" style={anchorStyle}>
       <div className="seat-action-header">
         <strong>{player.display_name}</strong>
         <button className="secondary" onClick={onClose} type="button">
@@ -67,12 +75,26 @@ export function SeatActionMenu({
       </div>
       {isStoryteller ? (
         <>
-          <button className="secondary" onClick={() => onOpenChat(player.id)} type="button">
-            Chat
-          </button>
-          <button className="secondary" onClick={() => onStartPrivateCall(player.id)} type="button">
-            Call
-          </button>
+          <div className="seat-action-comm-row">
+            <button className="secondary" onClick={() => onOpenChat(player.id)} type="button">
+              Chat
+            </button>
+            <button className="secondary" onClick={() => onStartPrivateCall(player.id)} type="button">
+              Call
+            </button>
+          </div>
+          <label className="seat-action-volume">
+            <span>Volume</span>
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="0.05"
+              value={playerVolume}
+              onChange={(event) => onSetPlayerVolume(Number(event.target.value))}
+            />
+            <small>{Math.round(playerVolume * 100)}%</small>
+          </label>
           <div className="segmented-control seat-status-control">
             <button
               className={player.status === 'alive' ? 'active' : ''}
@@ -111,14 +133,28 @@ export function SeatActionMenu({
         </>
       ) : (
         <>
-          {canChatWithPlayer ? (
-            <button className="secondary" onClick={() => onOpenChat(player.id)} type="button">
-              Chat
+          <div className="seat-action-comm-row">
+            {canChatWithPlayer ? (
+              <button className="secondary" onClick={() => onOpenChat(player.id)} type="button">
+                Chat
+              </button>
+            ) : null}
+            <button className="secondary" disabled={roomPhase === 'night'} onClick={() => onStartPrivateCall(player.id)} type="button">
+              Call
             </button>
-          ) : null}
-          <button className="secondary" disabled={roomPhase === 'night'} onClick={() => onStartPrivateCall(player.id)} type="button">
-            Call
-          </button>
+          </div>
+          <label className="seat-action-volume">
+            <span>Volume</span>
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="0.05"
+              value={playerVolume}
+              onChange={(event) => onSetPlayerVolume(Number(event.target.value))}
+            />
+            <small>{Math.round(playerVolume * 100)}%</small>
+          </label>
           {!player.is_storyteller ? (
             <>
               <button disabled={!canNominatePlayer} onClick={() => onNominate(player.id)} type="button">

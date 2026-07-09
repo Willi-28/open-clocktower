@@ -162,6 +162,21 @@
   }
 }
 
+/*
+ * Fluid UI scale. Every `rem` size (text plus the icon/avatar/control sizes that
+ * were converted to rem) is anchored to this one clamp, so the interface scales
+ * smoothly with viewport WIDTH instead of snapping between breakpoints: ~13px on
+ * small phones, ~16px on a 1440px desktop, up to 18.5px on very wide screens.
+ * The slope is deliberately gentle and width-only so the same width always gives
+ * the same size regardless of aspect ratio; short viewports are handled by the
+ * height media queries (which compact the panels), not by shrinking every glyph.
+ * Structural widths, the table, and touch targets stay in px/vw, so this only
+ * rescales content, never the layout skeleton.
+ */
+html {
+  font-size: clamp(13px, 11.5px + 0.32vw, 18.5px);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -313,6 +328,195 @@ h2 {
   position: relative;
 }
 
+/* Room view stacks the collapsible top bar above the workspace. */
+.app-shell.topbar-open,
+.app-shell.topbar-collapsed {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell.topbar-open .workspace {
+  --top-bar-h: 56px;
+}
+
+.app-shell.topbar-collapsed .workspace {
+  --top-bar-h: 22px;
+}
+
+/* The workspace (and everything it sizes off the viewport) shrinks by the bar
+ * height so the table circle keeps fitting. Defined after the :root dvh block
+ * so the dvh override below still wins where supported. */
+.workspace {
+  --viewport-block: calc(100vh - var(--top-bar-h, 0px));
+}
+
+@supports (height: 100dvh) {
+  .workspace {
+    --viewport-block: calc(100dvh - var(--top-bar-h, 0px));
+  }
+}
+
+.game-top-bar {
+  align-items: center;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-0) 48%, transparent), color-mix(in srgb, var(--panel-0) 28%, transparent)),
+    color-mix(in srgb, var(--theme-glow) 18%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--panel-border) 62%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--gold-bright) 8%, transparent),
+    0 6px 18px rgba(0, 0, 0, 0.18);
+  color: var(--cream);
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 12px;
+  justify-content: space-between;
+  min-height: 56px;
+  padding: 8px 16px;
+  position: relative;
+  z-index: 6;
+}
+
+.game-top-bar button {
+  cursor: pointer;
+}
+
+/* Collapsed: a slim handle strip with just a reopen control. */
+.game-top-bar.collapsed {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-0) 36%, transparent), color-mix(in srgb, var(--panel-0) 22%, transparent)),
+    color-mix(in srgb, var(--theme-glow) 14%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--panel-border) 50%, transparent);
+  justify-content: center;
+  min-height: 22px;
+  padding: 0;
+}
+
+.top-bar-reopen {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--gold);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 700;
+  gap: 7px;
+  letter-spacing: 0.04em;
+  min-height: 22px;
+  padding: 0 14px;
+  text-transform: uppercase;
+  width: 100%;
+}
+
+.top-bar-reopen:hover {
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  color: var(--gold-bright);
+}
+
+.top-bar-reopen-label {
+  max-width: 60vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-bar-identity {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.top-bar-room {
+  color: var(--cream);
+  font-family: var(--display-font);
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  max-width: 26vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-bar-code {
+  font-size: 0.82rem;
+}
+
+.top-bar-phase {
+  white-space: nowrap;
+}
+
+.top-bar-player {
+  align-items: center;
+  background: color-mix(in srgb, var(--gold) 14%, var(--inner-bg));
+  border: 1px solid color-mix(in srgb, var(--gold) 32%, transparent);
+  border-radius: 999px;
+  color: var(--gold-bright);
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 800;
+  gap: 6px;
+  max-width: 20vw;
+  overflow: hidden;
+  padding: 4px 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-bar-player::before {
+  background: radial-gradient(circle, var(--gold-bright), var(--gold));
+  border-radius: 999px;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--gold) 60%, transparent);
+  content: "";
+  flex: 0 0 auto;
+  height: 7px;
+  width: 7px;
+}
+
+.top-bar-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.top-bar-button {
+  align-items: center;
+  border-radius: 10px;
+  display: inline-flex;
+  gap: 7px;
+  min-height: 40px;
+  transition: background-color 130ms ease, border-color 130ms ease, transform 100ms ease;
+  white-space: nowrap;
+}
+
+.top-bar-button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.top-bar-icon {
+  aspect-ratio: 1;
+  font-size: 1.1rem;
+  justify-content: center;
+  padding: 0;
+  width: 40px;
+}
+
+.top-bar-toggle {
+  color: var(--gold);
+  font-size: 0.8rem;
+}
+
+.top-bar-mute.muted {
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  color: #18080d;
+}
+
 .app-shell.background-space::before {
   background:
     radial-gradient(ellipse at 52% 48%, rgba(42, 72, 118, 0.08), transparent 34rem),
@@ -361,13 +565,13 @@ h2 {
 
 .app-shell.player-night::after {
   content: "";
-  display: none;
+  display: none !important;
   inset: 0;
-  opacity: 0;
+  opacity: 0 !important;
   pointer-events: none;
   position: fixed;
   transition: opacity 240ms ease;
-  z-index: 4;
+  z-index: 0;
 }
 
 .workspace::before {
@@ -378,21 +582,52 @@ h2 {
   pointer-events: none;
   position: absolute;
   transition: opacity 240ms ease;
-  z-index: 0;
+  z-index: 1;
 }
 
-.app-shell.player-night.night-effect-subtle::after {
+.app-shell.night-effect-subtle .workspace::before {
+  background:
+    radial-gradient(circle at 14% 6%, rgba(226, 240, 255, 0.46), rgba(126, 170, 244, 0.2) 12%, transparent 30%),
+    linear-gradient(116deg, rgba(150, 195, 255, 0.2) 8%, rgba(84, 128, 220, 0.1) 40%, transparent 66%),
+    radial-gradient(ellipse at 48% 52%, transparent 36%, rgba(6, 16, 48, 0.24) 70%, rgba(2, 7, 28, 0.4));
+}
+
+.app-shell.night-effect-fog .workspace::before {
+  animation: workspace-fog-drift 58s ease-in-out infinite alternate;
+  background:
+    radial-gradient(ellipse 54rem 16rem at 18% 78%, rgba(248, 250, 253, 0.22), rgba(240, 245, 250, 0.1) 48%, transparent 72%),
+    radial-gradient(ellipse 58rem 18rem at 80% 34%, rgba(244, 248, 252, 0.2), rgba(236, 242, 248, 0.08) 44%, transparent 68%),
+    radial-gradient(ellipse 72rem 24rem at 48% 98%, rgba(250, 252, 255, 0.26), rgba(241, 246, 251, 0.12) 48%, transparent 74%),
+    linear-gradient(180deg, rgba(210, 225, 245, 0.08), rgba(235, 242, 249, 0.16) 78%, rgba(245, 248, 252, 0.2));
+  background-size: 220% 200%, 240% 220%, 260% 220%, 100% 100%;
+}
+
+@keyframes workspace-fog-drift {
+  from {
+    background-position: 0% 48%, 100% 36%, 12% 100%, 0 0;
+  }
+
+  to {
+    background-position: 100% 54%, 0% 42%, 84% 90%, 0 0;
+  }
+}
+
+.app-shell.room-night.night-effect-subtle::after,
+.app-shell.room-night.night-effect-fog::after {
   opacity: 0;
 }
 
-.app-shell.player-night.night-effect-subtle .workspace::before,
-.app-shell.player-night.night-effect-fog .workspace::before {
-  display: none;
-  opacity: 0;
+.app-shell.room-night.night-effect-subtle .workspace::before,
+.app-shell.room-night.night-effect-fog .workspace::before {
+  display: block;
 }
 
-.app-shell.player-night.night-effect-fog::after {
-  opacity: 0;
+.app-shell.room-night.night-effect-subtle .workspace::before {
+  opacity: 0.42;
+}
+
+.app-shell.room-night.night-effect-fog .workspace::before {
+  opacity: 0.58;
 }
 
 .eyebrow {
@@ -500,7 +735,10 @@ h2 {
   display: grid;
   gap: var(--workspace-gap);
   grid-template-areas: "communication table tools";
-  grid-template-columns: var(--desktop-left-panel) minmax(500px, 1fr) var(--desktop-right-panel);
+  /* minmax(0, 1fr) so the table column can shrink instead of forcing the grid
+   * wider than the viewport (which pushed the whole overlay off the left edge
+   * when the right dashboard expanded). */
+  grid-template-columns: var(--desktop-left-panel) minmax(0, 1fr) var(--desktop-right-panel);
   height: var(--viewport-block);
   margin: 0;
   min-height: 0;
@@ -631,13 +869,13 @@ h2 {
   --vote-hand-center-light: #f0d08c;
   --vote-hand-border: rgba(214, 174, 102, 0.5);
   --seat-bg:
-    linear-gradient(180deg, rgba(39, 36, 41, 0.98), rgba(13, 14, 17, 0.99)),
-    #191a1d;
+    linear-gradient(180deg, rgba(31, 33, 38, 0.98), rgba(8, 9, 12, 0.99)),
+    #111318;
   --seat-bg-character:
-    linear-gradient(180deg, rgba(69, 54, 39, 0.98), rgba(15, 16, 19, 0.99)),
-    #1b1c20;
-  --seat-border: rgba(214, 174, 102, 0.34);
-  --seat-overlay: linear-gradient(180deg, rgba(30, 31, 34, 0.18), rgba(17, 18, 20, 0.72));
+    linear-gradient(180deg, rgba(42, 45, 52, 0.98), rgba(11, 12, 16, 0.99)),
+    #17191f;
+  --seat-border: rgba(148, 155, 164, 0.34);
+  --seat-overlay: linear-gradient(180deg, rgba(48, 51, 58, 0.12), rgba(7, 8, 11, 0.74));
   --seat-text: #dbdee1;
   background: #111216;
 }
@@ -834,10 +1072,10 @@ h2 {
   --vote-hand-center: #0f7783;
   --vote-hand-center-light: #ffe59c;
   --vote-hand-border: rgba(255, 219, 146, 0.6);
-  --seat-bg: linear-gradient(180deg, rgba(20, 103, 111, 0.94), rgba(8, 49, 63, 0.97)), #0a4658;
-  --seat-bg-character: linear-gradient(180deg, rgba(238, 165, 80, 0.96), rgba(15, 83, 93, 0.98)), #0d5b67;
-  --seat-border: rgba(255, 219, 146, 0.46);
-  --seat-overlay: linear-gradient(180deg, rgba(255, 242, 201, 0.1), rgba(4, 32, 45, 0.56));
+  --seat-bg: linear-gradient(180deg, rgba(15, 112, 130, 0.94), rgba(5, 54, 75, 0.97)), #073f58;
+  --seat-bg-character: linear-gradient(180deg, rgba(24, 138, 157, 0.96), rgba(7, 66, 88, 0.98)), #084c63;
+  --seat-border: rgba(126, 224, 237, 0.46);
+  --seat-overlay: linear-gradient(180deg, rgba(216, 250, 255, 0.1), rgba(3, 40, 58, 0.58));
   --seat-text: #fff7df;
   background:
     radial-gradient(ellipse at 42% 28%, rgba(255, 222, 139, 0.24), transparent 36rem),
@@ -899,6 +1137,17 @@ h2 {
   display: grid;
   gap: 12px;
   padding: 14px;
+}
+
+.app-shell.topbar-open .right-dashboard.panel,
+.app-shell.topbar-collapsed .right-dashboard.panel,
+.app-shell.topbar-open .edge-panel details:not(.voice-panel),
+.app-shell.topbar-collapsed .edge-panel details:not(.voice-panel),
+.app-shell.topbar-open .lobby-info,
+.app-shell.topbar-collapsed .lobby-info {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-0) 72%, transparent), color-mix(in srgb, var(--panel-0) 54%, transparent)),
+    color-mix(in srgb, var(--theme-glow) 12%, transparent);
 }
 
 .panel.compact {
@@ -1005,7 +1254,7 @@ h2 {
   position: sticky;
   scrollbar-width: none;
   top: 0;
-  z-index: 5;
+  z-index: 12;
 }
 
 .edge-panel::-webkit-scrollbar {
@@ -1013,40 +1262,180 @@ h2 {
 }
 
 .left-edge {
-  align-content: start;
   align-items: stretch;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   grid-area: communication;
+  min-height: 0;
   min-width: 0;
+  /* Unlike the other edge panels, the communication column keeps a visible thin
+   * scrollbar: the voice + chat dashboards can together exceed a short viewport,
+   * and a hidden scrollbar made them feel un-scrollable. */
+  overscroll-behavior: contain;
+  scrollbar-color: color-mix(in srgb, var(--gold) 50%, transparent) transparent;
+  scrollbar-width: thin;
 }
 
-.left-edge > details {
-  align-self: start;
+.left-edge::-webkit-scrollbar {
+  display: block;
+  width: 7px;
+}
+
+.left-edge::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--gold) 50%, transparent);
+  border-radius: 999px;
+}
+
+.left-edge::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Voice Rooms sit at the top; the Text Chat is pushed to the bottom-left corner. */
+.left-edge .chat-panel {
+  margin-top: auto;
 }
 
 .left-edge > details,
-.left-edge .chat-panel,
-.left-edge .lobby-info {
+.left-edge > .voice-panel {
   border-radius: 0 8px 8px 0;
+  flex: 0 0 auto;
   max-width: 100%;
   min-width: 0;
   padding: 12px;
 }
 
-.left-edge > details {
+.left-edge > details,
+.left-edge > .voice-panel {
   background: var(--panel-bg);
   border-color: var(--panel-border);
   box-shadow: inset 0 1px 0 rgba(255, 232, 184, 0.055), 0 14px 34px rgba(0, 0, 0, 0.24);
 }
 
-.left-edge > details > summary {
+.left-edge > details > summary,
+.left-edge > .voice-panel > .voice-panel-title {
   min-height: 30px;
   padding: 6px 8px;
+}
+
+/* The voice panel gets whatever vertical room the pinned chat leaves. When many
+ * people sit in one room, only the room list scrolls; local controls keep their
+ * own row and stay reachable. */
+.left-edge > .voice-panel {
+  /* One source of truth for the panel height so every breakpoint only overrides
+   * --voice-h. The floor is low enough for short viewports; when the content is
+   * taller than the panel the room list scrolls inside it. */
+  --voice-h: clamp(240px, 54vh, 680px);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 90%, var(--theme-glow) 10%), color-mix(in srgb, var(--panel-bg) 82%, var(--inner-bg) 18%)),
+    var(--panel-bg);
+  border-color: color-mix(in srgb, var(--panel-border) 72%, var(--gold) 28%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 184, 0.055),
+    0 10px 26px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex: 0 1 var(--voice-h);
+  flex-direction: column;
+  height: var(--voice-h);
+  max-height: var(--voice-h);
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  padding: 10px 8px 7px;
+  position: relative;
+  z-index: 13;
+}
+
+.left-edge > .voice-panel > .voice-panel-title {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+  padding: 1px 5px 0;
+}
+
+.left-edge > .voice-panel .voice-panel-shell {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.left-edge > .voice-panel .voice-room-list {
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  max-height: none;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 2px;
+  scrollbar-color: color-mix(in srgb, var(--gold) 46%, transparent) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  touch-action: pan-y;
+}
+
+.left-edge > .voice-panel .voice-room-list::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+
+.left-edge > .voice-panel .voice-room-list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--gold) 46%, transparent);
+  border-radius: 999px;
+}
+
+.left-edge > .voice-panel .voice-room-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.left-edge > .voice-panel .voice-panel-footer {
+  align-self: stretch;
+  display: grid;
+  flex: 0 0 auto;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+}
+
+.left-edge > .voice-panel .voice-user-panel {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-0) 52%, transparent), color-mix(in srgb, var(--panel-1) 82%, transparent)),
+    color-mix(in srgb, var(--theme-glow) 8%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--gold) 20%, transparent);
+  margin: 2px -2px 0;
+  padding-top: 4px;
+  z-index: 2;
 }
 
 .left-edge button {
   min-height: 36px;
   padding: 0 12px;
+}
+
+.left-edge button.voice-room {
+  min-height: 32px;
+  padding: 4px 8px;
+}
+
+.left-edge button.voice-user-button {
+  height: 2rem;
+  min-height: 2rem;
+  min-width: 2rem;
+  padding: 0;
+  width: 2rem;
+}
+
+.left-edge button.chat-minimize {
+  height: 2rem;
+  min-height: 2rem;
+  min-width: 2rem;
+  padding: 0;
+  width: 2rem;
 }
 
 .right-edge {
@@ -1166,19 +1555,19 @@ h2 {
   width: 34px;
 }
 
-.lobby-info .fullscreen-button {
+.fullscreen-button {
   color: var(--gold-bright);
   --fullscreen-icon-color: currentColor;
 }
 
 /* Island buttons use an orange gradient, on which the pale-yellow gold-bright
  * icon is nearly invisible — use the theme's deep ocean blue instead. */
-.app-shell.theme-island .lobby-info .fullscreen-button {
+.app-shell.theme-island .fullscreen-button {
   color: #0d4f6e;
   --fullscreen-icon-color: #0d4f6e;
 }
 
-.app-shell.theme-light .lobby-info .fullscreen-button {
+.app-shell.theme-light .fullscreen-button {
   color: #2e3338;
 }
 
@@ -1267,17 +1656,23 @@ h2 {
   width: 30px;
 }
 
-.settings-button .fullscreen-icon {
+.fullscreen-icon {
   background: var(--fullscreen-icon-color, currentColor);
   display: block;
-  height: 34px;
+  height: 20px;
   mask: var(--fullscreen-icon-url) center / contain no-repeat;
   -webkit-mask: var(--fullscreen-icon-url) center / contain no-repeat;
+  width: 20px;
+}
+
+.settings-button .fullscreen-icon {
+  height: 34px;
   width: 34px;
 }
 
 .table-wrap {
   container-type: inline-size;
+  isolation: isolate;
   min-height: 0;
   position: relative;
   z-index: 1;
@@ -1291,7 +1686,7 @@ h2 {
 .table-wrap::before,
 .table-wrap::after {
   content: "";
-  inset: -28px -22vw;
+  inset: -28px 0;
   opacity: 0;
   pointer-events: none;
   position: absolute;
@@ -1363,9 +1758,9 @@ h2 {
 
 /* Only visibility is tied to night, so the 5s fade keeps its imagery while
  * fading out at daybreak. */
-.app-shell.player-night.night-effect-subtle .table-wrap::after,
-.app-shell.player-night.night-effect-fog .table-wrap::after,
-.app-shell.player-night.night-effect-fog .table-wrap::before {
+.app-shell.room-night.night-effect-subtle .table-wrap::after,
+.app-shell.room-night.night-effect-fog .table-wrap::after,
+.app-shell.room-night.night-effect-fog .table-wrap::before {
   opacity: 1;
 }
 
@@ -1412,7 +1807,9 @@ h2 {
 
 .table-timer {
   align-items: center;
-  background: var(--panel-bg);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-0) 62%, transparent), color-mix(in srgb, var(--panel-0) 42%, transparent)),
+    color-mix(in srgb, var(--theme-glow) 12%, transparent);
   border: 1px solid var(--panel-border);
   border-radius: 999px;
   box-shadow:
@@ -1565,9 +1962,33 @@ h2 {
   padding: clamp(42px, 2.5vw, 48px) clamp(42px, 4.7vw, 90px) clamp(18px, 1.5vw, 30px);
   place-items: center;
   position: relative;
-  transform: scale(var(--table-zoom));
-  transform-origin: center center;
-  transition: transform 120ms ease-out;
+}
+
+/* Grab cursor over the pannable table background (mouse only). */
+@media (hover: hover) and (pointer: fine) {
+  .table-stage {
+    cursor: grab;
+  }
+
+  .table-stage.table-panning {
+    cursor: grabbing;
+  }
+
+  /* While dragging, don't animate the translate so it tracks the pointer 1:1. */
+  .table-stage.table-panning .table-surface {
+    transition: none;
+  }
+}
+
+/* No native image ghost-drag or text selection while panning the table. */
+.table-stage {
+  user-select: none;
+  touch-action: none;
+}
+
+.table-stage img {
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .table-stage.phase-day {
@@ -1589,6 +2010,10 @@ h2 {
   container-type: inline-size;
   max-width: 1240px;
   position: relative;
+  transform: translate(var(--table-pan-x, 0px), var(--table-pan-y, 0px)) scale(var(--table-zoom));
+  transform-origin: center center;
+  transition: transform 120ms ease-out;
+  will-change: transform;
   width: min(100%, calc(var(--viewport-block) - clamp(104px, 7.3vw, 140px)));
 }
 
@@ -1789,18 +2214,36 @@ h2 {
   z-index: 3;
 }
 
-.table-center span {
+/* Day/Night indicator: a sun or moon over the phase name, tinted warm by day and
+ * cool by night, with a soft matching glow ring behind the medallion. */
+.table-phase {
+  align-items: center;
   color: var(--gold);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.table-phase-icon {
+  filter: drop-shadow(0 0 10px color-mix(in srgb, currentcolor 55%, transparent));
+  height: 34px;
+  width: 34px;
+}
+
+.table-phase-label {
   font-family: var(--display-font);
+  font-size: 1.02rem;
   font-weight: 700;
   letter-spacing: var(--display-tracking);
   text-transform: uppercase;
 }
 
-.table-center small {
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 800;
+.table-phase[data-phase='day'] {
+  color: color-mix(in srgb, var(--gold-bright) 82%, #ffd27a);
+}
+
+.table-phase[data-phase='night'] {
+  color: color-mix(in srgb, var(--cream) 62%, #9fb6e6);
 }
 
 .table-vote-counter {
@@ -2025,6 +2468,33 @@ h2 {
   font-weight: 800;
 }
 
+/* The storyteller nameplate is now identical to a player's (name + mic icon);
+ * the role is shown by the on-seat "Storyteller" tag instead. */
+
+/* "Storyteller" sits ON the seat token as a gold ribbon over the lower edge of
+ * the avatar - the role is stated on the seat itself, and the nameplate below
+ * carries only the name (never the voice room). */
+/* No frame/pill - just the word in gold (the colour the old border carried),
+ * with a dark shadow so it stays legible over the avatar. */
+.storyteller-seat-tag {
+  bottom: calc(7px * var(--seat-scale));
+  color: var(--gold-bright);
+  font-family: var(--display-font);
+  font-size: calc(0.62rem * var(--seat-scale));
+  font-weight: 800;
+  left: 50%;
+  letter-spacing: 0.08em;
+  max-width: 92%;
+  overflow: hidden;
+  position: absolute;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.75);
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  z-index: 3;
+}
+
 .table-corner-seat {
   bottom: 18px;
   left: 18px;
@@ -2147,13 +2617,62 @@ h2 {
   font-weight: 900;
 }
 
-.demon-bluff-slot select {
-  bottom: 58px;
-  left: 50%;
-  min-width: 210px;
-  position: absolute;
-  transform: translateX(-50%);
-  z-index: 12;
+/* Portaled demon-bluff character picker: always above the side dashboards. */
+.demon-bluff-picker {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 20px 52px rgba(0, 0, 0, 0.42),
+    0 0 24px var(--theme-glow);
+  display: grid;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 7px;
+  scrollbar-width: thin;
+  width: 220px;
+  z-index: 45;
+}
+
+.demon-bluff-picker button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: none;
+  color: var(--cream);
+  display: grid;
+  font-size: 0.82rem;
+  font-weight: 700;
+  gap: 8px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  justify-items: start;
+  min-height: 38px;
+  padding: 3px 7px;
+  text-align: left;
+}
+
+.demon-bluff-picker button:hover {
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+}
+
+.demon-bluff-picker button img,
+.demon-bluff-picker-fallback {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  height: 28px;
+  object-fit: contain;
+  width: 28px;
+}
+
+.demon-bluff-picker-fallback {
+  align-items: center;
+  background: color-mix(in srgb, var(--gold) 16%, var(--inner-bg));
+  color: var(--gold);
+  display: flex;
+  justify-content: center;
 }
 
 .seat-action-menu {
@@ -2173,7 +2692,7 @@ h2 {
   padding: 12px;
   position: absolute;
   transform: translateX(-50%);
-  z-index: 11;
+  z-index: 40;
 }
 
 .seat-action-header {
@@ -2185,6 +2704,118 @@ h2 {
 
 .seat-action-menu strong {
   color: var(--gold-bright);
+}
+
+/* Call/Chat share one row; Call fills it when there is no chat option. */
+.seat-action-comm-row {
+  display: flex;
+  gap: 8px;
+}
+
+.seat-action-comm-row button {
+  flex: 1;
+}
+
+/* Per-player volume slider row in the seat menu. */
+.seat-action-volume {
+  align-items: center;
+  display: grid;
+  gap: 4px 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.seat-action-volume span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.seat-action-volume input {
+  accent-color: var(--gold);
+  min-height: auto;
+  width: 100%;
+}
+
+.seat-action-volume small {
+  color: var(--gold-bright);
+  font-size: 0.74rem;
+  font-weight: 700;
+  min-width: 36px;
+  text-align: right;
+}
+
+/* Right-click reminder token picker on the table. */
+.token-context-menu {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 20px 52px rgba(0, 0, 0, 0.42),
+    0 0 24px var(--theme-glow);
+  color: var(--cream);
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  width: 256px;
+  z-index: 45;
+}
+
+.token-context-menu > strong {
+  color: var(--gold-bright);
+  font-family: var(--display-font);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: var(--display-tracking);
+  text-transform: uppercase;
+}
+
+.token-context-grid {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-height: 244px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.token-context-grid button {
+  align-items: center;
+  background: color-mix(in srgb, var(--inner-bg) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold) 22%, transparent);
+  border-radius: 8px;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-height: 56px;
+  padding: 5px 3px;
+}
+
+.token-context-grid button:hover {
+  background: color-mix(in srgb, var(--gold) 16%, var(--inner-bg));
+  border-color: var(--gold-bright);
+}
+
+.token-context-grid button img {
+  height: 30px;
+  object-fit: contain;
+  width: 30px;
+}
+
+.token-context-grid button small {
+  color: var(--muted);
+  font-size: 0.52rem;
+  font-weight: 700;
+  line-height: 1.05;
+  max-width: 100%;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.token-context-grid .helper-text {
+  grid-column: 1 / -1;
 }
 
 .seat-status-control {
@@ -2308,7 +2939,9 @@ h2 {
   transform: translate(calc(-50% + var(--seat-x) * 1cqw), calc(-50% + var(--seat-y) * 1cqw));
   width: calc(min(246px, 24cqi) * var(--seat-scale));
   z-index: 2;
-  overflow: hidden;
+  /* Visible so the nameplate can sit below the box; the avatar and overlay
+   * round their own corners instead of relying on the box clipping them. */
+  overflow: visible;
   transition:
     transform 220ms ease,
     opacity 180ms ease,
@@ -2324,6 +2957,28 @@ h2 {
 
 .seat.occupied {
   border-color: var(--gold);
+}
+
+.app-shell.theme-dark .seat:hover {
+  border-color: rgba(216, 222, 232, 0.82);
+  box-shadow:
+    0 0 0 4px rgba(148, 155, 164, 0.14),
+    0 0 26px rgba(0, 0, 0, 0.44);
+}
+
+.app-shell.theme-dark .seat.occupied {
+  border-color: rgba(148, 155, 164, 0.64);
+}
+
+.app-shell.theme-island .seat:hover {
+  border-color: rgba(218, 251, 255, 0.9);
+  box-shadow:
+    0 0 0 4px rgba(126, 224, 237, 0.16),
+    0 0 28px rgba(57, 196, 204, 0.24);
+}
+
+.app-shell.theme-island .seat.occupied {
+  border-color: rgba(126, 224, 237, 0.74);
 }
 
 .table-stage.phase-night .seat {
@@ -2482,6 +3137,7 @@ h2 {
 }
 
 .seat-avatar {
+  border-radius: 14px;
   height: 100%;
   inset: 0;
   object-fit: cover;
@@ -2493,11 +3149,77 @@ h2 {
 
 .seat.occupied:has(.seat-avatar)::after {
   background: var(--seat-overlay);
+  border-radius: 14px;
   content: "";
   inset: 0;
   pointer-events: none;
   position: absolute;
   z-index: -1;
+}
+
+/* Initials fill the box for occupied players who have no avatar, so no seat
+ * ever looks blank now that the name sits below the box. */
+.seat-initials {
+  align-items: center;
+  color: color-mix(in srgb, var(--gold-bright) 82%, var(--cream));
+  display: flex;
+  font-family: var(--display-font);
+  font-size: calc(1.5rem * var(--seat-scale));
+  font-weight: 700;
+  justify-content: center;
+  letter-spacing: 0.02em;
+  opacity: 0.9;
+}
+
+/* Player name sits on a readable pill just below the seat box. */
+.seat-nameplate {
+  align-items: center;
+  background: color-mix(in srgb, var(--panel-0) 84%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+  border-radius: 999px;
+  display: flex;
+  gap: calc(5px * var(--seat-scale));
+  left: 50%;
+  max-width: calc(160px * var(--seat-scale));
+  padding: calc(2px * var(--seat-scale)) calc(9px * var(--seat-scale));
+  position: absolute;
+  top: calc(100% + 5px);
+  transform: translateX(-50%);
+  z-index: 3;
+}
+
+/* Per-player mic indicator: live mic in gold, muted mic in a soft red. */
+.seat-mic {
+  color: var(--gold-bright);
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.seat-mic.muted {
+  color: #ff8f8f;
+}
+
+.seat-mic svg {
+  height: calc(14px * var(--seat-scale));
+  width: calc(14px * var(--seat-scale));
+}
+
+.seat-nameplate strong {
+  display: block;
+  font-size: calc(clamp(0.92rem, 2.1cqi, 1.28rem) * var(--seat-scale));
+  font-weight: 550;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seat.vote-highlight .seat-nameplate,
+.seat.nominee-seat .seat-nameplate,
+.seat.nominator-seat .seat-nameplate {
+  border-color: var(--gold-bright);
 }
 
 .seat strong,
@@ -2547,23 +3269,44 @@ h2 {
   border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent);
   border-radius: 50%;
   flex: 0 0 auto;
-  height: 24px;
-  width: 24px;
+  height: calc(30px * var(--seat-scale));
+  width: calc(30px * var(--seat-scale));
 }
 
 .seat-character-token small {
-  color: var(--gold);
-  font-size: 0.68rem;
-  font-weight: 900;
-  max-width: 84px;
+  color: var(--gold-bright);
+  font-size: calc(clamp(0.82rem, 1.75cqi, 1.08rem) * var(--seat-scale));
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  max-width: calc(104px * var(--seat-scale));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Empty seat: a soft armchair glyph instead of any avatar so open seats read
+ * clearly as "sit here". */
+.seat-empty-icon {
+  color: color-mix(in srgb, var(--gold) 62%, var(--muted));
+  display: grid;
+  place-items: center;
+}
+
+.seat-empty-icon svg {
+  height: calc(min(58px, 6cqi) * var(--seat-scale));
+  width: calc(min(58px, 6cqi) * var(--seat-scale));
+}
+
+.seat:not(.occupied):hover .seat-empty-icon {
+  color: var(--gold-bright);
 }
 
 .seat-suspicion-token small {
   color: var(--gold-bright);
-  font-size: calc(0.74rem * var(--seat-scale));
+  font-size: calc(0.88rem * var(--seat-scale));
   font-weight: 700;
   letter-spacing: 0.01em;
-  max-width: 84px;
+  max-width: calc(104px * var(--seat-scale));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2647,30 +3390,41 @@ h2 {
   user-select: none;
 }
 
+/* Open chat: fills its frame with a themed gold border like the other panels. */
 .chat-panel {
-  align-self: start;
-  background: var(--chat-bg);
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--chat-bg) 60%, transparent), color-mix(in srgb, var(--chat-bg) 42%, transparent)),
+    color-mix(in srgb, var(--theme-glow) 12%, transparent);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  border: 1px solid color-mix(in srgb, var(--gold) 34%, var(--panel-border));
+  border-radius: 0 8px 8px 0;
+  box-shadow: inset 0 1px 0 rgba(255, 232, 184, 0.055), 0 14px 34px rgba(0, 0, 0, 0.24);
   color: var(--cream);
   display: flex;
+  flex: 0 1 clamp(240px, 38vh, 430px);
   flex-direction: column;
   gap: 0;
-  height: 430px;
+  height: clamp(240px, 38vh, 430px);
+  max-width: 100%;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
   padding: 0;
 }
 
-.chat-panel-closed {
+/* Minimized: shrink to the open button, keep the framed border. */
+.chat-panel.chat-panel-closed {
+  flex-basis: auto;
   height: auto;
   padding: 0;
 }
 
 .chat-panel-open-button {
   align-items: center;
-  background: var(--chat-bg);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--chat-bg) 72%, transparent), color-mix(in srgb, var(--chat-bg) 54%, transparent)),
+    color-mix(in srgb, var(--theme-glow) 10%, transparent);
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -2684,8 +3438,76 @@ h2 {
   width: 100%;
 }
 
+/* Ornate chat header: town-chat / whisper title, subtitle, and a minimize
+ * button. Mirrors the voice-panel heading so both dashboards read as a set. */
+.chat-heading {
+  align-items: center;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--chat-bg) 68%, transparent), color-mix(in srgb, var(--chat-bg) 48%, transparent)),
+    color-mix(in srgb, var(--theme-glow) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--gold) 32%, transparent);
+  display: flex;
+  gap: 10px;
+  min-height: 46px;
+  padding: 7px 12px;
+}
+
+.chat-heading-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.chat-heading-text strong {
+  color: var(--gold-bright);
+  font-family: var(--display-font);
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--gold) 26%, transparent);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.chat-heading-text small {
+  color: color-mix(in srgb, var(--muted) 82%, transparent);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.chat-minimize {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: none;
+  color: var(--gold);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 32px;
+  justify-content: center;
+  padding: 0;
+  width: 32px;
+}
+
+.chat-minimize:hover {
+  background: color-mix(in srgb, var(--gold) 15%, transparent);
+  color: var(--gold-bright);
+}
+
+.chat-minimize svg {
+  height: 20px;
+  width: 20px;
+}
+
 .chat-simple-targets {
-  background: color-mix(in srgb, var(--chat-bg) 78%, black 22%);
+  background: color-mix(in srgb, var(--chat-bg) 46%, transparent);
   border: 0;
   border-bottom: 1px solid color-mix(in srgb, var(--chat-line) 70%, transparent);
   display: flex;
@@ -2752,8 +3574,8 @@ h2 {
 }
 
 .chat-simple-targets button.minimize svg {
-  height: 13px;
-  width: 13px;
+  height: 16px;
+  width: 16px;
 }
 
 .chat-simple-targets small {
@@ -2777,20 +3599,21 @@ h2 {
 
 .chat-log {
   align-content: start;
+  /* Translucent like the voice panel body so the themed backdrop shows through
+   * instead of a solid dark fill - the two dashboards read as one set. */
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--chat-bg) 88%, black 12%), color-mix(in srgb, var(--chat-bg) 74%, black 26%)),
-    var(--chat-bg);
+    linear-gradient(180deg, color-mix(in srgb, var(--chat-bg) 60%, transparent), color-mix(in srgb, var(--chat-bg) 46%, transparent));
   border: 0;
   border-radius: 0;
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 8px;
   flex: 1 1 auto;
   height: auto;
   min-height: 0;
   max-height: none;
   overflow: auto;
-  padding: 12px;
+  padding: 8px 9px;
   scrollbar-color: color-mix(in srgb, var(--gold) 42%, transparent) transparent;
 }
 
@@ -2804,24 +3627,62 @@ h2 {
   color: #ffe3a9;
 }
 
-/* Messages from one sender within a few minutes merge into one group: a small
- * name/time header followed by a stack of bubbles. Own groups align right. */
+/* Messages from one sender within a few minutes merge into one group: an avatar
+ * beside a small name/time header and a stack of bubbles. Own groups mirror so
+ * the current player's messages sit on the right. Avatars carry no role hint. */
 .chat-group {
   align-items: flex-start;
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  flex-direction: row;
+  gap: 7px;
 }
 
 .chat-group.own {
+  flex-direction: row-reverse;
+}
+
+.chat-avatar {
+  align-items: center;
+  background: color-mix(in srgb, var(--gold) 16%, var(--chat-bg));
+  border: 1px solid color-mix(in srgb, var(--gold) 34%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, black 30%, transparent);
+  color: var(--gold-bright);
+  display: flex;
+  flex: 0 0 auto;
+  font-family: var(--display-font);
+  font-size: 0.78rem;
+  font-weight: 700;
+  height: 2rem;
+  justify-content: center;
+  margin-top: 2px;
+  object-fit: cover;
+  overflow: hidden;
+  width: 2rem;
+}
+
+.chat-group-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 3px;
+  max-width: calc(100% - 2rem - 7px);
+  min-width: 0;
+}
+
+.chat-group.own .chat-group-content {
   align-items: flex-end;
 }
 
 .chat-group-header {
   align-items: baseline;
   display: flex;
-  gap: 7px;
-  padding: 0 3px;
+  gap: 5px;
+  padding: 0 2px;
+}
+
+.chat-group.own .chat-group-header {
+  flex-direction: row-reverse;
 }
 
 .chat-group-header strong {
@@ -2844,14 +3705,14 @@ h2 {
 .chat-bubble {
   background: color-mix(in srgb, var(--chat-tab-bg) 72%, transparent);
   border: 1px solid color-mix(in srgb, var(--chat-line) 42%, transparent);
-  border-radius: 13px;
+  border-radius: 11px;
   color: var(--message-text);
-  font-size: 0.88rem;
-  line-height: 1.35;
-  max-width: 88%;
+  font-size: 0.9rem;
+  line-height: 1.32;
+  max-width: 94%;
   min-width: 0;
   overflow-wrap: anywhere;
-  padding: 5px 11px;
+  padding: 4px 8px;
 }
 
 .chat-group .chat-bubble:first-of-type {
@@ -2864,7 +3725,7 @@ h2 {
 }
 
 .chat-group.own .chat-bubble:first-of-type {
-  border-top-left-radius: 13px;
+  border-top-left-radius: 11px;
   border-top-right-radius: 5px;
 }
 
@@ -2872,7 +3733,7 @@ h2 {
 .chat-bubble:has(> .emoji-only-message) {
   background: transparent;
   border-color: transparent;
-  padding: 2px 3px;
+  padding: 0 2px;
 }
 
 .chat-empty-state {
@@ -2918,7 +3779,7 @@ h2 {
 /* Composer: one rounded field with the emoji and send buttons docked inside. */
 .chat-input-row {
   align-items: end;
-  background: color-mix(in srgb, var(--chat-bg) 78%, black 22%);
+  background: color-mix(in srgb, var(--chat-bg) 44%, transparent);
   border: 0;
   border-top: 1px solid color-mix(in srgb, var(--chat-line) 70%, transparent);
   display: grid;
@@ -2976,15 +3837,15 @@ h2 {
   color: var(--gold);
   display: inline-flex;
   font-size: 1rem;
-  height: 30px;
+  height: 1.9rem;
   justify-content: center;
   justify-self: center;
   margin-bottom: 4px;
-  min-width: 30px;
-  min-height: 30px;
+  min-width: 1.9rem;
+  min-height: 1.9rem;
   padding: 0;
   position: relative;
-  width: 30px;
+  width: 1.9rem;
   transition:
     opacity 140ms ease,
     transform 120ms ease,
@@ -3000,8 +3861,8 @@ h2 {
 
 .chat-input-row button svg {
   fill: currentColor;
-  height: 17px;
-  width: 17px;
+  height: 1.06rem;
+  width: 1.06rem;
 }
 
 .chat-input-row button:active:not(:disabled) {
@@ -3135,12 +3996,13 @@ h2 {
 .voice-toggle-icon {
   align-items: center;
   color: currentColor;
-  display: inline-flex;
+  display: inline-grid;
   flex: 0 0 auto;
   height: 20px;
-  margin-right: 7px;
+  margin: 0;
+  place-items: center;
   position: relative;
-  vertical-align: -5px;
+  vertical-align: middle;
   width: 20px;
 }
 
@@ -3177,15 +4039,157 @@ h2 {
   white-space: nowrap;
 }
 
-.voice-current-room {
+/* Discord-style user panel at the bottom of the voice dashboard. */
+.voice-user-panel {
   align-items: center;
-  display: grid;
-  gap: 6px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  background: transparent;
+  border: 0;
+  display: flex;
+  gap: 5px;
+  justify-content: space-between;
+  margin-top: 0;
+  padding: 0 4px 2px;
 }
 
-.voice-current-room p {
+.voice-user-identity {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.voice-user-avatar {
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, var(--gold) 34%, transparent);
+  border-radius: 50%;
+  flex: 0 0 auto;
+  height: 1.9rem;
+  object-fit: cover;
+  width: 1.9rem;
+}
+
+.voice-user-avatar-fallback {
+  align-items: center;
+  background: color-mix(in srgb, var(--theme-glow) 20%, var(--inner-bg));
+  color: var(--gold-bright);
+  display: flex;
+  font-size: 0.68rem;
+  font-weight: 800;
+  justify-content: center;
+}
+
+.voice-user-text {
+  display: grid;
+  min-width: 0;
+}
+
+.voice-user-text strong {
+  color: var(--cream);
+  font-size: 0.82rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-user-text small {
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 700;
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-user-controls {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 1px;
+}
+
+.voice-user-button {
+  align-items: center;
+  aspect-ratio: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  box-shadow: none;
+  color: color-mix(in srgb, var(--gold) 72%, var(--muted));
+  display: grid;
+  height: 2rem;
+  line-height: 0;
+  min-height: 2rem;
+  min-width: 2rem;
+  padding: 0;
+  place-items: center;
+  transition: background 130ms ease, color 130ms ease, border-color 130ms ease;
+  width: 2rem;
+}
+
+.voice-user-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  color: var(--gold-bright);
+}
+
+.voice-user-button:disabled {
+  opacity: 0.4;
+}
+
+.voice-user-button svg {
+  display: block;
+  height: 1.2rem;
   margin: 0;
+  width: 1.2rem;
+}
+
+.voice-user-button .voice-toggle-icon {
+  display: grid;
+  height: 1.2rem;
+  margin: 0;
+  place-items: center;
+  width: 1.2rem;
+}
+
+.voice-user-button > svg,
+.voice-user-button .voice-toggle-icon {
+  align-self: center;
+  justify-self: center;
+  place-self: center;
+}
+
+.voice-user-button .voice-toggle-icon svg {
+  height: 100%;
+  width: 100%;
+}
+
+.voice-user-button.active {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #3a1822 78%, var(--panel-0)), color-mix(in srgb, #160910 88%, black)),
+    #1a0910;
+  border-color: color-mix(in srgb, var(--danger, #d8546e) 68%, var(--gold) 22%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 226, 232, 0.14),
+    0 0 0 1px rgba(0, 0, 0, 0.42),
+    0 0 12px color-mix(in srgb, var(--danger, #d8546e) 28%, transparent);
+  color: #fff4f6;
+}
+
+.voice-user-button.active:hover:not(:disabled) {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #4a1f2b 82%, var(--panel-0)), color-mix(in srgb, #200c15 88%, black)),
+    #240d16;
+  border-color: color-mix(in srgb, var(--danger, #d8546e) 78%, var(--gold-bright) 18%);
+  color: #fff;
+}
+
+.voice-user-leave {
+  color: color-mix(in srgb, var(--danger, #d8546e) 66%, var(--muted));
+}
+
+.voice-user-leave:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger, #d8546e) 22%, transparent);
+  color: color-mix(in srgb, var(--danger, #d8546e) 38%, var(--cream));
 }
 
 .voice-audio-unlock {
@@ -3419,14 +4423,11 @@ h2 {
 }
 
 .voice-room-list {
-  background: color-mix(in srgb, var(--panel-bg) 72%, black 28%);
-  border: 1px solid var(--panel-border);
-  border-radius: 14px;
-  gap: 0;
+  gap: 6px;
   max-height: none;
   min-width: 0;
-  overflow: hidden;
-  padding: 3px;
+  overflow: visible;
+  padding: 2px;
 }
 
 .reminder-symbol-grid {
@@ -3534,34 +4535,81 @@ h2 {
   letter-spacing: 0.02em;
 }
 
-.role-distribution-grid {
+/* Seat-count stepper in the storyteller widget. */
+.role-dist-stepper {
+  align-items: center;
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+  gap: 8px;
 }
 
-.role-pill {
-  align-items: baseline;
-  background: color-mix(in srgb, var(--panel-0) 66%, black 34%);
-  border: 1px solid color-mix(in srgb, var(--gold) 28%, transparent);
-  border-radius: 999px;
-  display: inline-flex;
-  gap: 6px;
-  padding: 3px 10px;
-}
-
-.role-pill small {
-  color: var(--muted);
-  font-size: 0.66rem;
+.role-dist-step {
+  border-radius: 10px;
+  font-size: 1.25rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  line-height: 1;
+  min-height: 40px;
+  padding: 0;
+  width: 44px;
 }
 
-.role-pill strong {
+.role-dist-step:disabled {
+  opacity: 0.35;
+}
+
+.role-dist-count {
   color: var(--gold-bright);
-  font-size: 0.92rem;
+  font-family: var(--display-font);
+  font-size: 1.5rem;
+  font-weight: 700;
   line-height: 1;
+  min-width: 1.6em;
+  text-align: center;
+}
+
+.role-dist-caption {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.role-dist-caption small {
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
+  font-size: 0.74rem;
+}
+
+/* Four themed category cards: classic team hues blended with the theme surface. */
+.role-card-grid {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.role-card {
+  align-items: center;
+  background: color-mix(in srgb, var(--role-accent) 15%, var(--inner-bg));
+  border: 1px solid color-mix(in srgb, var(--role-accent) 52%, transparent);
+  border-radius: var(--radius-inner);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 4px;
+}
+
+.role-card strong {
+  color: color-mix(in srgb, var(--role-accent) 78%, var(--cream));
+  font-family: var(--display-font);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.role-card small {
+  color: color-mix(in srgb, var(--cream) 62%, var(--role-accent));
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .role-distribution .helper-text {
@@ -3656,7 +4704,257 @@ h2 {
   z-index: 6;
 }
 
-.voice-room,
+/* ---- Voice rooms: Blood-on-the-Clocktower styled list ---- */
+/* No +/- disclosure glyph: the mockup header is a plain centred crest + title. */
+.voice-panel > summary::before {
+  content: none;
+}
+
+details.voice-panel[open] > summary::before {
+  content: none;
+  display: none;
+}
+
+.voice-panel > summary {
+  display: flex;
+  cursor: default;
+  list-style: none;
+}
+
+.voice-panel > summary::marker,
+.voice-panel > summary::-webkit-details-marker {
+  display: none;
+  content: "";
+}
+
+.voice-panel-heading {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0;
+  text-align: center;
+}
+
+.voice-panel-heading strong {
+  color: color-mix(in srgb, var(--gold-bright) 84%, var(--cream));
+  font-family: var(--display-font);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* A slim engraved flourish between the header, the room list, and the user bar. */
+.voice-ornament {
+  align-items: center;
+  color: color-mix(in srgb, var(--gold) 48%, transparent);
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  padding: 2px 8px;
+}
+
+.voice-ornament-line {
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--gold) 32%, transparent));
+  flex: 1 1 auto;
+  height: 1px;
+  max-width: 34%;
+}
+
+.voice-ornament-line:last-child {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 32%, transparent), transparent);
+}
+
+.voice-ornament-mark {
+  flex: 0 0 auto;
+  height: 7px;
+  width: 26px;
+}
+
+/* Rooms read as one clean list: only the room you are in becomes a card; every
+ * other room is a plain, dimmed row — no borders, pills, or dividers. */
+.voice-room-block {
+  border: 1px solid transparent;
+  border-radius: 5px;
+  /* Natural height, never compressed by the flex list - the list scrolls
+   * instead of squashing a room and clipping its players. */
+  flex: 0 0 auto;
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.voice-room-block.active {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 74%, var(--theme-glow) 26%), color-mix(in srgb, var(--inner-bg) 86%, var(--gold) 14%));
+  border-color: color-mix(in srgb, var(--panel-border) 42%, var(--gold) 58%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--cream) 8%, transparent),
+    0 0 10px color-mix(in srgb, var(--theme-glow) 55%, transparent);
+}
+
+.voice-room {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  box-shadow: none;
+  color: var(--cream);
+  display: grid;
+  gap: 0 6px;
+  grid-template-columns: minmax(0, 1fr) 12px;
+  justify-items: start;
+  min-height: 32px;
+  min-width: 0;
+  padding: 4px 8px;
+  text-align: left;
+  transition: background-color 130ms ease;
+  width: 100%;
+}
+
+.voice-room-block:not(.active) {
+  opacity: 0.62;
+}
+
+.voice-room-block:not(.active) .voice-room:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--gold) 7%, transparent);
+}
+
+.voice-room-body {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.voice-room-name {
+  color: color-mix(in srgb, var(--gold) 46%, var(--muted));
+  font-family: var(--display-font);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.052em;
+  line-height: 1.1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.voice-room-block:not(.active) .voice-room:hover:not(:disabled) .voice-room-name {
+  color: color-mix(in srgb, var(--gold) 74%, var(--cream));
+}
+
+.voice-room-block.active .voice-room-name {
+  color: color-mix(in srgb, var(--gold-bright) 88%, var(--cream));
+  text-shadow: 0 0 10px color-mix(in srgb, var(--theme-glow) 60%, transparent);
+}
+
+.voice-room-sub {
+  color: color-mix(in srgb, var(--muted) 76%, transparent);
+  font-family: var(--body-font);
+  font-size: 0.64rem;
+  font-style: italic;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-room-marker {
+  color: color-mix(in srgb, var(--gold-bright) 78%, var(--cream));
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--theme-glow) 70%, transparent));
+  font-size: 0.5rem;
+  justify-self: end;
+}
+
+/* Occupants sit inside the active room's card: avatar + name, speaking bars. */
+.voice-room-occupants {
+  display: grid;
+  gap: 5px;
+  padding: 2px 8px 7px 9px;
+}
+
+.voice-occupant {
+  align-items: center;
+  color: var(--cream);
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 1.8rem minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.voice-occupant-avatar {
+  aspect-ratio: 1;
+  background: color-mix(in srgb, var(--theme-glow) 20%, var(--inner-bg));
+  border: 1px solid color-mix(in srgb, var(--panel-border) 46%, var(--gold) 34%);
+  border-radius: 50%;
+  color: var(--gold-bright);
+  height: 1.8rem;
+  object-fit: cover;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  width: 1.8rem;
+}
+
+.voice-occupant-fallback {
+  align-items: center;
+  display: flex;
+  font-size: 0.68rem;
+  font-weight: 800;
+  justify-content: center;
+}
+
+.voice-occupant.speaking .voice-occupant-avatar {
+  border-color: color-mix(in srgb, var(--gold-bright) 86%, var(--cream));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--gold-bright) 78%, transparent),
+    0 0 9px color-mix(in srgb, var(--theme-glow) 74%, transparent);
+}
+
+.voice-occupant-name {
+  color: var(--cream);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-speaking-bars {
+  align-items: flex-end;
+  display: flex;
+  gap: 2px;
+  height: 12px;
+}
+
+.voice-speaking-bars i {
+  animation: voice-bar 900ms ease-in-out infinite;
+  background: var(--gold-bright);
+  border-radius: 1px;
+  width: 2px;
+}
+
+.voice-speaking-bars i:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.voice-speaking-bars i:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+@keyframes voice-bar {
+  0%,
+  100% {
+    height: 4px;
+  }
+
+  50% {
+    height: 13px;
+  }
+}
+
+/* player-row keeps its own look (used by the storyteller player list). */
 .player-row {
   background: rgba(0, 0, 0, 0.22);
   color: var(--cream);
@@ -3664,86 +4962,6 @@ h2 {
   text-align: left;
 }
 
-.voice-room {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-radius: 10px;
-  box-shadow: none;
-  display: grid;
-  gap: 6px 8px;
-  grid-template-columns: minmax(0, 1fr) 22px;
-  justify-items: start;
-  max-width: 100%;
-  min-width: 0;
-  min-height: 47px;
-  padding: 8px 9px;
-  transition:
-    background-color 140ms ease,
-    box-shadow 140ms ease,
-    transform 140ms ease;
-}
-
-.voice-room + .voice-room {
-  border-top: 1px solid color-mix(in srgb, var(--panel-border) 72%, transparent);
-}
-
-.voice-room:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--inner-bg) 76%, transparent);
-  transform: translateX(2px);
-}
-
-.voice-room span,
-.private-call-list strong {
-  color: var(--cream);
-}
-
-.voice-room > span:first-child {
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.voice-room small {
-  color: var(--muted);
-  font-size: 0.68rem;
-  font-weight: 800;
-  grid-column: 1 / 2;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.voice-room .voice-room-action {
-  align-self: center;
-  background: color-mix(in srgb, var(--gold) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--gold) 32%, transparent);
-  border-radius: 999px;
-  color: var(--gold-bright);
-  display: grid;
-  font-size: 0.72rem;
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  height: 22px;
-  justify-self: end;
-  place-items: center;
-  width: 22px;
-}
-
-.voice-room .voice-room-action svg {
-  fill: none;
-  height: 15px;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2.2;
-  width: 15px;
-}
-
-.voice-room.active,
 .player-row.selected {
   background: var(--tab-active-bg);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 8px 20px rgba(0, 0, 0, 0.2);
@@ -3942,8 +5160,127 @@ h2 {
 }
 
 .checkbox-row input {
+  accent-color: var(--gold);
   min-height: auto;
   width: auto;
+}
+
+/* Pre-game switch-style toggle row (e.g. public voice during night). */
+.toggle-row {
+  align-items: center;
+  background: color-mix(in srgb, var(--inner-bg) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--panel-border) 80%, transparent);
+  border-radius: 999px;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  padding: 7px 12px;
+  transition: border-color 140ms ease;
+}
+
+.toggle-row.active {
+  border-color: color-mix(in srgb, var(--gold) 52%, transparent);
+}
+
+.toggle-row input {
+  display: none;
+}
+
+.toggle-switch {
+  background: color-mix(in srgb, var(--panel-0) 60%, black 40%);
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+  border-radius: 999px;
+  flex: 0 0 auto;
+  height: 20px;
+  position: relative;
+  transition: background 140ms ease;
+  width: 36px;
+}
+
+.toggle-switch::after {
+  background: var(--muted);
+  border-radius: 50%;
+  content: "";
+  height: 14px;
+  left: 3px;
+  position: absolute;
+  top: 2px;
+  transition: transform 140ms ease, background-color 140ms ease;
+  width: 14px;
+}
+
+.toggle-row.active .toggle-switch {
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+}
+
+.toggle-row.active .toggle-switch::after {
+  background: #18080d;
+  transform: translateX(16px);
+}
+
+.toggle-label {
+  color: color-mix(in srgb, var(--cream) 42%, var(--muted));
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.toggle-row.active .toggle-label {
+  color: var(--cream);
+}
+
+/* Character setup pool: selectable role cards with icon, name and category. */
+.character-pick {
+  align-items: center;
+  background: color-mix(in srgb, var(--inner-bg) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--panel-border) 74%, transparent);
+  border-radius: var(--radius-inner);
+  cursor: pointer;
+  display: grid;
+  gap: 3px 9px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  padding: 6px 9px;
+  transition: border-color 130ms ease, background-color 130ms ease;
+}
+
+.character-pick:hover {
+  border-color: color-mix(in srgb, var(--gold) 40%, var(--panel-border));
+}
+
+.character-pick.selected {
+  background: color-mix(in srgb, var(--gold) 16%, var(--inner-bg));
+  border-color: var(--gold);
+}
+
+.character-pick input {
+  display: none;
+}
+
+.character-pick img,
+.character-pick .character-fallback {
+  aspect-ratio: 1;
+  background: var(--inner-bg);
+  border-radius: 50%;
+  grid-row: 1 / span 2;
+  height: 30px;
+  object-fit: contain;
+  width: 30px;
+}
+
+.character-pick-name {
+  color: var(--cream);
+  font-size: 0.86rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.character-pick-category {
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .helper-text {
@@ -3992,9 +5329,10 @@ h2 {
   align-items: flex-start;
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--panel-0) 52%, black 48%),
-    color-mix(in srgb, var(--panel-0) 68%, black 32%)
-  );
+    color-mix(in srgb, var(--panel-0) 68%, transparent),
+    color-mix(in srgb, var(--panel-0) 50%, transparent)
+  ),
+  color-mix(in srgb, var(--theme-glow) 12%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--gold) 38%, var(--panel-border));
   box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.28);
   display: flex;
@@ -4044,44 +5382,63 @@ h2 {
   box-shadow: inset 0 -2px 0 var(--gold-bright);
 }
 
-/* Collapse/expand control lives at the end of the tab rail. */
-.dashboard-collapse {
-  background: var(--inner-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--radius-inner);
+/* Edge handle at the dashboard's inner-left border: click to hide/show the
+ * dashboard (slides fully off-screen), drag to resize its width. Fixed so it
+ * rides the screen edge and sits over the freed table space when collapsed. */
+.dashboard-edge-handle {
+  align-items: center;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel-0) 72%, black 28%), color-mix(in srgb, var(--panel-0) 58%, black 42%));
+  border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent);
+  border-radius: 8px 0 0 8px;
   color: var(--gold-bright);
-  flex: 0 0 auto;
-  font-size: 1.15rem;
-  font-weight: 700;
-  line-height: 1;
-  min-height: 38px;
+  cursor: ew-resize;
+  display: flex;
+  height: 84px;
+  justify-content: center;
   padding: 0;
-  width: 34px;
+  position: fixed;
+  right: var(--desktop-right-panel, 0px);
+  top: 50%;
+  transform: translateY(-50%);
+  transition: right 280ms ease, border-color 130ms ease;
+  width: 18px;
+  z-index: 20;
 }
 
-.dashboard-collapse:hover:not(:disabled) {
+.dashboard-edge-handle:hover {
   border-color: var(--gold-bright);
   color: var(--cream);
 }
 
-/* Minimized: the panel collapses to a slim rail with just the expand control,
- * and the workspace grid hands the freed width to the table. */
+.dashboard-edge-grip {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Minimized: the whole dashboard slides away; only the handle remains. */
 .right-edge.minimized .right-dashboard {
-  max-height: max-content;
-}
-
-.right-edge.minimized .dashboard-tabs {
-  border-bottom: 0;
-  overflow: visible;
-  padding: 6px;
-}
-
-.right-edge.minimized .dashboard-collapse {
-  width: 100%;
+  display: none;
 }
 
 .workspace:has(.right-edge.minimized) {
-  --desktop-right-panel: 52px;
+  --desktop-right-panel: 0px;
+}
+
+.workspace:has(.right-edge.resizing) {
+  transition: none;
+}
+
+.right-edge.resizing .dashboard-edge-handle {
+  transition: none;
+}
+
+/* The handle is desktop-only; mobile uses the bottom workspace nav. */
+@media (max-width: 980px), (max-height: 540px) {
+  .dashboard-edge-handle {
+    display: none;
+  }
 }
 
 /* The explicit display would otherwise beat the UA's [hidden] rule, leaving
@@ -4144,7 +5501,7 @@ h2 {
 
 /* On mobile the right edge is itself the scroll area, so let the dashboard grow
  * and pin the tab rail to the top of that single scroll instead of nesting one. */
-@media (max-width: 980px) {
+@media (max-width: 980px), (max-height: 540px) {
   .right-dashboard {
     max-height: none;
   }
@@ -4152,6 +5509,17 @@ h2 {
   .dashboard-body {
     overflow: visible;
     padding: 10px;
+  }
+
+  /* Minimize is a desktop-only affordance (its edge handle is hidden here), so a
+   * dashboard left minimized on desktop must not stay stuck empty in compact
+   * view - always show the tab content. */
+  .dashboard-body[hidden] {
+    display: grid;
+  }
+
+  .right-edge.minimized .right-dashboard {
+    display: grid;
   }
 }
 
@@ -4171,11 +5539,209 @@ h2 {
   padding-bottom: 5px;
 }
 
+/* Detached-sheet placeholder shown in the dashboard while it floats. */
+.sheet-detached-note {
+  align-items: center;
+  background: color-mix(in srgb, var(--inner-bg) 76%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--gold) 48%, transparent);
+  border-radius: var(--radius-card);
+  color: var(--muted);
+  display: grid;
+  font-size: 0.82rem;
+  font-weight: 700;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+  line-height: 1.35;
+  padding: 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.sheet-detached-note:hover {
+  border-color: var(--gold-bright);
+  color: var(--cream);
+}
+
+.sheet-detached-icon {
+  color: var(--gold-bright);
+  font-size: 1.3rem;
+}
+
+/* Draggable Characters tab: subtle grip hint; dashed while detached. */
+.dashboard-tab-characters {
+  gap: 5px;
+}
+
+.dashboard-tab-detach-hint {
+  font-size: 0.72rem;
+  opacity: 0.5;
+}
+
+.dashboard-tab-characters.detached {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+/* Floating, draggable + resizable character-sheet window. */
+.floating-sheet {
+  background: var(--panel-bg);
+  border: 1px solid color-mix(in srgb, var(--gold) 42%, var(--panel-border));
+  border-radius: var(--radius-panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 60px rgba(0, 0, 0, 0.5),
+    0 0 26px var(--theme-glow);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 440px;
+  max-height: 92vh;
+  max-width: 94vw;
+  min-height: 220px;
+  min-width: 250px;
+  overflow: hidden;
+  position: fixed;
+  width: 320px;
+  z-index: 46;
+}
+
+/* Invisible grab strips on every edge and corner; the sheet is resized from any
+ * side, with corner handles sized a touch larger and given diagonal cursors. */
+.floating-sheet-resize {
+  position: absolute;
+  touch-action: none;
+  z-index: 1;
+}
+
+.floating-sheet-resize-n,
+.floating-sheet-resize-s {
+  cursor: ns-resize;
+  height: 7px;
+  left: 8px;
+  right: 8px;
+}
+
+.floating-sheet-resize-e,
+.floating-sheet-resize-w {
+  bottom: 8px;
+  cursor: ew-resize;
+  top: 8px;
+  width: 7px;
+}
+
+.floating-sheet-resize-n {
+  top: 0;
+}
+
+.floating-sheet-resize-s {
+  bottom: 0;
+}
+
+.floating-sheet-resize-e {
+  right: 0;
+}
+
+.floating-sheet-resize-w {
+  left: 0;
+}
+
+.floating-sheet-resize-ne,
+.floating-sheet-resize-nw,
+.floating-sheet-resize-se,
+.floating-sheet-resize-sw {
+  height: 14px;
+  width: 14px;
+}
+
+.floating-sheet-resize-nw {
+  cursor: nwse-resize;
+  left: 0;
+  top: 0;
+}
+
+.floating-sheet-resize-ne {
+  cursor: nesw-resize;
+  right: 0;
+  top: 0;
+}
+
+.floating-sheet-resize-sw {
+  bottom: 0;
+  cursor: nesw-resize;
+  left: 0;
+}
+
+.floating-sheet-resize-se {
+  bottom: 0;
+  cursor: nwse-resize;
+  right: 0;
+}
+
+.floating-sheet-titlebar {
+  align-items: center;
+  background: color-mix(in srgb, var(--panel-0) 70%, black 30%);
+  border-bottom: 1px solid color-mix(in srgb, var(--gold) 34%, transparent);
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  cursor: grab;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px 8px 14px;
+  touch-action: none;
+  user-select: none;
+}
+
+.floating-sheet-titlebar:active {
+  cursor: grabbing;
+}
+
+.floating-sheet-titlebar strong {
+  color: var(--gold-bright);
+  font-family: var(--display-font);
+  font-size: 0.82rem;
+  letter-spacing: var(--display-tracking);
+  text-transform: uppercase;
+}
+
+.floating-sheet-reattach {
+  aspect-ratio: 1;
+  font-size: 1rem;
+  min-height: 30px;
+  padding: 0;
+  width: 30px;
+}
+
+.floating-sheet-body {
+  overflow-y: auto;
+  padding: 10px;
+  scrollbar-color: color-mix(in srgb, var(--gold) 46%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
 /* Character sheet: frame each role icon like an inlaid token and lift on hover. */
 .character-card {
+  position: relative;
   transition:
     border-color 140ms ease,
     box-shadow 140ms ease;
+}
+
+/* Flash a role card when its player's seat is clicked. */
+.character-card-flash {
+  animation: character-card-flash 1.8s ease;
+}
+
+@keyframes character-card-flash {
+  0%,
+  70% {
+    border-color: var(--gold-bright);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--gold) 55%, transparent),
+      0 0 22px var(--theme-glow);
+  }
+
+  100% {
+    border-color: var(--panel-border);
+    box-shadow: none;
+  }
 }
 
 .character-card:hover {
@@ -4191,6 +5757,103 @@ h2 {
   box-shadow:
     inset 0 0 0 2px rgba(0, 0, 0, 0.26),
     0 0 0 1px color-mix(in srgb, var(--gold-bright) 20%, transparent);
+}
+
+/* During night the atmosphere lives inside transparent dashboards instead of
+ * above them. That keeps controls readable while the fog/moonlight continues
+ * behind the side panels instead of ending abruptly at the table column. */
+.app-shell.room-night.night-effect-subtle :is(
+  .game-top-bar,
+  .right-dashboard.panel,
+  .left-edge > details,
+  .left-edge > .voice-panel,
+  .chat-panel,
+  .floating-sheet,
+  .seat-action-menu,
+  .token-context-menu,
+  .settings-panel,
+  .left-edge > .voice-panel .voice-user-panel
+) {
+  background:
+    radial-gradient(ellipse at 18% 0%, rgba(220, 235, 255, 0.16), transparent 18rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-0) 48%, transparent), color-mix(in srgb, var(--panel-1) 36%, transparent)),
+    color-mix(in srgb, var(--theme-glow) 10%, transparent);
+}
+
+.app-shell.room-night.night-effect-fog :is(
+  .game-top-bar,
+  .right-dashboard.panel,
+  .left-edge > details,
+  .left-edge > .voice-panel,
+  .chat-panel,
+  .floating-sheet,
+  .seat-action-menu,
+  .token-context-menu,
+  .settings-panel,
+  .left-edge > .voice-panel .voice-user-panel
+) {
+  background:
+    radial-gradient(ellipse 20rem 8rem at 12% 12%, rgba(246, 249, 252, 0.2), transparent 66%),
+    radial-gradient(ellipse 24rem 9rem at 86% 82%, rgba(242, 247, 251, 0.17), transparent 68%),
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-0) 50%, transparent), color-mix(in srgb, var(--panel-1) 38%, transparent)),
+    color-mix(in srgb, var(--theme-glow) 10%, transparent);
+}
+
+.app-shell.room-night:not(.night-effect-none).background-magic :is(
+  .game-top-bar,
+  .right-dashboard.panel,
+  .left-edge > details,
+  .left-edge > .voice-panel,
+  .chat-panel,
+  .floating-sheet,
+  .seat-action-menu,
+  .token-context-menu,
+  .settings-panel,
+  .left-edge > .voice-panel .voice-user-panel
+) {
+  background:
+    radial-gradient(ellipse 24rem 11rem at 16% 18%, rgba(238, 244, 255, 0.18), transparent 68%),
+    radial-gradient(ellipse 28rem 13rem at 82% 76%, rgba(211, 224, 248, 0.14), transparent 70%),
+    linear-gradient(180deg, rgba(15, 12, 25, 0.56), rgba(10, 9, 18, 0.42)),
+    url("../assets/magic_background.jpg") center / cover fixed no-repeat;
+}
+
+.app-shell.room-night:not(.night-effect-none).background-space :is(
+  .game-top-bar,
+  .right-dashboard.panel,
+  .left-edge > details,
+  .left-edge > .voice-panel,
+  .chat-panel,
+  .floating-sheet,
+  .seat-action-menu,
+  .token-context-menu,
+  .settings-panel,
+  .left-edge > .voice-panel .voice-user-panel
+) {
+  background:
+    radial-gradient(ellipse 24rem 11rem at 16% 18%, rgba(214, 237, 255, 0.16), transparent 68%),
+    radial-gradient(ellipse 30rem 14rem at 84% 80%, rgba(109, 162, 238, 0.12), transparent 72%),
+    linear-gradient(180deg, rgba(3, 11, 23, 0.6), rgba(1, 5, 14, 0.46)),
+    url("../assets/universe_background2.jpg") center 48% / cover fixed no-repeat;
+}
+
+.app-shell.room-night:not(.night-effect-none).background-island :is(
+  .game-top-bar,
+  .right-dashboard.panel,
+  .left-edge > details,
+  .left-edge > .voice-panel,
+  .chat-panel,
+  .floating-sheet,
+  .seat-action-menu,
+  .token-context-menu,
+  .settings-panel,
+  .left-edge > .voice-panel .voice-user-panel
+) {
+  background:
+    radial-gradient(ellipse 24rem 11rem at 16% 18%, rgba(230, 250, 255, 0.16), transparent 68%),
+    radial-gradient(ellipse 30rem 14rem at 84% 80%, rgba(168, 227, 235, 0.12), transparent 72%),
+    linear-gradient(180deg, rgba(4, 52, 68, 0.56), rgba(3, 34, 49, 0.44)),
+    url("../assets/sunny_island_background.jpg") center / cover fixed no-repeat;
 }
 
 /* Night order: replace the plain list numbers with small engraved ordinals. */
@@ -4268,21 +5931,6 @@ h2 {
 }
 
 /* Voice rooms: mark the joined room with a gold edge rail. */
-.voice-room.active {
-  position: relative;
-}
-
-.voice-room.active::before {
-  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
-  border-radius: 999px;
-  bottom: 7px;
-  content: "";
-  left: 2px;
-  position: absolute;
-  top: 7px;
-  width: 3px;
-}
-
 @media (max-width: 1180px) {
   .setup-grid {
     grid-template-columns: 1fr;
@@ -4291,7 +5939,7 @@ h2 {
   .workspace {
     --desktop-left-panel: clamp(250px, 26vw, 300px);
     --desktop-right-panel: clamp(250px, 26vw, 300px);
-    grid-template-columns: var(--desktop-left-panel) minmax(440px, 1fr) var(--desktop-right-panel);
+    grid-template-columns: var(--desktop-left-panel) minmax(0, 1fr) var(--desktop-right-panel);
   }
 
   .table-stage {
@@ -4303,7 +5951,7 @@ h2 {
   .workspace {
     --desktop-left-panel: clamp(260px, 21vw, 312px);
     --desktop-right-panel: clamp(284px, 23vw, 344px);
-    grid-template-columns: var(--desktop-left-panel) minmax(360px, 1fr) var(--desktop-right-panel);
+    grid-template-columns: var(--desktop-left-panel) minmax(0, 1fr) var(--desktop-right-panel);
   }
 
   .panel,
@@ -4316,16 +5964,21 @@ h2 {
 
   .panel.compact,
   .left-edge > details,
+  .left-edge > .voice-panel,
   .left-edge .chat-panel,
   .left-edge .lobby-info {
     padding: 9px;
   }
 
   .chat-panel {
-    height: min(39vh, 380px);
+    flex-basis: clamp(230px, 36vh, 380px);
+    height: clamp(230px, 36vh, 380px);
   }
 
-  .voice-room-list,
+  .left-edge > .voice-panel {
+    --voice-h: clamp(280px, 56vh, 620px);
+  }
+
   .player-list,
   .character-pool,
   .night-call-tools,
@@ -4335,7 +5988,6 @@ h2 {
     scrollbar-width: none;
   }
 
-  .voice-room-list::-webkit-scrollbar,
   .player-list::-webkit-scrollbar,
   .character-pool::-webkit-scrollbar,
   .night-call-tools::-webkit-scrollbar,
@@ -4394,6 +6046,7 @@ h2 {
 
   .panel.compact,
   .left-edge > details,
+  .left-edge > .voice-panel,
   .left-edge .chat-panel,
   .left-edge .lobby-info {
     padding: 8px;
@@ -4409,10 +6062,14 @@ h2 {
   }
 
   .chat-panel {
-    height: min(34vh, 320px);
+    flex-basis: clamp(210px, 34vh, 320px);
+    height: clamp(210px, 34vh, 320px);
   }
 
-  .voice-room-list,
+  .left-edge > .voice-panel {
+    --voice-h: clamp(230px, 52vh, 500px);
+  }
+
   .player-list,
   .character-pool,
   .night-call-tools,
@@ -4439,13 +6096,54 @@ h2 {
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 980px), (max-height: 540px) {
   body {
     overscroll-behavior: none;
   }
 
   .app-shell {
     padding: 0;
+  }
+
+  /* Compact top bar on phones/tablets: keep room name + all action buttons,
+   * drop the identity extras and button text labels to fit narrow widths. */
+  .app-shell.topbar-open .workspace {
+    --top-bar-h: 52px;
+  }
+
+  .game-top-bar {
+    gap: 6px;
+    min-height: 52px;
+    padding: 6px 10px;
+  }
+
+  .top-bar-identity {
+    min-width: 0;
+  }
+
+  .top-bar-room {
+    max-width: 34vw;
+  }
+
+  .top-bar-code,
+  .top-bar-phase,
+  .top-bar-player,
+  .top-bar-button-label {
+    display: none;
+  }
+
+  .top-bar-actions {
+    gap: 6px;
+  }
+
+  .top-bar-icon {
+    width: 34px;
+  }
+
+  .top-bar-optional {
+    font-size: 0.72rem;
+    min-height: 34px;
+    padding: 0 8px;
   }
 
   .workspace {
@@ -4484,6 +6182,7 @@ h2 {
   }
 
   .left-edge > details,
+  .left-edge > .voice-panel,
   .left-edge .chat-panel,
   .left-edge .lobby-info,
   .right-edge > details {
@@ -4558,7 +6257,12 @@ h2 {
   }
 
   .chat-panel {
-    height: min(52vh, 430px);
+    flex-basis: min(46vh, 430px);
+    height: min(46vh, 430px);
+  }
+
+  .left-edge > .voice-panel {
+    --voice-h: min(62vh, 620px);
   }
 
   .mobile-workspace-nav {
@@ -4652,6 +6356,173 @@ h2 {
 
   .settings-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/*
+ * Extreme aspect ratios.
+ *
+ * The breakpoints above cover the common phone/tablet/desktop cases. These
+ * handle the corners the fluid root font alone cannot: very narrow phones,
+ * short landscape windows (wide-and-flat), tall-and-thin portraits, and very
+ * wide desktops. They only nudge spacing, panel heights, and a couple of grid
+ * tracks - all colours still come from the theme tokens.
+ */
+
+/* Tiny phones (older/compact devices, split-screen). Trim padding and the
+ * bottom nav so the table and dashboards keep real estate. */
+@media (max-width: 380px) {
+  .left-edge,
+  .right-edge {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .game-top-bar {
+    gap: 4px;
+    padding: 6px 8px;
+  }
+
+  .top-bar-room {
+    max-width: 42vw;
+  }
+
+  .mobile-workspace-nav {
+    gap: 4px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    height: calc(56px + env(safe-area-inset-bottom));
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-workspace-nav button {
+    min-height: 40px;
+  }
+
+  .workspace {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+
+  .workspace > .left-edge,
+  .workspace > .right-edge,
+  .workspace > .table-wrap {
+    height: calc(var(--viewport-block) - 56px - env(safe-area-inset-bottom));
+  }
+
+  .table-stage {
+    padding: 42px 30px 30px;
+  }
+
+  .table-surface {
+    width: min(calc(100vw - 60px), calc(var(--viewport-block) - 190px));
+  }
+}
+
+/* Short landscape (phone/tablet turned sideways, or a wide-and-flat window):
+ * width is fine but height is scarce, so slim the top and bottom chrome, keep
+ * the dashboards scrollable, and let the table use the width it has. */
+/* Any short viewport (landscape phone, or a wide window dragged very low): the
+ * three-column desktop layout cannot fit a round table plus stacked panels, so
+ * the mobile media block above has already switched to the single-view + bottom
+ * nav layout. Here we tune that layout for the little vertical room there is -
+ * slim top bar and nav, and a table scaled to fit its view height INCLUDING the
+ * seats that ring it (they overhang the surface, hence the ~0.74 factor). */
+@media (max-height: 540px) {
+  .app-shell.topbar-open .workspace {
+    --top-bar-h: 44px;
+  }
+
+  .game-top-bar {
+    min-height: 44px;
+    padding: 4px 10px;
+  }
+
+  .mobile-workspace-nav {
+    height: calc(46px + env(safe-area-inset-bottom));
+    padding: 5px 8px calc(5px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-workspace-nav button {
+    min-height: 34px;
+  }
+
+  .workspace {
+    padding-bottom: calc(46px + env(safe-area-inset-bottom));
+  }
+
+  .workspace > .left-edge,
+  .workspace > .right-edge,
+  .workspace > .table-wrap {
+    height: calc(var(--viewport-block) - 46px - env(safe-area-inset-bottom));
+  }
+
+  .left-edge > .voice-panel {
+    --voice-h: min(78vh, 460px);
+  }
+
+  .chat-panel {
+    flex-basis: min(62vh, 360px);
+    height: min(62vh, 360px);
+  }
+
+  .table-stage {
+    padding: 6px 24px;
+  }
+
+  /* Fit the whole table + its ring of seats into the short view height. */
+  .table-surface {
+    width: min(calc(100vw - 40px), calc((var(--viewport-block) - 58px) * 0.74));
+  }
+}
+
+/* Short desktop windows in the 541-620px band: still the 3-column layout, just
+ * more compact. Below 541px the single-view layout takes over (see above). */
+@media (min-width: 981px) and (max-height: 620px) and (min-height: 541px) {
+  .left-edge > .voice-panel {
+    --voice-h: clamp(190px, 48vh, 380px);
+  }
+
+  .chat-panel {
+    flex-basis: clamp(150px, 30vh, 260px);
+    height: clamp(150px, 30vh, 260px);
+  }
+
+  .table-stage {
+    padding: 30px 30px 12px;
+  }
+
+  .table-surface {
+    width: min(100%, calc(var(--viewport-block) - 64px));
+  }
+}
+
+/* Tall, narrow portraits (phones/tablets held upright with lots of height):
+ * hand the extra vertical space to the table and let the voice list breathe. */
+@media (max-width: 820px) and (min-height: 900px) and (orientation: portrait) {
+  .table-stage {
+    padding: 7% 8% 6%;
+  }
+
+  .left-edge > .voice-panel {
+    --voice-h: min(56vh, 720px);
+  }
+
+  .chat-panel {
+    flex-basis: min(42vh, 520px);
+    height: min(42vh, 520px);
+  }
+}
+
+/* Very wide desktops / 4K: let the side dashboards claim a little more of the
+ * abundant width, and cap the table so seats never balloon past a comfortable
+ * size on a huge canvas. */
+@media (min-width: 2000px) {
+  .workspace {
+    --desktop-left-panel: clamp(360px, 19vw, 460px);
+    --desktop-right-panel: clamp(380px, 20vw, 480px);
+  }
+
+  .table-surface {
+    width: min(100%, calc(var(--viewport-block) - clamp(120px, 8vw, 200px)), 1180px);
   }
 }
 

@@ -3,6 +3,13 @@
  *
  * This module wraps rnnoise-wasm in a MediaStream transform so live voice can
  * use client-side noise suppression before WebRTC sends audio to peers.
+ *
+ * The pipeline intentionally runs on a ScriptProcessorNode rather than an
+ * AudioWorklet: the rnnoise-wasm build refuses to load outside window/Worker
+ * scopes and worklet module imports are still unreliable in Firefox/Safari.
+ * The 1024-sample buffer (~21 ms) keeps latency low while riding out main
+ * thread jank; callers must treat any construction failure as "fall back to
+ * the browser's native noise suppression".
  */
 
 import type { Rnnoise } from '@shiguredo/rnnoise-wasm';
@@ -82,7 +89,7 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
   // suppression" (fine) and a silently empty outgoing track (the user is heard as
   // silence) on Windows setups whose audio device runs at 44.1 kHz or in exclusive
   // mode, and on browsers where a MediaStream-only graph never leaves 'suspended'.
-  const audioContext = new AudioContextClass({ sampleRate: 48000 });
+  const audioContext = new AudioContextClass({ sampleRate: 48000, latencyHint: 'interactive' });
   if (audioContext.sampleRate !== 48000) {
     await audioContext.close();
     throw new Error(
@@ -117,9 +124,29 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
   const inputBuffer = new SampleRingBuffer(frameSize * 32);
   const outputBuffer = new SampleRingBuffer(frameSize * 32);
   const dryBuffer = new SampleRingBuffer(frameSize * 32);
+  const gateBuffer = new SampleRingBuffer(frameSize * 32);
   const frame = new Float32Array(frameSize);
   let isCleanedUp = false;
 
+  // Residual-noise expander driven by RNNoise's own per-frame voice detection:
+  // while nobody is talking the output is eased down another ~10 dB, which
+  // removes the residual hiss/hum RNNoise leaves behind. Speech opens the gate
+  // instantly (the decision is made on the same 10 ms frame, so onsets are
+  // never clipped) and a generous hangover plus a slow ramp-down keep pauses
+  // between words untouched - it never sounds like a walkie-talkie.
+  const voiceProbabilityThreshold = 0.5;
+  const gateHoldFrames = 40; // 40 frames x 10 ms = 400 ms hangover after speech.
+  const gateFloor = 0.3; // Attenuate silence by ~10 dB instead of hard-muting.
+  const gateOpenRate = 0.007; // Per-sample smoothing: fully open in ~3 ms.
+  const gateCloseRate = 0.00018; // Per-sample smoothing: closes over ~120 ms.
+  let gateHoldRemaining = gateHoldFrames;
+  let gateGain = 1;
+
+  // Filter chain tuning. The high-pass only removes sub-voice rumble (desk
+  // thumps, wind) without touching voice fundamentals. The compressor evens
+  // out quiet/loud talkers with a slow release so it never audibly pumps, and
+  // the limiter is a pure safety ceiling against clipping - both leave the
+  // spectrum alone so the voice stays bright, not muffled.
   highPass.type = 'highpass';
   highPass.frequency.value = 78;
   highPass.Q.value = 0.72;
@@ -127,12 +154,12 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
   compressor.knee.value = 18;
   compressor.ratio.value = 3;
   compressor.attack.value = 0.004;
-  compressor.release.value = 0.16;
-  limiter.threshold.value = -3;
+  compressor.release.value = 0.24;
+  limiter.threshold.value = -2;
   limiter.knee.value = 0;
   limiter.ratio.value = 20;
   limiter.attack.value = 0.002;
-  limiter.release.value = 0.08;
+  limiter.release.value = 0.12;
 
   processor.onaudioprocess = (event) => {
     if (isCleanedUp) {
@@ -150,9 +177,16 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
       for (let index = 0; index < frame.length; index += 1) {
         dryBuffer.push(frame[index] / 32768);
       }
-      denoiseState.processFrame(frame);
+      const voiceProbability = denoiseState.processFrame(frame);
+      if (voiceProbability > voiceProbabilityThreshold) {
+        gateHoldRemaining = gateHoldFrames;
+      } else if (gateHoldRemaining > 0) {
+        gateHoldRemaining -= 1;
+      }
+      const gateTarget = gateHoldRemaining > 0 ? 1 : gateFloor;
       for (let index = 0; index < frame.length; index += 1) {
         outputBuffer.push(Math.max(-1, Math.min(1, frame[index] / 32768)));
+        gateBuffer.push(gateTarget);
       }
     }
 
@@ -163,7 +197,10 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
       }
       const wet = outputBuffer.pop();
       const dry = dryBuffer.pop();
-      output[index] = Math.max(-1, Math.min(1, wet * 0.96 + dry * 0.04));
+      const gateTarget = gateBuffer.pop();
+      gateGain += (gateTarget - gateGain) * (gateTarget > gateGain ? gateOpenRate : gateCloseRate);
+      // A 2% dry bleed keeps sibilants natural without re-admitting noise.
+      output[index] = Math.max(-1, Math.min(1, (wet * 0.98 + dry * 0.02) * gateGain));
     }
   };
 
@@ -176,12 +213,21 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
   keepAlive.connect(audioContext.destination);
   void audioContext.resume();
 
+  // OS output-device switches and mobile audio interruptions can suspend the
+  // context mid-session, which would silently kill the outgoing voice track.
+  audioContext.onstatechange = () => {
+    if (!isCleanedUp && audioContext.state === 'suspended') {
+      void audioContext.resume().catch(() => undefined);
+    }
+  };
+
   /** Release RNNoise, audio graph nodes, and all media tracks created for the stream. */
   const cleanup = () => {
     if (isCleanedUp) {
       return;
     }
     isCleanedUp = true;
+    audioContext.onstatechange = null;
     processor.onaudioprocess = null;
     keepAlive.disconnect();
     limiter.disconnect();

@@ -1,14 +1,27 @@
 # Character Packs
 
-Open Clocktower imports custom characters per room. The app does not ship protected game content.
+Open Clocktower imports custom character packs per room. The app does not ship protected game content, so each server operator or storyteller provides their own content.
 
-## File Type
+## File Type And Limits
 
-Upload a single `.zip` file.
+Upload one `.zip` file.
 
-Maximum pack size: 15 MB.
+Limits:
 
-Required structure:
+- maximum ZIP upload size: 15 MB
+- maximum uncompressed archive content: 50 MB
+- maximum archive entries: 1000
+- maximum icon size: 512 KB per icon
+
+Archive paths must be relative and safe. Absolute paths and `..` path traversal are rejected.
+
+Required root file:
+
+```text
+manifest.json
+```
+
+Recommended layout:
 
 ```text
 my-pack.zip
@@ -32,15 +45,14 @@ my-pack.zip
   "defaultLocale": "en",
   "supportedLocales": [
     { "code": "en", "name": "English" },
-    { "code": "de", "name": "Deutsch" },
-    { "code": "es", "name": "Español" }
+    { "code": "es", "name": "Spanish" }
   ],
   "characters": [
     {
       "id": "character-a",
       "name": "Character A",
       "team": "town",
-      "category": "information",
+      "category": "townsfolk",
       "ability": "Ability text shown on the character sheet.",
       "icon": "icons/character-a.png",
       "firstNight": 12,
@@ -48,11 +60,11 @@ my-pack.zip
       "otherNight": 34,
       "otherNightReminder": "Wake on later nights and do the recurring action.",
       "translations": {
-        "de": {
-          "name": "Rolle A",
-          "category": "Bürger",
-          "ability": "Übersetzter Fähigkeitstext.",
-          "firstNightReminder": "Übersetzte Erinnerung für die erste Nacht."
+        "es": {
+          "name": "Translated Character A",
+          "category": "Translated Category",
+          "ability": "Translated ability text.",
+          "firstNightReminder": "Translated first-night reminder."
         }
       }
     }
@@ -66,9 +78,9 @@ my-pack.zip
         "reminder_token": "MARKED",
         "file": "reminder_tokens/character-a_marked.png",
         "translations": {
-          "de": {
-            "character": "Rolle A",
-            "reminder_token": "MARKIERT"
+          "es": {
+            "character": "Translated Character A",
+            "reminder_token": "TRANSLATED MARKED"
           }
         }
       }
@@ -79,6 +91,8 @@ my-pack.zip
   }
 }
 ```
+
+## Characters
 
 Required character fields:
 
@@ -91,47 +105,62 @@ Required character fields:
 Optional character fields:
 
 - `icon`
-- `firstNight`: official first-night order number; use `0` or omit if the character does not wake
-- `firstNightReminder`: text shown in the First Night section
-- `otherNight`: official other-night order number; use `0` or omit if the character does not wake
-- `otherNightReminder`: text shown in the Other Nights section
-- `translations`: optional per-language overrides for `name`, `team`,
-  `category`, `ability`, `firstNightReminder`, and `otherNightReminder`
+- `firstNight`: first-night order number; use `0` or omit if the character does not wake
+- `firstNightReminder`
+- `otherNight`: other-night order number; use `0` or omit if the character does not wake
+- `otherNightReminder`
+- `translations`: per-language overrides for `name`, `team`, `category`, `ability`, `firstNightReminder`, and `otherNightReminder`
+
+The character sheet groups roles by `category`. Keep category values consistent inside a pack so the dashboard stays readable.
+
+## Languages
 
 Optional language fields:
 
-- `defaultLocale`: base language of the un-translated character and token fields
-- `supportedLocales`: languages offered in client settings; entries can be
-  plain strings like `"de"` or objects like `{ "code": "de", "name": "Deutsch" }`
+- `defaultLocale`: base language of the untranslated fields
+- `supportedLocales`: languages offered in client settings
 
-Optional reminder token fields:
+Each supported locale may be a string such as `"es"` or an object such as:
 
-- `reminderTokenPack`: grouped reminder token metadata
-- `reminderTokenPack.name`: optional human-readable token pack name
-- `reminderTokenPack.tokens`: list of reminder tokens available as private table tokens
-- `reminderTokenPack.tokens[].id`: unique inside the pack
-- `reminderTokenPack.tokens[].character`: character name used for the tooltip
-- `reminderTokenPack.tokens[].reminder_token`: visible text rendered below the token icon
-- `reminderTokenPack.tokens[].file`: PNG/JPG/JPEG/WEBP image path inside the ZIP
-- `reminderTokenPack.tokens[].icon`: alternative image field name; use either `file` or `icon`
-- `reminderTokenPack.tokens[].translations`: optional per-language overrides for
-  `character`, `reminder_token`, or `label`
+```json
+{ "code": "es", "name": "Spanish" }
+```
 
-For compatibility, top-level `tokens`, `reminderTokens`, and `reminder_tokens`
-are also accepted. New packs should prefer `reminderTokenPack.tokens`.
+When languages are present, the browser settings show a `Language` section with a character sheet language selector. This is local to each browser and does not change room state or assignments.
 
-Reminder token PNGs should contain only the token artwork. The app renders
-`reminder_token` as the white caption below the icon, so captions can be
-translated and remain readable at different table sizes.
+## Reminder Tokens
 
-If `supportedLocales` is present, the frontend exposes those languages in
-client settings under `Language` -> `Character Sheet Language`. Selecting a
-language is local to each browser and does not change room state or character
-assignments.
+Recommended token location:
 
-Night order can be provided in either of these formats:
+```json
+{
+  "reminderTokenPack": {
+    "tokens": []
+  }
+}
+```
 
-- Recommended: put `firstNight`, `firstNightReminder`, `otherNight`, and `otherNightReminder` directly on each character in `manifest.json`.
+Supported token fields:
+
+- `id`: unique inside the pack
+- `character`: character name used in tooltips
+- `reminder_token`, `reminderToken`, or `label`: visible text rendered under the icon
+- `file`, `icon`, `image`, `src`, or `source_icon_file`: image path inside the ZIP
+- `translations`: optional per-language overrides for `character`, `reminder_token`, or `label`
+
+For compatibility, top-level `tokens`, `reminderTokens`, and `reminder_tokens` are also accepted. New packs should prefer `reminderTokenPack.tokens`.
+
+If the manifest provides a token list, that list is authoritative. Automatic discovery from `reminder_tokens/` is only used when no token list exists.
+
+The UI shows each visible token once. If a pack contains multiple token IDs with the same icon and the same visible label, only the first one is shown in the token dashboard. For example, five copies of the same `CORRECT` token render as one selectable token.
+
+Reminder token images should contain only the artwork. The app renders the text caption under the icon so labels can be translated and kept readable at different sizes.
+
+## Night Order
+
+Night order can be provided in either format:
+
+- Recommended: set `firstNight`, `firstNightReminder`, `otherNight`, and `otherNightReminder` directly on each character.
 - Compatible: set `nightOrder.file` to a JSON file inside the ZIP.
 
 Example `night-order.json`:
@@ -139,14 +168,13 @@ Example `night-order.json`:
 ```json
 {
   "schemaVersion": 1,
-  "scriptId": "trouble-brewing",
-  "name": "Trouble Brewing Night Order",
+  "name": "Example Night Order",
   "nightOrder": {
     "firstNight": [
-      { "character": "Poisoner", "note": "Chooses a player to poison." }
+      { "character": "Character A", "note": "First-night action." }
     ],
     "otherNights": [
-      { "character": "Monk", "note": "Chooses a player to protect from the Demon." }
+      { "character": "Character A", "note": "Later-night action." }
     ]
   }
 }
@@ -154,19 +182,23 @@ Example `night-order.json`:
 
 ## Icon Requirements
 
-Allowed formats:
+Allowed icon formats:
 
 - PNG
 - JPG/JPEG
 - WEBP
 
-Maximum icon size: 512 KB per file.
-
 Recommended icon shape:
 
 - square image
-- 256x256 or 512x512 pixels
-- transparent PNG or WEBP works best
-- keep important details centered, because the UI renders icons as circles
+- transparent PNG or WEBP when possible
+- important details centered, because character icons are rendered as circles
 
-SVG is intentionally not accepted yet, because it needs sanitizing before it is safe for uploads.
+SVG is intentionally not accepted for uploaded icons because it requires sanitization before it is safe to serve.
+
+## Safety Notes
+
+- Do not include protected or unlicensed content unless you have the right to use it.
+- Keep ZIPs small and avoid unused assets.
+- Prefer explicit token lists over relying on filename discovery.
+- Use stable IDs; changing IDs can break saved assignments or placed local reminders after a pack is replaced.

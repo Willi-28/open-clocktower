@@ -132,6 +132,38 @@ export function playMuteToggleTone(isMuted: boolean) {
   });
 }
 
+/**
+ * Play the deafen toggle tone - deliberately duller/muffled than the mic mute
+ * tone: lower pitch, soft sine waves, and a low-pass filter that rolls off the
+ * highs, so silencing everyone sounds like the room going quiet.
+ */
+export function playDeafenToggleTone(deafened: boolean) {
+  const audioContext = getSharedAudioContext();
+  if (!audioContext) {
+    return;
+  }
+  const lowpass = audioContext.createBiquadFilter();
+  lowpass.type = 'lowpass';
+  lowpass.frequency.value = 500;
+  lowpass.Q.value = 0.6;
+  const frequencies = deafened ? [360, 220] : [220, 360];
+  frequencies.forEach((frequency, index) => {
+    const offset = index * 0.085;
+    const gain = audioContext.createGain();
+    const oscillator = audioContext.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime + offset);
+    gain.gain.setValueAtTime(0.001, audioContext.currentTime + offset);
+    gain.gain.exponentialRampToValueAtTime(0.12, audioContext.currentTime + offset + 0.014);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + offset + 0.18);
+    oscillator.connect(gain);
+    gain.connect(lowpass);
+    oscillator.start(audioContext.currentTime + offset);
+    oscillator.stop(audioContext.currentTime + offset + 0.2);
+  });
+  connectWithSoundEffectsVolume(audioContext, lowpass);
+}
+
 /** Play one clock tick for vote counting movement. */
 export function playTickTone() {
   const audio = new Audio(clockTickUrl);

@@ -42,6 +42,7 @@ type UseRoomSocketEventsOptions = {
   setIncomingVoiceCall: (call: { fromPlayerId: string; voiceRoom: string } | null) => void;
   setIsVoteCountRunning: (isRunning: boolean) => void;
   setRaisedHandPlayerIds: Dispatch<SetStateAction<string[]>>;
+  setMutedPlayerIds: Dispatch<SetStateAction<string[]>>;
   setRoom: (room: RoomState | null) => void;
   setSelectedPlayerId: Dispatch<SetStateAction<string>>;
   setVoteCountIndex: (index: number) => void;
@@ -69,6 +70,7 @@ export function useRoomSocketEvents({
   setIncomingVoiceCall,
   setIsVoteCountRunning,
   setRaisedHandPlayerIds,
+  setMutedPlayerIds,
   setRoom,
   setSelectedPlayerId,
   setVoteCountIndex,
@@ -89,6 +91,7 @@ export function useRoomSocketEvents({
     setIncomingVoiceCall,
     setIsVoteCountRunning,
     setRaisedHandPlayerIds,
+    setMutedPlayerIds,
     setRoom,
     setSelectedPlayerId,
     setVoteCountIndex,
@@ -111,6 +114,7 @@ export function useRoomSocketEvents({
       setIncomingVoiceCall,
       setIsVoteCountRunning,
       setRaisedHandPlayerIds,
+      setMutedPlayerIds,
       setRoom,
       setSelectedPlayerId,
       setVoteCountIndex,
@@ -158,6 +162,9 @@ export function useRoomSocketEvents({
       }
       if (event.type === 'hand.state') {
         handlers.setRaisedHandPlayerIds(event.payload.playerIds);
+      }
+      if (event.type === 'mute.state') {
+        handlers.setMutedPlayerIds(event.payload.playerIds);
       }
       if (event.type === 'voice.state') {
         handlers.applyVoiceParticipants(event.payload.participants);
@@ -209,6 +216,7 @@ export function useRoomSocketEvents({
         handlers.setVoiceParticipants([]);
         handlers.setIncomingVoiceCall(null);
         handlers.setRaisedHandPlayerIds([]);
+        handlers.setMutedPlayerIds([]);
         handlers.setRoom(null);
         handlers.setError('The room was deleted.');
       }
@@ -221,6 +229,7 @@ export function useRoomSocketEvents({
         handlers.setVoiceParticipants([]);
         handlers.setIncomingVoiceCall(null);
         handlers.setRaisedHandPlayerIds([]);
+        handlers.setMutedPlayerIds([]);
         handlers.setCurrentPlayerId('');
         handlers.setSelectedPlayerId('');
         handlers.setRoom(null);

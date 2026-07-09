@@ -1,42 +1,32 @@
 # Open Clocktower
 
-Open Clocktower is a self-hosted browser app for live, moderated social-deduction games.
+Open Clocktower is a self-hosted browser app for live, storyteller-led social deduction games.
 
-It gives a group a shared digital table with rooms, seats, phases, nominations, voting, private notes, private chat, calls, and custom character packs. It is meant for groups that want to run their own game night online or around a table with a browser-based helper.
+It provides a shared digital table with rooms, seats, phases, nominations, voting, reminders, private notes, text chat, voice rooms, timers, and custom character packs. The app is designed for private groups that want to host their own online or hybrid game nights.
 
-## What it is
+## What It Provides
 
-Open Clocktower helps a storyteller host a hidden-role game session:
+- private rooms with short room codes
+- player seating around a shared table
+- storyteller-controlled phase and nomination flow
+- hidden character assignments and demon bluffs
+- character sheet, night order, and reminder token dashboards
+- local player notes, suspicions, and table reminders
+- public and private text chat
+- WebRTC voice rooms with browser-side audio settings
+- room-local character pack uploads
 
-* create a private room
-* invite players with a room code
-* arrange players around a digital table
-* upload a character pack to play
-* choose which characters are in play
-* assign hidden characters
-* manage day and night phases
-* run nominations and votes
-* keep local notes, reminders, and private suspicions
+Players do not need accounts. A browser receives private session credentials when it creates or joins a room, and those credentials are used for later actions.
 
-Players do not need accounts. They join with a name and a room code.
+## Content
 
-## Character packs
+Open Clocktower does not include official game content, protected artwork, logos, rules text, or character packs. Server operators and storytellers are responsible for the content they upload to their own instance.
 
-To play, you need to upload a character pack.
+Character packs are uploaded per room and may contain custom scripts, homebrew content, translated text, icons, reminder tokens, and night order data.
 
-Character packs contain the roles and character information used in a room. Open Clocktower does not include official game content, so each server operator or storyteller provides their own packs.
+See [Character Packs](docs/character-packs.md) for the supported format and upload limits.
 
-Packs are uploaded per room and can be customized for your own group, scripts, variants, or homebrew content.
-
-See [`docs/character-packs.md`](docs/character-packs.md) for the expected format.
-
-## Inspiration and content
-
-Open Clocktower is inspired by the style of live, storyteller-led hidden-role games, especially Blood on the Clocktower.
-
-This project is independent and unaffiliated. It does not include official game content, character names, rules text, logos, artwork, or protected assets. Server operators are responsible for the content they upload to their own instance.
-
-## Install and run locally
+## Local Run
 
 You need Docker and Docker Compose.
 
@@ -44,46 +34,51 @@ You need Docker and Docker Compose.
 docker compose up --build
 ```
 
-Then open:
+Open:
 
 ```text
 http://localhost:3000
 ```
 
-## Docker image
+For frontend hot reload and development checks, see [Development](docs/development.md).
 
-A Docker image is available on Docker Hub:
+## Production
 
-[Docker Hub: willi28/open-clocktower](https://hub.docker.com/repository/docker/willi28/open-clocktower/general)
+The production stack is intended to run one app container behind an HTTPS reverse proxy and one internal PostgreSQL container. The default production image tag should be `latest` unless you deliberately pin a known-good image for rollback.
 
-The project repositories and Docker image may remain private while the project is still in preparation. They are intended to become public once the project is ready.
+Example domain used throughout the docs:
 
-## Production setup
+```text
+clocktower.example.com
+```
 
-Production is designed for a small self-hosted setup behind an existing Traefik reverse proxy.
-
-Basic steps:
-
-1. Copy `.env.production.example` to `.env`.
-2. Set `APP_DOMAIN`, `POSTGRES_PASSWORD`, and `OPEN_CLOCKTOWER_IMAGE`.
-3. Make sure Traefik has an external Docker network named `traefik_proxy`.
-4. Start the production stack:
+Basic production flow:
 
 ```bash
+cp .env.production.example .env
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-For the full setup, see [`docs/deployment.md`](docs/deployment.md).
+Before starting, set at least:
 
-## More information
+```env
+OPEN_CLOCKTOWER_IMAGE=willi28/open-clocktower:latest
+APP_DOMAIN=clocktower.example.com
+POSTGRES_PASSWORD=use-a-long-random-password
+```
 
-* [`docs/deployment.md`](docs/deployment.md) — homeserver and Traefik setup
-* [`docs/development.md`](docs/development.md) — local development
-* [`docs/character-packs.md`](docs/character-packs.md) — custom character pack format
-* [`docs/api-events.md`](docs/api-events.md) — API and realtime events
-* [`docs/webapp-structure.md`](docs/webapp-structure.md) — project structure
+For the full setup, security checklist, voice/TURN notes, and backup guidance, see [Deployment](docs/deployment.md).
 
-## Status
+## Documentation
 
-Open Clocktower is an early MVP. It is usable for testing and small private sessions, but it is intentionally simple. Most game data is scoped to a room session, and deleting a room also deletes its related players, nominations, and votes.
+- [Deployment](docs/deployment.md)
+- [Development](docs/development.md)
+- [Webapp Structure](docs/webapp-structure.md)
+- [Character Packs](docs/character-packs.md)
+- [API & Events](docs/api-events.md)
+- [Voice Audio](docs/voice-audio.md)
+
+## Operational Status
+
+Open Clocktower is suitable for small self-hosted sessions. The current deployment model should run as a single app container because WebSocket connections, timers, voice signaling, and some room runtime state are process-local. Scale-out requires a shared realtime/state layer before multiple app replicas are safe.

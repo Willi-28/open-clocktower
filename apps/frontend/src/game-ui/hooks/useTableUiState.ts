@@ -20,15 +20,18 @@ export function useTableUiState() {
   const [activeNightOrderTab, setActiveNightOrderTab] = useState<'first' | 'other'>('first');
 
   useEffect(() => {
-    /** Zoom the table when the user scrolls with Control pressed. */
-    const zoomTableWithCtrlWheel = (event: WheelEvent) => {
-      if (event.ctrlKey) {
-        event.preventDefault();
-        setTableZoom((current) => Math.max(0.72, Math.min(1.42, current + (event.deltaY < 0 ? 0.06 : -0.06))));
+    /** Zoom the table when the wheel is used over the table area itself. */
+    const zoomTableWithWheel = (event: WheelEvent) => {
+      const target = event.target;
+      // Only hijack the wheel over the table column; panels keep scrolling.
+      if (!(target instanceof Element) || !target.closest('.table-wrap')) {
+        return;
       }
+      event.preventDefault();
+      setTableZoom((current) => Math.max(0.72, Math.min(1.6, current + (event.deltaY < 0 ? 0.08 : -0.08))));
     };
-    window.addEventListener('wheel', zoomTableWithCtrlWheel, { passive: false });
-    return () => window.removeEventListener('wheel', zoomTableWithCtrlWheel);
+    window.addEventListener('wheel', zoomTableWithWheel, { passive: false });
+    return () => window.removeEventListener('wheel', zoomTableWithWheel);
   }, []);
 
   return {

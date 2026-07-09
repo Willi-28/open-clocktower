@@ -9,6 +9,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 
 import { getSharedAudioContext } from '../../audio/browserAudio';
+import { tuneOpusSdp } from '../../audio/opusSdp';
+import { voiceConfig } from '../../audio/voiceConfig';
 import type { VoiceParticipant } from '../voiceRooms';
 import type { openRoomSocket } from '../../websocket/roomSocket';
 
@@ -27,6 +29,28 @@ type RemoteBoostChain = {
 function clampRemoteVolume(volume: number) {
   return Math.max(0, Math.min(2, volume));
 }
+
+/**
+ * Apply the configured Opus tuning (FEC, DTX policy, mono, 48 kHz playback,
+ * average bitrate) to a local offer/answer before sending it out.
+ */
+function tunedDescription(description: RTCSessionDescriptionInit): RTCSessionDescriptionInit {
+  if (!description.sdp) {
+    return description;
+  }
+  return {
+    type: description.type,
+    sdp: tuneOpusSdp(description.sdp, {
+      maxAverageBitrate: voiceConfig.maxBitrate,
+      forwardErrorCorrection: voiceConfig.forwardErrorCorrection,
+      discontinuousTransmission: voiceConfig.discontinuousTransmission,
+    }),
+  };
+}
+
+// One ICE restart usually rescues a network change; more than two attempts on
+// a dead path just burns signaling.
+const maxIceRestartAttempts = 2;
 
 type UseVoicePeersOptions = {
   applyAudioSink: (audio: HTMLAudioElement) => Promise<void>;
@@ -58,6 +82,7 @@ export function useVoicePeers({
 }: UseVoicePeersOptions) {
   const peerConnectionsRef = useRef<Record<string, RTCPeerConnection>>({});
   const pendingIceCandidatesRef = useRef<Record<string, RTCIceCandidateInit[]>>({});
+  const iceRestartAttemptsRef = useRef<Record<string, number>>({});
   const remoteAudioRef = useRef<Record<string, HTMLAudioElement>>({});
   const remoteStreamRef = useRef<Record<string, MediaStream>>({});
   const remoteBoostRef = useRef<Record<string, RemoteBoostChain>>({});
@@ -67,6 +92,16 @@ export function useVoicePeers({
   const [voiceDiagnostics, setVoiceDiagnostics] = useState<Record<string, string>>({});
   const remoteVolumesRef = useRef(remoteVolumes);
   remoteVolumesRef.current = remoteVolumes;
+  // Deafen (Discord-style headphone): mute every incoming remote audio element.
+  const deafenedRef = useRef(false);
+
+  /** Mute or unmute all remote audio at once (deafen toggle). */
+  function setDeafened(deafened: boolean) {
+    deafenedRef.current = deafened;
+    Object.values(remoteAudioRef.current).forEach((audio) => {
+      audio.muted = deafened;
+    });
+  }
 
   useEffect(() => {
     Object.entries(remoteAudioRef.current).forEach(([playerId, audio]) => {
@@ -143,12 +178,14 @@ export function useVoicePeers({
     const stream = await getLocalVoiceStream();
     stream.getTracks().forEach((track) => {
       if (track.kind === 'audio') {
+        // Tells the encoder to optimise for speech intelligibility over music.
         track.contentHint = 'speech';
       }
       const sender = peer.addTrack(track, stream);
       const parameters = sender.getParameters();
       parameters.encodings = parameters.encodings?.length ? parameters.encodings : [{}];
-      parameters.encodings[0].maxBitrate = 128000;
+      parameters.encodings[0].maxBitrate = voiceConfig.maxBitrate;
+      parameters.encodings[0].priority = 'high';
       void sender.setParameters(parameters).catch(() => undefined);
     });
     preferOpus(peer);
@@ -167,7 +204,11 @@ export function useVoicePeers({
             : peer.connectionState;
       setVoiceDiagnostics((current) => ({ ...current, [playerId]: connectionStateLabel }));
       if (peer.connectionState === 'connected') {
+        iceRestartAttemptsRef.current[playerId] = 0;
         void enableVoiceAudio();
+      }
+      if (peer.connectionState === 'failed') {
+        void restartIceForPeer(playerId, peer);
       }
     };
     peer.oniceconnectionstatechange = () => {
@@ -185,7 +226,7 @@ export function useVoicePeers({
       const audio = remoteAudioRef.current[playerId] ?? new Audio();
       audio.autoplay = true;
       audio.controls = false;
-      audio.muted = false;
+      audio.muted = deafenedRef.current;
       audio.preload = 'auto';
       audio.setAttribute('playsinline', 'true');
       audio.srcObject = remoteStream;
@@ -202,11 +243,38 @@ export function useVoicePeers({
     };
 
     if (shouldOffer) {
-      const offer = await peer.createOffer();
+      const offer = tunedDescription(await peer.createOffer());
       await peer.setLocalDescription(offer);
       roomSocketRef.current?.sendVoiceSignal(playerId, { kind: 'offer', description: offer });
     }
     return peer;
+  }
+
+  /**
+   * Re-negotiates a failed peer over fresh ICE candidates (network change,
+   * dead TURN allocation). Only the deterministic offerer side restarts so the
+   * two peers cannot glare; attempts are capped per peer.
+   */
+  async function restartIceForPeer(playerId: string, peer: RTCPeerConnection) {
+    const isOfferer = currentPlayerId < playerId;
+    const attempts = iceRestartAttemptsRef.current[playerId] ?? 0;
+    if (!isOfferer || attempts >= maxIceRestartAttempts || peerConnectionsRef.current[playerId] !== peer) {
+      return;
+    }
+    iceRestartAttemptsRef.current[playerId] = attempts + 1;
+    setVoiceDiagnostics((current) => ({ ...current, [playerId]: 'connection failed - restarting' }));
+    try {
+      // Older Safari lacks restartIce(); the createOffer flag does the same.
+      const hasRestartIce = typeof peer.restartIce === 'function';
+      if (hasRestartIce) {
+        peer.restartIce();
+      }
+      const offer = tunedDescription(await peer.createOffer(hasRestartIce ? {} : { iceRestart: true }));
+      await peer.setLocalDescription(offer);
+      roomSocketRef.current?.sendVoiceSignal(playerId, { kind: 'offer', description: offer });
+    } catch (caught) {
+      setVoiceDiagnostics((current) => ({ ...current, [playerId]: `restart failed - ${voiceErrorMessage(caught)}` }));
+    }
   }
 
   /**
@@ -250,7 +318,7 @@ export function useVoicePeers({
       if (signal.kind === 'offer' && signal.description) {
         await peer.setRemoteDescription(signal.description);
         await flushPendingIceCandidates(fromPlayerId, peer);
-        const answer = await peer.createAnswer();
+        const answer = tunedDescription(await peer.createAnswer());
         await peer.setLocalDescription(answer);
         roomSocketRef.current?.sendVoiceSignal(fromPlayerId, { kind: 'answer', description: answer });
       }
@@ -439,6 +507,7 @@ export function useVoicePeers({
     peerConnectionsRef.current[playerId]?.close();
     delete peerConnectionsRef.current[playerId];
     delete pendingIceCandidatesRef.current[playerId];
+    delete iceRestartAttemptsRef.current[playerId];
     stopVoiceLevelMonitor(playerId);
     // The element may play the boosted stream, so stop the raw remote tracks too.
     remoteStreamRef.current[playerId]?.getTracks().forEach((track) => track.stop());
@@ -474,6 +543,7 @@ export function useVoicePeers({
     handleVoiceSignal,
     needsVoiceAudioUnlock: blockedRemoteAudioPlayerIds.length > 0,
     remoteVolumes,
+    setDeafened,
     setRemoteVolumes,
     setVoiceDiagnostics,
     voiceDiagnostics,

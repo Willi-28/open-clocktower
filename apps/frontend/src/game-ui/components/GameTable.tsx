@@ -24,10 +24,14 @@ type GameTableProps = {
   isReminderMode: boolean;
   isStoryteller: boolean;
   onReminderClick: (reminderId: string) => void;
+  onReminderRemove: (reminderId: string) => void;
   onReminderMove: (reminderId: string, x: number, y: number) => void;
-  onSeatClick: (seatIndex: number) => void;
-  onStorytellerClick: () => void;
+  onSeatSelect: (seatIndex: number, clientX: number, clientY: number) => void;
+  onSeatMenu: (seatIndex: number, clientX: number, clientY: number) => void;
+  onStorytellerClick: (clientX: number, clientY: number) => void;
   onTableClick: (x: number, y: number) => void;
+  onFieldContextMenu: (x: number, y: number, clientX: number, clientY: number) => void;
+  mutedPlayerIds: string[];
   raisedHandPlayerIds: string[];
   reminders: ReminderToken[];
   room: RoomState;
@@ -41,7 +45,6 @@ type GameTableProps = {
   voiceParticipants: Array<{ playerId: string; voiceRoom: string }>;
   showTable: boolean;
   storyteller?: Player;
-  storytellerVoiceLabel?: string;
 };
 
 type TableSeatButtonProps = {
@@ -54,16 +57,46 @@ type TableSeatButtonProps = {
   guessedCharacterName: string;
   hasDeadVote: boolean;
   hasRaisedHand: boolean;
+  isInVoice: boolean;
+  isPlayerMuted: boolean;
   isNominee: boolean;
   isNominator: boolean;
   left: number;
-  onSeatClick: (seatIndex: number) => void;
+  onConsumeSuppressedSeatClick: () => boolean;
+  onSeatSelect: (seatIndex: number, clientX: number, clientY: number) => void;
+  onSeatMenu: (seatIndex: number, clientX: number, clientY: number) => void;
   playerName: string;
   playerStatus: Player['status'] | null;
   seatIndex: number;
   seatScale: number;
   top: number;
 };
+
+/** First one or two initials of a display name for an avatar-less seat. */
+function seatInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
+/** Microphone glyph for a seat nameplate, crossed out when the player is muted. */
+function SeatMicIcon({ muted }: { muted: boolean }) {
+  return muted ? (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.7" />
+      <path d="M17 11a5 5 0 0 1-.6 2.4M5 11a7 7 0 0 0 10.8 5.9M12 19v3" />
+      <path d="m3 3 18 18" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+    </svg>
+  );
+}
 
 /** Render one seat and avoid re-rendering unchanged seats during rapid moves. */
 const TableSeatButton = memo(function TableSeatButton({
@@ -76,10 +109,14 @@ const TableSeatButton = memo(function TableSeatButton({
   guessedCharacterName,
   hasDeadVote,
   hasRaisedHand,
+  isInVoice,
+  isPlayerMuted,
   isNominee,
   isNominator,
   left,
-  onSeatClick,
+  onConsumeSuppressedSeatClick,
+  onSeatSelect,
+  onSeatMenu,
   playerName,
   playerStatus,
   seatIndex,
@@ -97,16 +134,46 @@ const TableSeatButton = memo(function TableSeatButton({
       }) as CSSProperties,
     [left, seatScale, top],
   );
+  // Touch has no right-click, so a tap opens the menu there; a mouse left-click
+  // only selects (the interaction menu is right-click on desktop).
+  const pointerTypeRef = useRef<string>('mouse');
+  const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+    pointerTypeRef.current = event.pointerType;
+  }, []);
   const handleClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
-      onSeatClick(seatIndex);
+      if (onConsumeSuppressedSeatClick()) {
+        event.preventDefault();
+        return;
+      }
+      if (pointerTypeRef.current === 'touch') {
+        onSeatMenu(seatIndex, event.clientX, event.clientY);
+      } else {
+        onSeatSelect(seatIndex, event.clientX, event.clientY);
+      }
     },
-    [onSeatClick, seatIndex],
+    [onConsumeSuppressedSeatClick, onSeatMenu, onSeatSelect, seatIndex],
+  );
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      // Right-click opens the seat's interaction menu at the cursor.
+      event.preventDefault();
+      event.stopPropagation();
+      onSeatMenu(seatIndex, event.clientX, event.clientY);
+    },
+    [onSeatMenu, seatIndex],
   );
 
   return (
-    <button className={className} onClick={handleClick} style={seatStyle} type="button">
+    <button
+      className={className}
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+      onPointerDown={handlePointerDown}
+      style={seatStyle}
+      type="button"
+    >
       {isNominator ? <span className="nomination-role">Accuser</span> : null}
       {isNominee ? <span className="nomination-role accused">Accused</span> : null}
       {hasRaisedHand ? <span className="raised-hand-indicator">Hand</span> : null}
@@ -115,8 +182,18 @@ const TableSeatButton = memo(function TableSeatButton({
           {hasDeadVote ? 'Dead Vote' : 'Spent'}
         </span>
       ) : null}
-      {avatarUrl ? <img className="seat-avatar" alt="" src={avatarUrl} /> : null}
-      <strong>{playerName}</strong>
+      {avatarUrl ? <img className="seat-avatar" alt="" draggable={false} src={avatarUrl} /> : null}
+      {playerStatus === null ? (
+        <span className="seat-empty-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 11V7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5V11" />
+            <path d="M4 11a2 2 0 0 1 2 2v2h12v-2a2 2 0 0 1 2-2 2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2Z" />
+            <path d="M6 19v1.5M18 19v1.5" />
+          </svg>
+        </span>
+      ) : !avatarUrl ? (
+        <span className="seat-initials" aria-hidden="true">{seatInitials(playerName)}</span>
+      ) : null}
       {canSeeCharacter && characterName ? (
         <span className="seat-character-token">
           {characterIcon ? <img alt="" src={characterIcon} /> : <span className="character-fallback" />}
@@ -129,9 +206,41 @@ const TableSeatButton = memo(function TableSeatButton({
           <small>{guessedCharacterName}</small>
         </span>
       ) : null}
+      <span className="seat-nameplate">
+        {isInVoice ? (
+          <span className={isPlayerMuted ? 'seat-mic muted' : 'seat-mic'} aria-hidden="true">
+            <SeatMicIcon muted={isPlayerMuted} />
+          </span>
+        ) : null}
+        <strong>{playerName}</strong>
+      </span>
     </button>
   );
 });
+
+/** Sun for day, crescent moon for night, hourglass for the lobby. */
+function PhaseIcon({ phase }: { phase: RoomState['phase'] }) {
+  if (phase === 'night') {
+    return (
+      <svg className="table-phase-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z" />
+      </svg>
+    );
+  }
+  if (phase === 'day') {
+    return (
+      <svg className="table-phase-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="4.2" />
+        <path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="table-phase-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9S7 12 7 21M17 3c0 5-10 5-10 9" />
+    </svg>
+  );
+}
 
 /** Render the central table and all seat-level interaction targets. */
 export function GameTable({
@@ -144,10 +253,14 @@ export function GameTable({
   isReminderMode,
   isStoryteller,
   onReminderClick,
+  onReminderRemove,
   onReminderMove,
-  onSeatClick,
+  onSeatSelect,
+  onSeatMenu,
   onStorytellerClick,
   onTableClick,
+  onFieldContextMenu,
+  mutedPlayerIds,
   raisedHandPlayerIds,
   reminders,
   room,
@@ -161,13 +274,18 @@ export function GameTable({
   voiceParticipants,
   showTable,
   storyteller,
-  storytellerVoiceLabel,
 }: GameTableProps) {
-  const onSeatClickRef = useRef(onSeatClick);
-  onSeatClickRef.current = onSeatClick;
-  const handleSeatButtonClick = useCallback((seatIndex: number) => {
-    onSeatClickRef.current(seatIndex);
+  const onSeatSelectRef = useRef(onSeatSelect);
+  onSeatSelectRef.current = onSeatSelect;
+  const onSeatMenuRef = useRef(onSeatMenu);
+  onSeatMenuRef.current = onSeatMenu;
+  const handleSeatSelect = useCallback((seatIndex: number, clientX: number, clientY: number) => {
+    onSeatSelectRef.current(seatIndex, clientX, clientY);
   }, []);
+  const handleSeatMenu = useCallback((seatIndex: number, clientX: number, clientY: number) => {
+    onSeatMenuRef.current(seatIndex, clientX, clientY);
+  }, []);
+  const storytellerPointerTypeRef = useRef<string>('mouse');
 
   // Reminder tokens are dragged with pointer capture: the token moves by the
   // pointer's delta from where it was grabbed, so it lands exactly where it
@@ -184,6 +302,24 @@ export function GameTable({
   } | null>(null);
   const suppressReminderClickRef = useRef(false);
   const [reminderDrag, setReminderDrag] = useState<{ id: string; x: number; y: number } | null>(null);
+
+  // Pan the table by dragging anywhere that is not a reminder or form control.
+  // A small drag threshold keeps normal clicks/taps from moving the table, and
+  // completed drags suppress the follow-up click on seats or the table surface.
+  const [tablePan, setTablePan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panDragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number; active: boolean } | null>(null);
+  const suppressTableClickRef = useRef(false);
+  const suppressSeatClickRef = useRef(false);
+
+  /** Consume the one synthetic click that follows a completed table drag. */
+  const consumeSuppressedSeatClick = useCallback(() => {
+    if (!suppressSeatClickRef.current) {
+      return false;
+    }
+    suppressSeatClickRef.current = false;
+    return true;
+  }, []);
 
   /** Resolve the dragged token's live table position, or null when not dragging. */
   function draggedReminderPosition(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -255,7 +391,6 @@ export function GameTable({
   const seatScale = Math.max(0.58, Math.min(1.08, 1.1 - Math.max(0, room.seat_count - 5) * 0.035));
   const isFocusedVoiceRoom = Boolean(joinedVoiceRoom && joinedVoiceRoom !== voiceRooms[0]);
   const playerById = useMemo(() => new Map(room.players.map((player) => [player.id, player])), [room.players]);
-  const playerCount = useMemo(() => room.players.filter((player) => !player.is_storyteller).length, [room.players]);
   const characterById = useMemo(
     () => new Map(characters.map((character) => [character.id, character])),
     [characters],
@@ -265,6 +400,11 @@ export function GameTable({
     [assignments],
   );
   const raisedHandPlayerIdSet = useMemo(() => new Set(raisedHandPlayerIds), [raisedHandPlayerIds]);
+  const mutedPlayerIdSet = useMemo(() => new Set(mutedPlayerIds), [mutedPlayerIds]);
+  const voiceParticipantIdSet = useMemo(
+    () => new Set(voiceParticipants.map((participant) => participant.playerId)),
+    [voiceParticipants],
+  );
   const speakingPlayerIdSet = useMemo(() => new Set(speakingPlayerIds), [speakingPlayerIds]);
   const voiceFocusPlayerIds = useMemo(
     () =>
@@ -350,33 +490,132 @@ export function GameTable({
     return nextAngle;
   }
 
+  /** Begin a table pan from any primary pointer, including seats. */
+  function handlePanPointerDown(event: ReactPointerEvent<HTMLElement>) {
+    if (!event.isPrimary || isReminderMode || (event.pointerType === 'mouse' && event.button !== 0)) {
+      return;
+    }
+    // Reminder tokens and form controls keep their own drag/interaction; grabbing
+    // anywhere else (including seats and the area outside the table) pans.
+    if (event.target instanceof Element && event.target.closest('.reminder-token, input, select, textarea')) {
+      return;
+    }
+    panDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: tablePan.x,
+      originY: tablePan.y,
+      active: false,
+    };
+  }
+
   return (
-    <section className={`table-stage phase-${room.phase}`}>
+    <section
+      className={`table-stage phase-${room.phase}${isPanning ? ' table-panning' : ''}`}
+      style={{ '--table-pan-x': `${tablePan.x}px`, '--table-pan-y': `${tablePan.y}px` } as CSSProperties}
+      onPointerDown={handlePanPointerDown}
+      onPointerMove={(event) => {
+        const drag = panDragRef.current;
+        if (!drag || event.pointerId !== drag.pointerId) {
+          return;
+        }
+        const dx = event.clientX - drag.startX;
+        const dy = event.clientY - drag.startY;
+        if (!drag.active && Math.abs(dx) < 4 && Math.abs(dy) < 4) {
+          return;
+        }
+        if (!drag.active) {
+          drag.active = true;
+          setIsPanning(true);
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }
+        event.preventDefault();
+        // Boundaries: keep the table from being dragged endlessly off-screen.
+        const maxX = window.innerWidth * 0.45;
+        const maxY = window.innerHeight * 0.45;
+        setTablePan({
+          x: Math.max(-maxX, Math.min(maxX, drag.originX + dx)),
+          y: Math.max(-maxY, Math.min(maxY, drag.originY + dy)),
+        });
+      }}
+      onPointerUp={() => {
+        if (panDragRef.current?.active) {
+          suppressTableClickRef.current = true;
+          suppressSeatClickRef.current = true;
+        }
+        panDragRef.current = null;
+        setIsPanning(false);
+      }}
+      onPointerCancel={() => {
+        panDragRef.current = null;
+        setIsPanning(false);
+      }}
+      onDoubleClick={() => setTablePan({ x: 0, y: 0 })}
+    >
       <div
         className={[
           isReminderMode ? 'table-surface placing-reminder' : 'table-surface',
           showTable ? '' : 'table-surface-hidden',
         ].join(' ')}
         onClick={(event) => {
+          if (suppressTableClickRef.current) {
+            suppressTableClickRef.current = false;
+            return;
+          }
           const bounds = event.currentTarget.getBoundingClientRect();
           onTableClick(
             ((event.clientX - bounds.left) / bounds.width) * 100,
             ((event.clientY - bounds.top) / bounds.height) * 100,
           );
         }}
+        onPointerDown={(event) => {
+          // Open the token picker the instant the right button is pressed, not on
+          // release - the native contextmenu event only fires on mouseup.
+          if (event.pointerType === 'mouse' && event.button === 2) {
+            // Right-clicking an existing token only removes it (the token handles
+            // that itself) - the picker must not pop up over a token, only on
+            // free table spots.
+            if (event.target instanceof Element && event.target.closest('.reminder-token')) {
+              return;
+            }
+            event.preventDefault();
+            // pointerdown is a discrete event, so React flushes this state update
+            // synchronously and the token menu's outside-close listener attaches
+            // mid-event; stop propagation so this same pointerdown does not reach
+            // document and immediately close the menu we are opening.
+            event.stopPropagation();
+            const bounds = event.currentTarget.getBoundingClientRect();
+            onFieldContextMenu(
+              ((event.clientX - bounds.left) / bounds.width) * 100,
+              ((event.clientY - bounds.top) / bounds.height) * 100,
+              event.clientX,
+              event.clientY,
+            );
+          }
+        }}
+        onContextMenu={(event) => {
+          // The picker already opened on pointerdown; just suppress the native menu.
+          event.preventDefault();
+        }}
       >
-        <div className="table-center">
-          <span>{phaseLabels[room.phase]}</span>
-          <strong>{playerCount} players</strong>
-          {isStoryteller ? <small>Random character setup</small> : null}
-          {voteCountIndex >= 0 ? (
-            <div className="table-vote-counter">
-              <span>{Math.min(voteCountIndex + 1, voteScanTotal)}/{voteScanTotal}</span>
-              <strong>{voteCounted}</strong>
-              <small>votes</small>
-            </div>
-          ) : null}
-        </div>
+        {room.phase !== 'lobby' || voteCountIndex >= 0 ? (
+          <div className="table-center">
+            {room.phase !== 'lobby' ? (
+              <span className="table-phase" data-phase={room.phase}>
+                <PhaseIcon phase={room.phase} />
+                <span className="table-phase-label">{phaseLabels[room.phase]}</span>
+              </span>
+            ) : null}
+            {voteCountIndex >= 0 ? (
+              <div className="table-vote-counter">
+                <span>{Math.min(voteCountIndex + 1, voteScanTotal)}/{voteScanTotal}</span>
+                <strong>{voteCounted}</strong>
+                <small>votes</small>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {activeNomination ? (
           <div className="nomination-display">
@@ -476,6 +715,12 @@ export function GameTable({
                 }
                 onReminderClick(reminder.id);
               }}
+              onContextMenu={(event) => {
+                // Right-click a token to remove it.
+                event.preventDefault();
+                event.stopPropagation();
+                onReminderRemove(reminder.id);
+              }}
               style={{
                 left: `${dragPosition ? dragPosition.x : reminder.x}%`,
                 top: `${dragPosition ? dragPosition.y : reminder.y}%`,
@@ -491,6 +736,8 @@ export function GameTable({
         {storyteller ? (() => {
           const isInFocusedVoiceRoom = voiceFocusPlayerIdSet.has(storyteller.id);
           const isSpeaking = speakingPlayerIdSet.has(storyteller.id);
+          const isStorytellerInVoice = voiceParticipantIdSet.has(storyteller.id);
+          const isStorytellerMuted = mutedPlayerIdSet.has(storyteller.id);
           const storytellerHomePosition = room.seat_count >= 12 ? { x: 2, y: 99 } : { x: -8, y: 104 };
           const seatPosition = voiceFocusPosition(
             storyteller.id,
@@ -507,9 +754,24 @@ export function GameTable({
                 isSpeaking ? 'speaking-seat' : '',
               ].join(' ')}
               disabled={storyteller.id === currentPlayerId}
+              onPointerDown={(event) => {
+                storytellerPointerTypeRef.current = event.pointerType;
+              }}
               onClick={(event) => {
                 event.stopPropagation();
-                onStorytellerClick();
+                if (consumeSuppressedSeatClick()) {
+                  event.preventDefault();
+                  return;
+                }
+                // Left-click stays free for panning; only touch taps open the menu.
+                if (storytellerPointerTypeRef.current === 'touch') {
+                  onStorytellerClick(event.clientX, event.clientY);
+                }
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onStorytellerClick(event.clientX, event.clientY);
               }}
               style={{
                 '--seat-x': seatPosition.x - 50,
@@ -518,10 +780,19 @@ export function GameTable({
               } as CSSProperties}
               type="button"
             >
-              {storyteller.avatar_url ? <img className="seat-avatar" alt="" src={storyteller.avatar_url} /> : null}
-              <strong>{storyteller.display_name}</strong>
-              <span className="storyteller-role-label">Storyteller</span>
-              <small className="storyteller-voice-label">{storytellerVoiceLabel}</small>
+              {storyteller.avatar_url ? <img className="seat-avatar" alt="" draggable={false} src={storyteller.avatar_url} /> : null}
+              {!storyteller.avatar_url ? (
+                <span className="seat-initials" aria-hidden="true">{seatInitials(storyteller.display_name)}</span>
+              ) : null}
+              <span className="storyteller-seat-tag" aria-hidden="true">Storyteller</span>
+              <span className="seat-nameplate storyteller-nameplate">
+                {isStorytellerInVoice ? (
+                  <span className={isStorytellerMuted ? 'seat-mic muted' : 'seat-mic'} aria-hidden="true">
+                    <SeatMicIcon muted={isStorytellerMuted} />
+                  </span>
+                ) : null}
+                <strong>{storyteller.display_name}</strong>
+              </span>
             </button>
           );
         })() : null}
@@ -570,11 +841,15 @@ export function GameTable({
               guessedCharacterName={guessedCharacter?.name ?? ''}
               hasDeadVote={Boolean(player?.has_dead_vote)}
               hasRaisedHand={hasRaisedHand}
+              isInVoice={Boolean(player && voiceParticipantIdSet.has(player.id))}
+              isPlayerMuted={Boolean(player && mutedPlayerIdSet.has(player.id))}
               isNominee={isNominee}
               isNominator={isNominator}
               key={seat.index}
               left={seatPosition.x}
-              onSeatClick={handleSeatButtonClick}
+              onConsumeSuppressedSeatClick={consumeSuppressedSeatClick}
+              onSeatSelect={handleSeatSelect}
+              onSeatMenu={handleSeatMenu}
               playerName={player?.display_name ?? 'Open'}
               playerStatus={player?.status ?? null}
               seatIndex={seat.index}
