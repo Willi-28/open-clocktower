@@ -106,7 +106,9 @@ export function useVoiceActivity({ currentPlayerId, isMutedRef }: UseVoiceActivi
         lastSpokenAt = now;
       }
       setPlayerSpeaking(playerId, now - lastSpokenAt < 500 && !isLocalMuted);
-      timeoutId = window.setTimeout(readLevel, 20);
+      // 30 Hz is imperceptible for a speaking glow but ~40% less continuous CPU
+      // per monitored stream than 50 Hz (one loop runs for every voice member).
+      timeoutId = window.setTimeout(readLevel, 33);
     };
 
     readLevel();

@@ -16,6 +16,7 @@ export type RoomSocketEvent =
   | { type: 'game.updated'; payload: RoomState }
   | { type: 'hand.state'; payload: { playerIds: string[] } }
   | { type: 'mute.state'; payload: { playerIds: string[] } }
+  | { type: 'deafen.state'; payload: { playerIds: string[] } }
   | { type: 'timer.state'; payload: { durationSeconds: number; remainingSeconds: number; isRunning: boolean; startedAt?: string | null } }
   | { type: 'bell.ring'; payload: { fromPlayerId: string } }
   | { type: 'nomination.executed'; payload: { roomId: string } }
@@ -87,6 +88,9 @@ export function openRoomSocket(roomId: string, playerId: string, onEvent: (event
     },
     setMuted: (isMuted: boolean) => {
       return sendJson({ type: 'mute.set', payload: { isMuted } });
+    },
+    setDeafened: (isDeafened: boolean) => {
+      return sendJson({ type: 'deafen.set', payload: { isDeafened } });
     },
     setTimer: (durationSeconds: number, remainingSeconds: number, isRunning: boolean) => {
       return sendJson({ type: 'timer.set', payload: { durationSeconds, remainingSeconds, isRunning } });

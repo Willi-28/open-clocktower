@@ -30,14 +30,15 @@ player's **Sound filters** toggle (Settings → Sound) is on:
   the RNNoise WASM model processes the microphone instead. Two suppressors in
   series eat consonants and make voices dull, so it is strictly one or the
   other. The RNNoise path adds a gentle chain after the model:
-  high-pass 78 Hz (rumble only, below voice fundamentals) → compressor
-  (-24 dB, 3:1, 4 ms/240 ms) for consistent loudness → limiter (-2 dB safety
-  ceiling against clipping). The output mixes 98% processed + 2% dry signal so
-  sibilants stay natural without re-admitting noise, and a residual-noise
-  expander driven by RNNoise's own voice detection eases silence down another
-  ~10 dB: speech opens it instantly on the same 10 ms frame (onsets are never
-  clipped), a 400 ms hangover plus a ~120 ms ramp-down keep pauses between
-  words untouched.
+  high-pass 78 Hz (rumble only, below voice fundamentals) → presence shelf
+  (+1.8 dB above 3.2 kHz, restoring the sparkle a neural denoiser shaves off
+  consonants) → compressor (-24 dB, 3:1, 4 ms/240 ms) for consistent loudness
+  → limiter (-2 dB safety ceiling against clipping). The output is 100%
+  denoised signal — zero dry bleed, like commercial suppressors — and a
+  residual-noise expander driven by RNNoise's own voice detection eases
+  silence down another ~10 dB: speech opens it instantly on the same 10 ms
+  frame (onsets are never clipped), a 400 ms hangover plus a ~120 ms ramp-down
+  keep pauses between words untouched.
 - **`native`** — the browser's built-in suppression (Chrome's is itself an
   RNNoise derivative and runs off the main thread with zero added latency).
 - **`off`** — echo cancellation and gain control only.

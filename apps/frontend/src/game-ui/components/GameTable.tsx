@@ -134,12 +134,9 @@ const TableSeatButton = memo(function TableSeatButton({
       }) as CSSProperties,
     [left, seatScale, top],
   );
-  // Touch has no right-click, so a tap opens the menu there; a mouse left-click
-  // only selects (the interaction menu is right-click on desktop).
-  const pointerTypeRef = useRef<string>('mouse');
-  const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-    pointerTypeRef.current = event.pointerType;
-  }, []);
+  // Left-click (or tap) on the seat body opens the interaction menu; clicking
+  // exactly on the character/suspicion token jumps to that card in the
+  // character sheet instead. Right-click does nothing on seats.
   const handleClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
@@ -147,30 +144,27 @@ const TableSeatButton = memo(function TableSeatButton({
         event.preventDefault();
         return;
       }
-      if (pointerTypeRef.current === 'touch') {
-        onSeatMenu(seatIndex, event.clientX, event.clientY);
-      } else {
+      const isTokenClick =
+        event.target instanceof Element && Boolean(event.target.closest('.seat-character-token, .seat-suspicion-token'));
+      if (isTokenClick) {
         onSeatSelect(seatIndex, event.clientX, event.clientY);
+      } else {
+        onSeatMenu(seatIndex, event.clientX, event.clientY);
       }
     },
     [onConsumeSuppressedSeatClick, onSeatMenu, onSeatSelect, seatIndex],
   );
-  const handleContextMenu = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
-      // Right-click opens the seat's interaction menu at the cursor.
-      event.preventDefault();
-      event.stopPropagation();
-      onSeatMenu(seatIndex, event.clientX, event.clientY);
-    },
-    [onSeatMenu, seatIndex],
-  );
+  const handleContextMenu = useCallback((event: MouseEvent<HTMLButtonElement>) => {
+    // No seat action on right-click; just keep the browser menu away.
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
 
   return (
     <button
       className={className}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
-      onPointerDown={handlePointerDown}
       style={seatStyle}
       type="button"
     >
@@ -285,7 +279,6 @@ export function GameTable({
   const handleSeatMenu = useCallback((seatIndex: number, clientX: number, clientY: number) => {
     onSeatMenuRef.current(seatIndex, clientX, clientY);
   }, []);
-  const storytellerPointerTypeRef = useRef<string>('mouse');
 
   // Reminder tokens are dragged with pointer capture: the token moves by the
   // pointer's delta from where it was grabbed, so it lands exactly where it
@@ -573,10 +566,10 @@ export function GameTable({
           // Open the token picker the instant the right button is pressed, not on
           // release - the native contextmenu event only fires on mouseup.
           if (event.pointerType === 'mouse' && event.button === 2) {
-            // Right-clicking an existing token only removes it (the token handles
-            // that itself) - the picker must not pop up over a token, only on
-            // free table spots.
-            if (event.target instanceof Element && event.target.closest('.reminder-token')) {
+            // The picker only pops up on free table spots: right-clicking an
+            // existing token removes it (the token handles that itself), and
+            // right-clicks on seats do nothing.
+            if (event.target instanceof Element && event.target.closest('.reminder-token, .seat')) {
               return;
             }
             event.preventDefault();
@@ -754,24 +747,18 @@ export function GameTable({
                 isSpeaking ? 'speaking-seat' : '',
               ].join(' ')}
               disabled={storyteller.id === currentPlayerId}
-              onPointerDown={(event) => {
-                storytellerPointerTypeRef.current = event.pointerType;
-              }}
               onClick={(event) => {
                 event.stopPropagation();
                 if (consumeSuppressedSeatClick()) {
                   event.preventDefault();
                   return;
                 }
-                // Left-click stays free for panning; only touch taps open the menu.
-                if (storytellerPointerTypeRef.current === 'touch') {
-                  onStorytellerClick(event.clientX, event.clientY);
-                }
+                // Left-click (or tap) opens the storyteller menu; a drag pans.
+                onStorytellerClick(event.clientX, event.clientY);
               }}
               onContextMenu={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                onStorytellerClick(event.clientX, event.clientY);
               }}
               style={{
                 '--seat-x': seatPosition.x - 50,

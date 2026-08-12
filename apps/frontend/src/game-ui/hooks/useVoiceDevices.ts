@@ -15,6 +15,17 @@ import type { MicrophoneProcessingOptions } from '../../audio/audioConstraints';
 import { createNoiseSuppressedStream } from '../../audio/rnnoiseStream';
 import { voiceConfig } from '../../audio/voiceConfig';
 
+export type VoiceStreamRequest = {
+  /** The stream sent to peers (denoised when sound filters are on). */
+  stream: MediaStream;
+  cleanup?: () => void;
+  /**
+   * Raw pre-processing capture, used only for the LOCAL speaking indicator so
+   * it reacts to the microphone instantly instead of after RNNoise's latency.
+   */
+  monitorStream?: MediaStream;
+};
+
 type UseVoiceDevicesOptions = {
   currentPlayerId: string;
   isMuted: boolean;
@@ -151,14 +162,14 @@ export function useVoiceDevices({
     if (localStreamRef.current) {
       return localStreamRef.current;
     }
-    const { stream, cleanup } = await requestVoiceStream(deviceId, soundFiltersEnabled);
+    const { stream, cleanup, monitorStream } = await requestVoiceStream(deviceId, soundFiltersEnabled);
     stream.getAudioTracks().forEach((track) => {
       track.enabled = !isMuted;
     });
     localStreamRef.current = stream;
     localVoiceCleanupRef.current = cleanup ?? null;
     if (currentPlayerId) {
-      onStartVoiceLevelMonitor(currentPlayerId, stream);
+      onStartVoiceLevelMonitor(currentPlayerId, monitorStream ?? stream);
     }
     void refreshMediaDevices();
     return stream;
@@ -199,7 +210,7 @@ export function useVoiceDevices({
    * Sound filters OFF captures the microphone completely raw for players who
    * use headphones and want the unprocessed signal.
    */
-  async function requestVoiceStream(deviceId: string, filtersEnabled: boolean) {
+  async function requestVoiceStream(deviceId: string, filtersEnabled: boolean): Promise<VoiceStreamRequest> {
     try {
       if (!filtersEnabled) {
         const rawStream = await captureMicrophone(deviceId, {
@@ -209,7 +220,7 @@ export function useVoiceDevices({
         });
         watchLocalTracks(rawStream);
         setAudioDeviceStatus('Sound filters are off - raw microphone audio.');
-        return { stream: rawStream, cleanup: undefined };
+        return { stream: rawStream, cleanup: undefined, monitorStream: rawStream };
       }
 
       const engine = voiceConfig.noiseSuppressionEngine;
@@ -223,7 +234,11 @@ export function useVoiceDevices({
           const suppressed = await createNoiseSuppressedStream(rawStream);
           watchLocalTracks(rawStream);
           setAudioDeviceStatus('RNNoise suppression is active.');
-          return suppressed;
+          // The local speaking indicator watches the RAW capture, not the
+          // suppressed output: RNNoise's buffer + noise gate add ~tens of ms of
+          // latency, so lighting the green ring off the raw mic makes the own
+          // client feel instantly responsive while the sent audio stays clean.
+          return { ...suppressed, monitorStream: rawStream };
         } catch (caught) {
           // RNNoise needs a running 48 kHz engine; when the device cannot
           // provide one, degrade to the browser's own suppression instead of
@@ -240,7 +255,7 @@ export function useVoiceDevices({
               ? `${caught.message} Using the browser's built-in noise suppression.`
               : "RNNoise could not start. Using the browser's built-in noise suppression.",
           );
-          return { stream: nativeStream, cleanup: undefined };
+          return { stream: nativeStream, cleanup: undefined, monitorStream: nativeStream };
         }
       }
 
@@ -253,7 +268,7 @@ export function useVoiceDevices({
       setAudioDeviceStatus(
         engine === 'native' ? "The browser's built-in noise suppression is active." : 'Noise suppression is disabled by configuration.',
       );
-      return { stream: nativeStream, cleanup: undefined };
+      return { stream: nativeStream, cleanup: undefined, monitorStream: nativeStream };
     } catch (caught) {
       setAudioDeviceStatus(microphoneErrorMessage(caught));
       throw new Error(microphoneErrorMessage(caught));
@@ -289,11 +304,11 @@ export function useVoiceDevices({
   /**
    * Adopts a freshly requested stream after a microphone or processing restart.
    */
-  function replaceLocalVoiceStream(stream: MediaStream, cleanup?: () => void) {
+  function replaceLocalVoiceStream(stream: MediaStream, cleanup?: () => void, monitorStream?: MediaStream) {
     localVoiceCleanupRef.current = cleanup ?? null;
     localStreamRef.current = stream;
     if (currentPlayerId) {
-      onStartVoiceLevelMonitor(currentPlayerId, stream);
+      onStartVoiceLevelMonitor(currentPlayerId, monitorStream ?? stream);
     }
   }
 

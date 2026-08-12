@@ -12,6 +12,7 @@ import { playVoiceTone } from '../../audio/browserAudio';
 import type { Player, RoomState } from '../../api/client';
 import type { openRoomSocket } from '../../websocket/roomSocket';
 import { privateVoiceRoomFor, type VoiceParticipant } from '../voiceRooms';
+import type { VoiceStreamRequest } from './useVoiceDevices';
 
 type RoomSocketRef = MutableRefObject<ReturnType<typeof openRoomSocket> | null>;
 
@@ -30,8 +31,8 @@ type UseVoiceSessionOptions = {
   getLocalVoiceStream: (deviceId?: string) => Promise<MediaStream>;
   isMuted: boolean;
   playerName: (playerId: string | undefined) => string;
-  replaceLocalVoiceStream: (stream: MediaStream, cleanup?: () => void) => void;
-  requestVoiceStream: (deviceId: string, soundFiltersEnabled: boolean) => Promise<{ stream: MediaStream; cleanup?: (() => void) | undefined }>;
+  replaceLocalVoiceStream: (stream: MediaStream, cleanup?: () => void, monitorStream?: MediaStream) => void;
+  requestVoiceStream: (deviceId: string, soundFiltersEnabled: boolean) => Promise<VoiceStreamRequest>;
   room: RoomState | null;
   roomSocketRef: RoomSocketRef;
   selectedAudioInputId: string;
@@ -140,7 +141,12 @@ export function useVoiceSession({
     setError('');
     try {
       if (joinedVoiceRoom && joinedVoiceRoom !== voiceRoom) {
-        roomSocketRef.current?.leaveVoiceRoom();
+        // Switching rooms must NOT send an explicit `voice.leave`: the server
+        // clears a player's mute/deafen presence whenever their voice room
+        // becomes null, so a leave-then-join round-trip silently dropped the
+        // deafen/mute badge on every switch. Joining the new room moves the
+        // player server-side while preserving that presence; the old room's
+        // peer connections are still torn down locally here.
         closeAllVoicePeers();
       }
       await getLocalVoiceStream();
@@ -280,7 +286,7 @@ export function useVoiceSession({
     try {
       const nextDeviceId = options.deviceId ?? selectedAudioInputId;
       const nextSoundFiltersEnabled = options.soundFiltersEnabled ?? clientSoundFiltersEnabled;
-      const { stream, cleanup } = await requestVoiceStream(nextDeviceId, nextSoundFiltersEnabled);
+      const { stream, cleanup, monitorStream } = await requestVoiceStream(nextDeviceId, nextSoundFiltersEnabled);
       stream.getAudioTracks().forEach((track) => {
         track.enabled = !isMuted;
       });
@@ -289,7 +295,7 @@ export function useVoiceSession({
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
-      replaceLocalVoiceStream(stream, cleanup);
+      replaceLocalVoiceStream(stream, cleanup, monitorStream);
       roomSocketRef.current?.joinVoiceRoom(roomToRejoin);
     } catch (caught) {
       if (voiceActionIdRef.current === actionId) {

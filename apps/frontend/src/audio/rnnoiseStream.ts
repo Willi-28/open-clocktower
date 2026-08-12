@@ -112,6 +112,7 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
   const source = audioContext.createMediaStreamSource(inputStream);
   const highPass = audioContext.createBiquadFilter();
   const processor = audioContext.createScriptProcessor(1024, 1, 1);
+  const presence = audioContext.createBiquadFilter();
   const compressor = audioContext.createDynamicsCompressor();
   const limiter = audioContext.createDynamicsCompressor();
   const destination = audioContext.createMediaStreamDestination();
@@ -123,7 +124,6 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
   const frameSize = rnnoise.frameSize;
   const inputBuffer = new SampleRingBuffer(frameSize * 32);
   const outputBuffer = new SampleRingBuffer(frameSize * 32);
-  const dryBuffer = new SampleRingBuffer(frameSize * 32);
   const gateBuffer = new SampleRingBuffer(frameSize * 32);
   const frame = new Float32Array(frameSize);
   let isCleanedUp = false;
@@ -150,6 +150,12 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
   highPass.type = 'highpass';
   highPass.frequency.value = 78;
   highPass.Q.value = 0.72;
+  // Gentle presence lift restores the sparkle a neural denoiser shaves off the
+  // consonant range, keeping the voice bright now that no dry signal is mixed
+  // back in (zero bleed, like commercial suppressors such as Krisp).
+  presence.type = 'highshelf';
+  presence.frequency.value = 3200;
+  presence.gain.value = 1.8;
   compressor.threshold.value = -24;
   compressor.knee.value = 18;
   compressor.ratio.value = 3;
@@ -174,9 +180,6 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
 
     while (inputBuffer.available >= frameSize) {
       inputBuffer.readInto(frame);
-      for (let index = 0; index < frame.length; index += 1) {
-        dryBuffer.push(frame[index] / 32768);
-      }
       const voiceProbability = denoiseState.processFrame(frame);
       if (voiceProbability > voiceProbabilityThreshold) {
         gateHoldRemaining = gateHoldFrames;
@@ -196,17 +199,18 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
         continue;
       }
       const wet = outputBuffer.pop();
-      const dry = dryBuffer.pop();
       const gateTarget = gateBuffer.pop();
       gateGain += (gateTarget - gateGain) * (gateTarget > gateGain ? gateOpenRate : gateCloseRate);
-      // A 2% dry bleed keeps sibilants natural without re-admitting noise.
-      output[index] = Math.max(-1, Math.min(1, (wet * 0.98 + dry * 0.02) * gateGain));
+      // Zero dry bleed: only the denoised signal leaves the pipeline; the
+      // presence shelf downstream keeps sibilants from sounding dull.
+      output[index] = Math.max(-1, Math.min(1, wet * gateGain));
     }
   };
 
   source.connect(highPass);
   highPass.connect(processor);
-  processor.connect(compressor);
+  processor.connect(presence);
+  presence.connect(compressor);
   compressor.connect(limiter);
   limiter.connect(destination);
   limiter.connect(keepAlive);
@@ -232,6 +236,7 @@ export async function createNoiseSuppressedStream(inputStream: MediaStream): Pro
     keepAlive.disconnect();
     limiter.disconnect();
     compressor.disconnect();
+    presence.disconnect();
     processor.disconnect();
     highPass.disconnect();
     source.disconnect();

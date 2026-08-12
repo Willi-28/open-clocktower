@@ -1,56 +1,49 @@
 /**
- * Floating, draggable character sheet.
+ * Floating text-chat window.
  *
- * When detached from the right dashboard the character sheet becomes a small
- * window the player can drag around over the table by its title bar and resize
- * from any edge or corner, so the layout feels less static. Portaled to the body
- * so it floats above panels.
+ * The text chat lives in a pop-out window toggled from the voice panel: it can
+ * be dragged by its title bar, resized from any edge or corner, minimized to
+ * the title bar, and closed again from the voice panel toggle. Portaled to the
+ * app shell so it floats above the table and side panels.
  */
 
 import { useRef } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { Character } from '../../api/client';
-import { CharacterSheetPanel } from './CharacterSheetPanel';
-
-type FloatingCharacterSheetProps = {
-  characters: Character[];
-  seatedPlayerCount: number;
-  highlight?: { id: string; nonce: number } | null;
-  position: { x: number; y: number };
-  /** Window size owned by the parent so it survives reattach/detach cycles. */
-  size: { width: number; height: number } | null;
-  portalTarget?: HTMLElement | null;
+type ChatPopoutProps = {
+  children: ReactNode;
+  isMinimized: boolean;
+  onClose: () => void;
   onMove: (position: { x: number; y: number }) => void;
   onResize: (size: { width: number; height: number }) => void;
-  onReattach: () => void;
+  onToggleMinimized: () => void;
+  portalTarget?: HTMLElement | null;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
 };
 
-const MIN_WIDTH = 250;
+const MIN_WIDTH = 260;
 const MIN_HEIGHT = 220;
-const DEFAULT_WIDTH = 320;
-const DEFAULT_HEIGHT = 440;
 
 // Each resize handle names the edges it drags. 'e'/'s' grow, 'w'/'n' also shift
 // the window's origin so the opposite edge stays put.
 type ResizeDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 const RESIZE_HANDLES: ResizeDir[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 
-/** Render the detached, draggable, resizable character-sheet window. */
-export function FloatingCharacterSheet({
-  characters,
-  seatedPlayerCount,
-  highlight,
-  position,
-  size: sizeProp,
-  portalTarget,
+/** Render the floating, draggable, resizable text chat window. */
+export function ChatPopout({
+  children,
+  isMinimized,
+  onClose,
   onMove,
   onResize,
-  onReattach,
-}: FloatingCharacterSheetProps) {
+  onToggleMinimized,
+  portalTarget,
+  position,
+  size,
+}: ChatPopoutProps) {
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
-  const size = sizeProp ?? { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
   const resizeRef = useRef<{
     pointerId: number;
     dir: ResizeDir;
@@ -68,7 +61,7 @@ export function FloatingCharacterSheet({
       return;
     }
     const maxX = Math.max(8, window.innerWidth - size.width - 8);
-    const maxY = Math.max(8, window.innerHeight - size.height - 8);
+    const maxY = Math.max(8, window.innerHeight - 48);
     onMove({
       x: Math.max(8, Math.min(maxX, drag.originX + event.clientX - drag.startX)),
       y: Math.max(8, Math.min(maxY, drag.originY + event.clientY - drag.startY)),
@@ -113,9 +106,12 @@ export function FloatingCharacterSheet({
   }
 
   return createPortal(
-    <div className="floating-sheet" style={{ left: position.x, top: position.y, width: size.width, height: size.height }}>
+    <div
+      className={isMinimized ? 'chat-popout minimized' : 'chat-popout'}
+      style={{ left: position.x, top: position.y, width: size.width, height: isMinimized ? undefined : size.height }}
+    >
       <div
-        className="floating-sheet-titlebar"
+        className="chat-popout-titlebar"
         onPointerDown={(event) => {
           if ((event.target instanceof Element && event.target.closest('button')) || event.button !== 0) {
             return;
@@ -131,61 +127,66 @@ export function FloatingCharacterSheet({
           };
         }}
         onPointerMove={handleTitlebarPointerMove}
-        onPointerUp={(event) => {
+        onPointerUp={() => {
           dragRef.current = null;
-          // Dropping the window over the right dashboard re-docks the sheet.
-          const dropTarget = document.elementFromPoint(event.clientX, event.clientY);
-          if (dropTarget instanceof Element && (dropTarget.closest('.right-dashboard') || dropTarget.closest('[data-characters-tab]'))) {
-            onReattach();
-          }
         }}
         onPointerCancel={() => {
           dragRef.current = null;
         }}
       >
-        <strong>Characters</strong>
-        <button className="floating-sheet-reattach" onClick={onReattach} aria-label="Reattach to dashboard" title="Reattach to dashboard" type="button">
-          ⤡
-        </button>
+        <strong>Text Chat</strong>
+        <span className="chat-popout-buttons">
+          <button
+            aria-label={isMinimized ? 'Restore chat window' : 'Minimize chat window'}
+            title={isMinimized ? 'Restore' : 'Minimize'}
+            onClick={onToggleMinimized}
+            type="button"
+          >
+            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              {isMinimized ? <path d="M12 5v14M5 12h14" /> : <path d="M5 12h14" />}
+            </svg>
+          </button>
+          <button aria-label="Close chat window" title="Close" onClick={onClose} type="button">
+            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </span>
       </div>
-      <div className="floating-sheet-body">
-        <CharacterSheetPanel
-          characters={characters}
-          highlight={highlight}
-          seatedPlayerCount={seatedPlayerCount}
-        />
-      </div>
-      {RESIZE_HANDLES.map((dir) => (
-        <div
-          key={dir}
-          className={`floating-sheet-resize floating-sheet-resize-${dir}`}
-          aria-hidden="true"
-          onPointerDown={(event) => {
-            if (event.button !== 0) {
-              return;
-            }
-            event.stopPropagation();
-            event.currentTarget.setPointerCapture(event.pointerId);
-            resizeRef.current = {
-              pointerId: event.pointerId,
-              dir,
-              startX: event.clientX,
-              startY: event.clientY,
-              startWidth: size.width,
-              startHeight: size.height,
-              originX: position.x,
-              originY: position.y,
-            };
-          }}
-          onPointerMove={handleResizePointerMove}
-          onPointerUp={() => {
-            resizeRef.current = null;
-          }}
-          onPointerCancel={() => {
-            resizeRef.current = null;
-          }}
-        />
-      ))}
+      {!isMinimized ? <div className="chat-popout-body">{children}</div> : null}
+      {!isMinimized
+        ? RESIZE_HANDLES.map((dir) => (
+            <div
+              key={dir}
+              className={`floating-sheet-resize floating-sheet-resize-${dir}`}
+              aria-hidden="true"
+              onPointerDown={(event) => {
+                if (event.button !== 0) {
+                  return;
+                }
+                event.stopPropagation();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                resizeRef.current = {
+                  pointerId: event.pointerId,
+                  dir,
+                  startX: event.clientX,
+                  startY: event.clientY,
+                  startWidth: size.width,
+                  startHeight: size.height,
+                  originX: position.x,
+                  originY: position.y,
+                };
+              }}
+              onPointerMove={handleResizePointerMove}
+              onPointerUp={() => {
+                resizeRef.current = null;
+              }}
+              onPointerCancel={() => {
+                resizeRef.current = null;
+              }}
+            />
+          ))
+        : null}
     </div>,
     portalTarget ?? document.body,
   );

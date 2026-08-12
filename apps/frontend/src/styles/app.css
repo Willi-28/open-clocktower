@@ -574,42 +574,64 @@ h2 {
   z-index: 0;
 }
 
-.workspace::before {
-  background: transparent;
+/* Night atmosphere spans the viewport, but it stays behind the app chrome and
+ * side dashboards. A soft radial mask keeps the effect in the scene background
+ * instead of creating a hard table-column edge beside the panels. */
+.workspace::before,
+.workspace::after {
   content: "";
   inset: 0;
+  -webkit-mask-image: radial-gradient(ellipse at 50% 52%, #000 0 54%, rgba(0, 0, 0, 0.82) 66%, rgba(0, 0, 0, 0.24) 82%, transparent 96%);
+  mask-image: radial-gradient(ellipse at 50% 52%, #000 0 54%, rgba(0, 0, 0, 0.82) 66%, rgba(0, 0, 0, 0.24) 82%, transparent 96%);
   opacity: 0;
   pointer-events: none;
-  position: absolute;
-  transition: opacity 240ms ease;
-  z-index: 1;
+  position: fixed;
+  transition: opacity 5s ease;
+  z-index: 5;
+  /* Drift via transform, never background-position: animating the position
+   * repaints the whole layer every frame, and during the 5s opacity fade-in
+   * that per-frame repaint flickered. Transform drift is pure compositing. */
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
+/* Moonlight: a cold blue moon disc high in one corner, a light shaft falling
+ * across, and blue-black darkness pooling smoothly toward every edge. */
 .app-shell.night-effect-subtle .workspace::before {
   background:
-    radial-gradient(circle at 14% 6%, rgba(226, 240, 255, 0.46), rgba(126, 170, 244, 0.2) 12%, transparent 30%),
-    linear-gradient(116deg, rgba(150, 195, 255, 0.2) 8%, rgba(84, 128, 220, 0.1) 40%, transparent 66%),
-    radial-gradient(ellipse at 48% 52%, transparent 36%, rgba(6, 16, 48, 0.24) 70%, rgba(2, 7, 28, 0.4));
+    radial-gradient(circle at 15% 8%, rgba(226, 240, 255, 0.8), rgba(158, 200, 255, 0.42) 6%, rgba(96, 152, 245, 0.2) 14%, rgba(60, 110, 210, 0.07) 24%, transparent 40%),
+    linear-gradient(118deg, rgba(150, 195, 255, 0.26) 6%, rgba(100, 150, 240, 0.14) 30%, rgba(64, 110, 205, 0.06) 48%, transparent 66%),
+    radial-gradient(ellipse at 50% 50%, transparent 46%, rgba(6, 16, 48, 0.32) 78%, rgba(2, 7, 28, 0.5) 100%);
 }
 
+/* Fog: milky banks that drift slowly across the whole scene. Oversized so the
+ * transform drift never uncovers a viewport edge. */
 .app-shell.night-effect-fog .workspace::before {
-  animation: workspace-fog-drift 58s ease-in-out infinite alternate;
+  animation: fog-drift 44s ease-in-out infinite alternate;
+  inset: -12%;
   background:
-    radial-gradient(ellipse 54rem 16rem at 18% 78%, rgba(248, 250, 253, 0.22), rgba(240, 245, 250, 0.1) 48%, transparent 72%),
-    radial-gradient(ellipse 58rem 18rem at 80% 34%, rgba(244, 248, 252, 0.2), rgba(236, 242, 248, 0.08) 44%, transparent 68%),
-    radial-gradient(ellipse 72rem 24rem at 48% 98%, rgba(250, 252, 255, 0.26), rgba(241, 246, 251, 0.12) 48%, transparent 74%),
-    linear-gradient(180deg, rgba(210, 225, 245, 0.08), rgba(235, 242, 249, 0.16) 78%, rgba(245, 248, 252, 0.2));
-  background-size: 220% 200%, 240% 220%, 260% 220%, 100% 100%;
+    radial-gradient(ellipse 46rem 15rem at 22% 74%, rgba(245, 248, 251, 0.5), rgba(238, 242, 247, 0.2) 45%, transparent 70%),
+    radial-gradient(ellipse 52rem 17rem at 76% 42%, rgba(242, 245, 250, 0.4), rgba(235, 240, 246, 0.16) 42%, transparent 66%),
+    radial-gradient(ellipse 58rem 20rem at 46% 96%, rgba(248, 250, 252, 0.54), rgba(240, 244, 249, 0.22) 46%, transparent 72%),
+    radial-gradient(ellipse 48rem 15rem at 38% 22%, rgba(240, 244, 249, 0.28), transparent 62%),
+    radial-gradient(ellipse 40rem 13rem at 66% 60%, rgba(243, 246, 250, 0.26), transparent 60%),
+    linear-gradient(180deg, rgba(240, 244, 249, 0.1), rgba(238, 242, 248, 0.2) 72%, rgba(242, 246, 250, 0.3));
+  background-size: 220% 200%, 240% 220%, 260% 220%, 230% 200%, 250% 210%, 100% 100%;
 }
 
-@keyframes workspace-fog-drift {
-  from {
-    background-position: 0% 48%, 100% 36%, 12% 100%, 0 0;
-  }
-
-  to {
-    background-position: 100% 54%, 0% 42%, 84% 90%, 0 0;
-  }
+/* Travelling cloud fronts on top of the banks so fresh fog keeps entering. A
+ * continuous transform scroll by exactly one tile width loops seamlessly; the
+ * layer is oversized horizontally so the shift never uncovers an edge, and all
+ * three cloud tiles share one 1400px width so a single translate stays seamless. */
+.app-shell.night-effect-fog .workspace::after {
+  animation: fog-clouds 100s linear infinite;
+  inset: 0 -1500px;
+  background:
+    radial-gradient(ellipse 21rem 9rem at 30% 28%, rgba(246, 249, 252, 0.36), rgba(240, 244, 249, 0.14) 52%, transparent 74%),
+    radial-gradient(ellipse 27rem 11rem at 62% 66%, rgba(243, 247, 251, 0.32), rgba(236, 241, 247, 0.11) 48%, transparent 70%),
+    radial-gradient(ellipse 16rem 8rem at 18% 82%, rgba(248, 250, 253, 0.28), transparent 66%);
+  background-repeat: repeat-x;
+  background-size: 1400px 100%, 1400px 100%, 1400px 100%;
 }
 
 .app-shell.room-night.night-effect-subtle::after,
@@ -617,17 +639,13 @@ h2 {
   opacity: 0;
 }
 
-.app-shell.room-night.night-effect-subtle .workspace::before,
-.app-shell.room-night.night-effect-fog .workspace::before {
-  display: block;
-}
-
 .app-shell.room-night.night-effect-subtle .workspace::before {
-  opacity: 0.42;
+  opacity: 0.92;
 }
 
-.app-shell.room-night.night-effect-fog .workspace::before {
-  opacity: 0.58;
+.app-shell.room-night.night-effect-fog .workspace::before,
+.app-shell.room-night.night-effect-fog .workspace::after {
+  opacity: 1;
 }
 
 .eyebrow {
@@ -1291,11 +1309,6 @@ h2 {
   background: transparent;
 }
 
-/* Voice Rooms sit at the top; the Text Chat is pushed to the bottom-left corner. */
-.left-edge .chat-panel {
-  margin-top: auto;
-}
-
 .left-edge > details,
 .left-edge > .voice-panel {
   border-radius: 0 8px 8px 0;
@@ -1322,10 +1335,8 @@ h2 {
  * people sit in one room, only the room list scrolls; local controls keep their
  * own row and stay reachable. */
 .left-edge > .voice-panel {
-  /* One source of truth for the panel height so every breakpoint only overrides
-   * --voice-h. The floor is low enough for short viewports; when the content is
-   * taller than the panel the room list scrolls inside it. */
-  --voice-h: clamp(240px, 54vh, 680px);
+  /* The text chat lives in its own pop-out window now, so the voice panel owns
+   * the whole left column; the room list scrolls inside when content overflows. */
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 90%, var(--theme-glow) 10%), color-mix(in srgb, var(--panel-bg) 82%, var(--inner-bg) 18%)),
     var(--panel-bg);
@@ -1334,10 +1345,10 @@ h2 {
     inset 0 1px 0 rgba(255, 232, 184, 0.055),
     0 10px 26px rgba(0, 0, 0, 0.2);
   display: flex;
-  flex: 0 1 var(--voice-h);
+  flex: 1 1 auto;
   flex-direction: column;
-  height: var(--voice-h);
-  max-height: var(--voice-h);
+  height: auto;
+  max-height: 100%;
   min-height: 0;
   overflow: hidden;
   overscroll-behavior: contain;
@@ -1679,90 +1690,33 @@ h2 {
   --table-zoom: 1;
 }
 
-/* Night-vision overlays span the whole workspace background (including the
- * strip behind the side panels), but the dashboards themselves stay on top:
- * .edge-panel (z-index 5) stacks above .table-wrap (z-index 1). They fade in
- * and out slowly with the day/night change instead of popping. */
-.table-wrap::before,
-.table-wrap::after {
-  content: "";
-  inset: -28px 0;
-  opacity: 0;
-  pointer-events: none;
-  position: absolute;
-  transition: opacity 5s ease;
-  z-index: 7;
-}
+/* The night-vision visuals moved to full-viewport `.workspace::before/::after`
+ * (above) so they no longer cut off at the table column's edges. Only the fog
+ * animation keyframes remain here. */
 
-/* The effect visuals hang on the (constant) effect setting alone; only the
- * opacity is keyed to night, so the slow fade-out keeps its imagery. */
-
-/* Moonlight: a radiant blue moon disc high in one corner, a cold blue light
- * shaft falling diagonally across the table, and blue-black darkness pooling
- * at the far edge. */
-.app-shell.night-effect-subtle .table-wrap::after {
-  background:
-    radial-gradient(circle at 16% 7%, rgba(226, 240, 255, 0.85), rgba(158, 200, 255, 0.45) 7%, rgba(96, 152, 245, 0.22) 17%, rgba(60, 110, 210, 0.08) 28%, transparent 40%),
-    linear-gradient(118deg, rgba(150, 195, 255, 0.34) 6%, rgba(100, 150, 240, 0.2) 30%, rgba(64, 110, 205, 0.09) 50%, transparent 64%),
-    radial-gradient(ellipse at 42% 46%, transparent 32%, rgba(6, 16, 48, 0.38) 66%, rgba(2, 7, 28, 0.6) 96%);
-}
-
-/* Fog: dense white banks that hug the table and drift slowly sideways - a
- * milky haze rather than a blur. The ::before layer above adds cloud fronts
- * that keep travelling across, so fresh fog keeps entering the scene. */
-.app-shell.night-effect-fog .table-wrap::after {
-  animation: fog-drift 44s ease-in-out infinite alternate;
-  background:
-    radial-gradient(ellipse 46rem 15rem at 22% 74%, rgba(245, 248, 251, 0.52), rgba(238, 242, 247, 0.22) 45%, transparent 70%),
-    radial-gradient(ellipse 52rem 17rem at 76% 42%, rgba(242, 245, 250, 0.42), rgba(235, 240, 246, 0.18) 42%, transparent 66%),
-    radial-gradient(ellipse 58rem 20rem at 46% 96%, rgba(248, 250, 252, 0.56), rgba(240, 244, 249, 0.24) 46%, transparent 72%),
-    radial-gradient(ellipse 48rem 15rem at 38% 22%, rgba(240, 244, 249, 0.3), transparent 62%),
-    radial-gradient(ellipse 40rem 13rem at 66% 60%, rgba(243, 246, 250, 0.28), transparent 60%),
-    linear-gradient(180deg, rgba(240, 244, 249, 0.12), rgba(238, 242, 248, 0.22) 72%, rgba(242, 246, 250, 0.32));
-  background-size: 220% 200%, 240% 220%, 260% 220%, 230% 200%, 250% 210%, 100% 100%;
-}
-
+/* Gentle 2D drift of the whole (oversized) bank layer - transform only. */
 @keyframes fog-drift {
   from {
-    background-position: 0% 40%, 100% 55%, 15% 100%, 80% 0%, 30% 50%, 0 0;
+    transform: translate3d(-2.5%, 1.5%, 0);
   }
 
   to {
-    background-position: 100% 55%, 0% 35%, 85% 90%, 20% 12%, 70% 60%, 0 0;
+    transform: translate3d(2.5%, -1.5%, 0);
   }
 }
 
-/* Travelling cloud fronts: three repeating layers at different speeds slide
- * one direction forever, so new fog banks keep floating into view. Each
- * layer's travel distance is a whole multiple of its tile width, making the
- * ~100s loop seamless. */
-.app-shell.night-effect-fog .table-wrap::before {
-  animation: fog-clouds 100s linear infinite;
-  background:
-    radial-gradient(ellipse 21rem 9rem at 30% 28%, rgba(246, 249, 252, 0.4), rgba(240, 244, 249, 0.15) 52%, transparent 74%),
-    radial-gradient(ellipse 27rem 11rem at 62% 66%, rgba(243, 247, 251, 0.36), rgba(236, 241, 247, 0.12) 48%, transparent 70%),
-    radial-gradient(ellipse 16rem 8rem at 18% 82%, rgba(248, 250, 253, 0.32), transparent 66%);
-  background-repeat: repeat-x;
-  background-size: 1200px 100%, 1500px 100%, 900px 100%;
-}
-
+/* Continuous horizontal scroll by exactly one 1400px tile, so `linear infinite`
+ * wraps with no visible jump - transform only, so no per-frame repaint. */
 @keyframes fog-clouds {
   from {
-    background-position: 0 0, 0 0, 0 0;
+    transform: translate3d(0, 0, 0);
   }
 
   to {
-    background-position: -2400px 0, -1500px 0, -1800px 0;
+    transform: translate3d(-1400px, 0, 0);
   }
 }
 
-/* Only visibility is tied to night, so the 5s fade keeps its imagery while
- * fading out at daybreak. */
-.app-shell.room-night.night-effect-subtle .table-wrap::after,
-.app-shell.room-night.night-effect-fog .table-wrap::after,
-.app-shell.room-night.night-effect-fog .table-wrap::before {
-  opacity: 1;
-}
 
 /* Envelope flight: glides from the sender's seat to the recipient's seat when
  * two players whisper. Positions are cqw offsets from the table centre. */
@@ -2942,6 +2896,10 @@ h2 {
   /* Visible so the nameplate can sit below the box; the avatar and overlay
    * round their own corners instead of relying on the box clipping them. */
   overflow: visible;
+  /* Keep seats on their own compositor layer so the frequent re-layout glides
+   * (adding a seat moves every seat) stay GPU work and do not spike the CPU by
+   * promoting ~20 layers at each animation start. */
+  will-change: transform;
   transition:
     transform 220ms ease,
     opacity 180ms ease,
@@ -4251,7 +4209,7 @@ h2 {
   padding: 4vh 24px 24px;
   justify-items: center;
   position: fixed;
-  z-index: 30;
+  z-index: 50;
 }
 
 .settings-panel {
@@ -4879,8 +4837,28 @@ details.voice-panel[open] > summary::before {
   color: var(--cream);
   display: grid;
   gap: 6px;
-  grid-template-columns: 1.8rem minmax(0, 1fr) auto;
+  grid-template-columns: 1.8rem minmax(0, 1fr) auto auto;
   min-width: 0;
+}
+
+/* Muted / deafened indicators beside an occupant: mic-slash left, headphone
+ * right (Discord-style), both in the same soft red as the seat nameplate. */
+.voice-occupant-status {
+  align-items: center;
+  color: #ff8f8f;
+  display: inline-flex;
+  gap: 3px;
+}
+
+.voice-occupant-muted {
+  color: #ff8f8f;
+  display: grid;
+  place-items: center;
+}
+
+.voice-occupant-muted svg {
+  height: 0.85rem;
+  width: 0.85rem;
 }
 
 .voice-occupant-avatar {
@@ -5573,8 +5551,20 @@ details.voice-panel[open] > summary::before {
 }
 
 .dashboard-tab-detach-hint {
-  font-size: 0.72rem;
+  display: inline-grid;
   opacity: 0.5;
+  place-items: center;
+}
+
+.dashboard-tab-detach-hint svg {
+  height: 0.8rem;
+  width: 0.8rem;
+}
+
+.sheet-detached-icon svg {
+  display: block;
+  height: 1.3rem;
+  width: 1.3rem;
 }
 
 .dashboard-tab-characters.detached {
@@ -5676,6 +5666,136 @@ details.voice-panel[open] > summary::before {
   right: 0;
 }
 
+/* Floating text-chat pop-out window, toggled from the voice panel. It reuses
+ * the floating-sheet resize handles and mirrors its framing so the two windows
+ * read as one family. */
+.chat-popout {
+  background: var(--panel-bg);
+  border: 1px solid color-mix(in srgb, var(--gold) 42%, var(--panel-border));
+  border-radius: var(--radius-panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 60px rgba(0, 0, 0, 0.5),
+    0 0 26px var(--theme-glow);
+  display: flex;
+  flex-direction: column;
+  max-height: 94vh;
+  max-width: 94vw;
+  min-height: 0;
+  overflow: hidden;
+  position: fixed;
+  z-index: 46;
+}
+
+.chat-popout.minimized {
+  height: auto;
+}
+
+.chat-popout-titlebar {
+  align-items: center;
+  background: color-mix(in srgb, var(--panel-0) 70%, black 30%);
+  border-bottom: 1px solid color-mix(in srgb, var(--gold) 34%, transparent);
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  cursor: grab;
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: space-between;
+  padding: 7px 8px 7px 14px;
+  touch-action: none;
+  user-select: none;
+}
+
+.chat-popout.minimized .chat-popout-titlebar {
+  border-bottom: 0;
+  border-radius: var(--radius-panel);
+}
+
+.chat-popout-titlebar:active {
+  cursor: grabbing;
+}
+
+.chat-popout-titlebar strong {
+  color: var(--gold-bright);
+  font-family: var(--display-font);
+  font-size: 0.82rem;
+  letter-spacing: var(--display-tracking);
+  text-transform: uppercase;
+}
+
+.chat-popout-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.chat-popout-buttons button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  box-shadow: none;
+  color: var(--gold);
+  display: grid;
+  height: 26px;
+  min-height: 26px;
+  min-width: 26px;
+  padding: 0;
+  place-items: center;
+  width: 26px;
+}
+
+.chat-popout-buttons button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--gold) 15%, transparent);
+  color: var(--gold-bright);
+}
+
+.chat-popout-buttons button svg {
+  height: 0.9rem;
+  width: 0.9rem;
+}
+
+.chat-popout-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Inside the pop-out the window provides frame and size; the chat itself just
+ * fills the body, and the window titlebar owns minimize/close. */
+.chat-popout .chat-panel {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  flex: 1 1 auto;
+  height: auto;
+  max-height: none;
+  width: 100%;
+}
+
+.chat-popout .chat-minimize {
+  display: none;
+}
+
+/* Chat window toggle in the voice user strip: gold when the window is open. */
+.voice-user-button.chat-toggle.open {
+  background: color-mix(in srgb, var(--gold) 20%, transparent);
+  border-color: color-mix(in srgb, var(--gold-bright) 55%, transparent);
+  color: var(--gold-bright);
+}
+
+/* Unread messages: the speech bubble fills solid white so it stands out even
+ * when the chat window is closed. */
+.voice-user-button.chat-toggle.unread svg {
+  fill: #fff;
+  stroke: #fff;
+}
+
+.voice-user-button.chat-toggle.unread {
+  color: #fff;
+}
+
 .floating-sheet-titlebar {
   align-items: center;
   background: color-mix(in srgb, var(--panel-0) 70%, black 30%);
@@ -5759,11 +5879,9 @@ details.voice-panel[open] > summary::before {
     0 0 0 1px color-mix(in srgb, var(--gold-bright) 20%, transparent);
 }
 
-/* During night the atmosphere lives inside transparent dashboards instead of
- * above them. That keeps controls readable while the fog/moonlight continues
- * behind the side panels instead of ending abruptly at the table column. */
-.app-shell.room-night.night-effect-subtle :is(
-  .game-top-bar,
+/* Keep dashboards opaque enough at night; the atmosphere belongs behind them,
+ * not inside their backgrounds. */
+.app-shell.room-night:not(.night-effect-none) :is(
   .right-dashboard.panel,
   .left-edge > details,
   .left-edge > .voice-panel,
@@ -5774,86 +5892,7 @@ details.voice-panel[open] > summary::before {
   .settings-panel,
   .left-edge > .voice-panel .voice-user-panel
 ) {
-  background:
-    radial-gradient(ellipse at 18% 0%, rgba(220, 235, 255, 0.16), transparent 18rem),
-    linear-gradient(180deg, color-mix(in srgb, var(--panel-0) 48%, transparent), color-mix(in srgb, var(--panel-1) 36%, transparent)),
-    color-mix(in srgb, var(--theme-glow) 10%, transparent);
-}
-
-.app-shell.room-night.night-effect-fog :is(
-  .game-top-bar,
-  .right-dashboard.panel,
-  .left-edge > details,
-  .left-edge > .voice-panel,
-  .chat-panel,
-  .floating-sheet,
-  .seat-action-menu,
-  .token-context-menu,
-  .settings-panel,
-  .left-edge > .voice-panel .voice-user-panel
-) {
-  background:
-    radial-gradient(ellipse 20rem 8rem at 12% 12%, rgba(246, 249, 252, 0.2), transparent 66%),
-    radial-gradient(ellipse 24rem 9rem at 86% 82%, rgba(242, 247, 251, 0.17), transparent 68%),
-    linear-gradient(180deg, color-mix(in srgb, var(--panel-0) 50%, transparent), color-mix(in srgb, var(--panel-1) 38%, transparent)),
-    color-mix(in srgb, var(--theme-glow) 10%, transparent);
-}
-
-.app-shell.room-night:not(.night-effect-none).background-magic :is(
-  .game-top-bar,
-  .right-dashboard.panel,
-  .left-edge > details,
-  .left-edge > .voice-panel,
-  .chat-panel,
-  .floating-sheet,
-  .seat-action-menu,
-  .token-context-menu,
-  .settings-panel,
-  .left-edge > .voice-panel .voice-user-panel
-) {
-  background:
-    radial-gradient(ellipse 24rem 11rem at 16% 18%, rgba(238, 244, 255, 0.18), transparent 68%),
-    radial-gradient(ellipse 28rem 13rem at 82% 76%, rgba(211, 224, 248, 0.14), transparent 70%),
-    linear-gradient(180deg, rgba(15, 12, 25, 0.56), rgba(10, 9, 18, 0.42)),
-    url("../assets/magic_background.jpg") center / cover fixed no-repeat;
-}
-
-.app-shell.room-night:not(.night-effect-none).background-space :is(
-  .game-top-bar,
-  .right-dashboard.panel,
-  .left-edge > details,
-  .left-edge > .voice-panel,
-  .chat-panel,
-  .floating-sheet,
-  .seat-action-menu,
-  .token-context-menu,
-  .settings-panel,
-  .left-edge > .voice-panel .voice-user-panel
-) {
-  background:
-    radial-gradient(ellipse 24rem 11rem at 16% 18%, rgba(214, 237, 255, 0.16), transparent 68%),
-    radial-gradient(ellipse 30rem 14rem at 84% 80%, rgba(109, 162, 238, 0.12), transparent 72%),
-    linear-gradient(180deg, rgba(3, 11, 23, 0.6), rgba(1, 5, 14, 0.46)),
-    url("../assets/universe_background2.jpg") center 48% / cover fixed no-repeat;
-}
-
-.app-shell.room-night:not(.night-effect-none).background-island :is(
-  .game-top-bar,
-  .right-dashboard.panel,
-  .left-edge > details,
-  .left-edge > .voice-panel,
-  .chat-panel,
-  .floating-sheet,
-  .seat-action-menu,
-  .token-context-menu,
-  .settings-panel,
-  .left-edge > .voice-panel .voice-user-panel
-) {
-  background:
-    radial-gradient(ellipse 24rem 11rem at 16% 18%, rgba(230, 250, 255, 0.16), transparent 68%),
-    radial-gradient(ellipse 30rem 14rem at 84% 80%, rgba(168, 227, 235, 0.12), transparent 72%),
-    linear-gradient(180deg, rgba(4, 52, 68, 0.56), rgba(3, 34, 49, 0.44)),
-    url("../assets/sunny_island_background.jpg") center / cover fixed no-repeat;
+  background: var(--panel-bg);
 }
 
 /* Night order: replace the plain list numbers with small engraved ordinals. */
@@ -5975,10 +6014,6 @@ details.voice-panel[open] > summary::before {
     height: clamp(230px, 36vh, 380px);
   }
 
-  .left-edge > .voice-panel {
-    --voice-h: clamp(280px, 56vh, 620px);
-  }
-
   .player-list,
   .character-pool,
   .night-call-tools,
@@ -6064,10 +6099,6 @@ details.voice-panel[open] > summary::before {
   .chat-panel {
     flex-basis: clamp(210px, 34vh, 320px);
     height: clamp(210px, 34vh, 320px);
-  }
-
-  .left-edge > .voice-panel {
-    --voice-h: clamp(230px, 52vh, 500px);
   }
 
   .player-list,
@@ -6261,10 +6292,6 @@ details.voice-panel[open] > summary::before {
     height: min(46vh, 430px);
   }
 
-  .left-edge > .voice-panel {
-    --voice-h: min(62vh, 620px);
-  }
-
   .mobile-workspace-nav {
     align-items: stretch;
     background: var(--panel-bg);
@@ -6455,10 +6482,6 @@ details.voice-panel[open] > summary::before {
     height: calc(var(--viewport-block) - 46px - env(safe-area-inset-bottom));
   }
 
-  .left-edge > .voice-panel {
-    --voice-h: min(78vh, 460px);
-  }
-
   .chat-panel {
     flex-basis: min(62vh, 360px);
     height: min(62vh, 360px);
@@ -6477,10 +6500,6 @@ details.voice-panel[open] > summary::before {
 /* Short desktop windows in the 541-620px band: still the 3-column layout, just
  * more compact. Below 541px the single-view layout takes over (see above). */
 @media (min-width: 981px) and (max-height: 620px) and (min-height: 541px) {
-  .left-edge > .voice-panel {
-    --voice-h: clamp(190px, 48vh, 380px);
-  }
-
   .chat-panel {
     flex-basis: clamp(150px, 30vh, 260px);
     height: clamp(150px, 30vh, 260px);
@@ -6500,10 +6519,6 @@ details.voice-panel[open] > summary::before {
 @media (max-width: 820px) and (min-height: 900px) and (orientation: portrait) {
   .table-stage {
     padding: 7% 8% 6%;
-  }
-
-  .left-edge > .voice-panel {
-    --voice-h: min(56vh, 720px);
   }
 
   .chat-panel {

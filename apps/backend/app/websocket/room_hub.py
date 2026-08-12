@@ -24,6 +24,7 @@ class RoomHub:
         self._rooms: dict[str, dict[WebSocket, str | None]] = {}
         self._raised_hands: dict[str, set[str]] = {}
         self._muted_players: dict[str, set[str]] = {}
+        self._deafened_players: dict[str, set[str]] = {}
         self._voice_rooms: dict[str, dict[str, str]] = {}
         self._timers: dict[str, dict[str, int | bool | str | None]] = {}
         self._vote_counts: dict[str, dict[str, int | bool]] = {}
@@ -39,6 +40,7 @@ class RoomHub:
             participants = self._night_visible_participants(room_id, participants, player_id, storyteller_id)
         await websocket.send_json({"type": "hand.state", "payload": {"playerIds": sorted(self._raised_hands.get(room_id, set()))}})
         await websocket.send_json({"type": "mute.state", "payload": {"playerIds": sorted(self._muted_players.get(room_id, set()))}})
+        await websocket.send_json({"type": "deafen.state", "payload": {"playerIds": sorted(self._deafened_players.get(room_id, set()))}})
         await websocket.send_json({"type": "voice.state", "payload": {"participants": participants}})
         await websocket.send_json({"type": "timer.state", "payload": self._timer_state(room_id)})
         await websocket.send_json({"type": "vote_count.state", "payload": self._vote_count_state(room_id)})
@@ -79,6 +81,7 @@ class RoomHub:
         await self._broadcast_text(room_id, {"type": "room.deleted", "payload": {"roomId": room_id}})
         self._raised_hands.pop(room_id, None)
         self._muted_players.pop(room_id, None)
+        self._deafened_players.pop(room_id, None)
         self._voice_rooms.pop(room_id, None)
         self._timers.pop(room_id, None)
         self._vote_counts.pop(room_id, None)
@@ -104,6 +107,7 @@ class RoomHub:
         )
         self._raised_hands.setdefault(room_id, set()).discard(player_id)
         self._muted_players.setdefault(room_id, set()).discard(player_id)
+        self._deafened_players.setdefault(room_id, set()).discard(player_id)
         self._voice_rooms.setdefault(room_id, {}).pop(player_id, None)
         await self.broadcast_room_event(
             room_id,
@@ -136,6 +140,18 @@ class RoomHub:
             muted.discard(player_id)
         await self.broadcast_room_event(room_id, {"type": "mute.state", "payload": {"playerIds": sorted(muted)}})
 
+    async def set_deafened(self, room_id: str, player_id: str, is_deafened: bool) -> None:
+        """Track a player's deafen (headphone-mute) state and broadcast the list."""
+        room = room_store.get_room(room_id)
+        if room is None or find_player(room.players, player_id) is None:
+            return
+        deafened = self._deafened_players.setdefault(room_id, set())
+        if is_deafened:
+            deafened.add(player_id)
+        else:
+            deafened.discard(player_id)
+        await self.broadcast_room_event(room_id, {"type": "deafen.state", "payload": {"playerIds": sorted(deafened)}})
+
     async def broadcast_room_event(self, room_id: str, payload: dict) -> None:
         """Send a lightweight realtime event to every connection in a room."""
         # Sends a lightweight event to every connected browser in the room.
@@ -151,11 +167,15 @@ class RoomHub:
             room_voice[player_id] = voice_room
         else:
             room_voice.pop(player_id, None)
-            # Mute status is only meaningful inside a voice room; clear it on exit.
+            # Mute/deafen status is only meaningful inside a voice room; clear on exit.
             muted = self._muted_players.get(room_id)
             if muted and player_id in muted:
                 muted.discard(player_id)
                 await self.broadcast_room_event(room_id, {"type": "mute.state", "payload": {"playerIds": sorted(muted)}})
+            deafened = self._deafened_players.get(room_id)
+            if deafened and player_id in deafened:
+                deafened.discard(player_id)
+                await self.broadcast_room_event(room_id, {"type": "deafen.state", "payload": {"playerIds": sorted(deafened)}})
         await self.broadcast_voice_state(room_id)
 
     async def close_public_voice_rooms(self, room_id: str) -> None:

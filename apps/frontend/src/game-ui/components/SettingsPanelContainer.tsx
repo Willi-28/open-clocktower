@@ -20,6 +20,7 @@ type SettingsPanelContainerProps = {
   defaultCharacterLanguage: string;
   isMuted: boolean;
   onClose: () => void;
+  onMicTestActiveChange: (isActive: boolean) => void;
   onToggleMuted: () => void;
   onUpdateClientSettings: Dispatch<SetStateAction<ClientSettings>>;
   playerName: (playerId: string | undefined) => string;
@@ -38,6 +39,7 @@ export function SettingsPanelContainer({
   defaultCharacterLanguage,
   isMuted,
   onClose,
+  onMicTestActiveChange,
   onToggleMuted,
   onUpdateClientSettings,
   playerName,
@@ -80,6 +82,7 @@ export function SettingsPanelContainer({
       joinedVoiceRoom={session.joinedVoiceRoom}
       onChooseOutputDevice={() => void devices.chooseOutputDevice()}
       onClose={onClose}
+      onMicTestActiveChange={onMicTestActiveChange}
       onRefreshDevices={() => void devices.refreshMediaDevices({ requestPermission: true })}
       onRequestVoiceStream={devices.requestVoiceStream}
       onSelectOutputDevice={devices.setSelectedAudioOutputId}

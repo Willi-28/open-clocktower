@@ -41,6 +41,17 @@ type RightControlStackProps = StorytellerToolsPanelProps & {
 
 type DashboardTabId = 'characters' | 'night' | 'reminders' | 'tools';
 
+/** Pop-out glyph: a window with an arrow escaping through the top-right corner. */
+function PopOutIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5" />
+      <path d="M14 4h6v6" />
+      <path d="M20 4 11.5 12.5" />
+    </svg>
+  );
+}
+
 /** Render the right-edge dashboard as one tabbed, minimizable panel beside the table. */
 export function RightControlStack(props: RightControlStackProps) {
   const { isStoryteller } = props;
@@ -250,7 +261,7 @@ export function RightControlStack(props: RightControlStackProps) {
                       type="button"
                     >
                       {tab.label}
-                      <span className="dashboard-tab-detach-hint" aria-hidden="true">⤢</span>
+                      <span className="dashboard-tab-detach-hint" aria-hidden="true"><PopOutIcon /></span>
                     </button>
                   );
                 }
@@ -277,7 +288,7 @@ export function RightControlStack(props: RightControlStackProps) {
           <div hidden={activeTab !== 'characters'}>
             {props.characterSheetFloating ? (
               <button className="sheet-detached-note" onClick={props.onReattachCharacterSheet} type="button">
-                <span className="sheet-detached-icon" aria-hidden="true">⤢</span>
+                <span className="sheet-detached-icon" aria-hidden="true"><PopOutIcon /></span>
                 <span>Character sheet is floating on the table.<br />Click here (or drag it back) to reattach.</span>
               </button>
             ) : (

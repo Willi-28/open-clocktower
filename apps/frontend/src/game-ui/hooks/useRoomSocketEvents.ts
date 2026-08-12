@@ -43,6 +43,7 @@ type UseRoomSocketEventsOptions = {
   setIsVoteCountRunning: (isRunning: boolean) => void;
   setRaisedHandPlayerIds: Dispatch<SetStateAction<string[]>>;
   setMutedPlayerIds: Dispatch<SetStateAction<string[]>>;
+  setDeafenedPlayerIds: Dispatch<SetStateAction<string[]>>;
   setRoom: (room: RoomState | null) => void;
   setSelectedPlayerId: Dispatch<SetStateAction<string>>;
   setVoteCountIndex: (index: number) => void;
@@ -71,6 +72,7 @@ export function useRoomSocketEvents({
   setIsVoteCountRunning,
   setRaisedHandPlayerIds,
   setMutedPlayerIds,
+  setDeafenedPlayerIds,
   setRoom,
   setSelectedPlayerId,
   setVoteCountIndex,
@@ -92,6 +94,7 @@ export function useRoomSocketEvents({
     setIsVoteCountRunning,
     setRaisedHandPlayerIds,
     setMutedPlayerIds,
+    setDeafenedPlayerIds,
     setRoom,
     setSelectedPlayerId,
     setVoteCountIndex,
@@ -115,6 +118,7 @@ export function useRoomSocketEvents({
       setIsVoteCountRunning,
       setRaisedHandPlayerIds,
       setMutedPlayerIds,
+      setDeafenedPlayerIds,
       setRoom,
       setSelectedPlayerId,
       setVoteCountIndex,
@@ -165,6 +169,9 @@ export function useRoomSocketEvents({
       }
       if (event.type === 'mute.state') {
         handlers.setMutedPlayerIds(event.payload.playerIds);
+      }
+      if (event.type === 'deafen.state') {
+        handlers.setDeafenedPlayerIds(event.payload.playerIds);
       }
       if (event.type === 'voice.state') {
         handlers.applyVoiceParticipants(event.payload.participants);
@@ -217,6 +224,7 @@ export function useRoomSocketEvents({
         handlers.setIncomingVoiceCall(null);
         handlers.setRaisedHandPlayerIds([]);
         handlers.setMutedPlayerIds([]);
+        handlers.setDeafenedPlayerIds([]);
         handlers.setRoom(null);
         handlers.setError('The room was deleted.');
       }
@@ -230,6 +238,7 @@ export function useRoomSocketEvents({
         handlers.setIncomingVoiceCall(null);
         handlers.setRaisedHandPlayerIds([]);
         handlers.setMutedPlayerIds([]);
+        handlers.setDeafenedPlayerIds([]);
         handlers.setCurrentPlayerId('');
         handlers.setSelectedPlayerId('');
         handlers.setRoom(null);

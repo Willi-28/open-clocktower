@@ -4,7 +4,9 @@ RoomStore is the backend's central write/read service for rooms, players,
 votes, nominations, character packs, assignments, and storyteller-only checks.
 """
 
+import base64
 import json
+from datetime import datetime
 from random import SystemRandom
 from secrets import compare_digest, token_urlsafe
 from threading import Lock
@@ -57,6 +59,31 @@ from .room_state import (
     Vote,
     VoteRequest,
 )
+
+
+def _avatar_version(created_at: datetime | None) -> str | None:
+    """A stable per-avatar version that changes whenever the image is replaced.
+
+    Millisecond precision so two uploads within the same second still produce a
+    new URL and bust the browser cache."""
+    return str(int(created_at.timestamp() * 1000)) if created_at is not None else None
+
+
+def _avatar_url(room_id: str, player_id: str, created_at: datetime | None) -> str | None:
+    """Build the cacheable avatar endpoint URL a room snapshot carries instead of
+    embedding the full base64 image. The version query busts the browser cache
+    only when the avatar actually changes."""
+    version = _avatar_version(created_at)
+    if version is None:
+        return None
+    return f"/api/rooms/{room_id}/players/{player_id}/avatar?v={version}"
+
+
+def _decode_data_url(data_url: str) -> tuple[str, bytes]:
+    """Split a stored `data:<media-type>;base64,<payload>` URL into bytes + type."""
+    header, _, payload = data_url.partition(",")
+    media_type = header[len("data:") :].split(";", 1)[0] or "application/octet-stream"
+    return media_type, base64.b64decode(payload)
 
 
 class RoomStore:
@@ -782,6 +809,23 @@ class RoomStore:
             session.commit()
             return self._to_state(session, room)
 
+    def get_player_avatar(self, room_id: str, player_id: str) -> tuple[bytes, str, str] | None:
+        """Return (image_bytes, media_type, version) for a player's avatar image.
+
+        The base64 payload is decoded here, on a cache-miss avatar fetch only,
+        instead of being serialized into every room snapshot."""
+        with SessionLocal() as session:
+            row = session.scalars(
+                select(PlayerAvatarModel).where(
+                    PlayerAvatarModel.room_id == room_id,
+                    PlayerAvatarModel.player_id == player_id,
+                )
+            ).first()
+            if row is None:
+                return None
+            media_type, image_bytes = _decode_data_url(row.data_url)
+            return image_bytes, media_type, _avatar_version(row.created_at) or "0"
+
     def list_assignments(
         self,
         room_id: str,
@@ -836,9 +880,16 @@ class RoomStore:
             .order_by(NominationRequestModel.created_at.asc())
         ).all()
         votes = session.scalars(select(VoteModel).where(VoteModel.room_id == room.id)).all()
-        avatars = {
-            avatar.player_id: avatar.data_url
-            for avatar in session.scalars(select(PlayerAvatarModel).where(PlayerAvatarModel.room_id == room.id)).all()
+        # Only the avatar id + version is loaded here, never the multi-megabyte
+        # base64 payload: the snapshot carries a cacheable URL instead, so a room
+        # GET no longer re-serializes every player's image on every request.
+        avatar_versions = {
+            player_id: created_at
+            for player_id, created_at in session.execute(
+                select(PlayerAvatarModel.player_id, PlayerAvatarModel.created_at).where(
+                    PlayerAvatarModel.room_id == room.id
+                )
+            ).all()
         }
         return RoomState(
             id=room.id,
@@ -860,7 +911,7 @@ class RoomStore:
                     has_dead_vote=player.has_dead_vote,
                     is_connected=player.is_connected,
                     is_storyteller=player.is_storyteller,
-                    avatar_url=avatars.get(player.id),
+                    avatar_url=_avatar_url(room.id, player.id, avatar_versions.get(player.id)),
                 )
                 for player in room.players
             ],

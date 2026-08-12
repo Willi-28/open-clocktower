@@ -5,7 +5,7 @@
  * resets together so the chat panel can stay mostly presentational.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ChatMessage } from './types';
 
@@ -26,6 +26,10 @@ export function useChatState({ allowedPrivateChatIds, allowedPrivateChatKey, cur
   const [openChatTabs, setOpenChatTabs] = useState<string[]>(['public']);
   const [activeChatTab, setActiveChatTab] = useState('public');
   const [attentionChatTabs, setAttentionChatTabs] = useState<string[]>([]);
+  // Unread badge for the chat pop-out toggle: set when a message from someone
+  // else arrives while the chat window is not being viewed, cleared when it is.
+  const [hasUnreadChat, setHasUnreadChat] = useState(false);
+  const chatVisibleRef = useRef(false);
 
   useEffect(() => {
     setChatDraft('');
@@ -33,7 +37,16 @@ export function useChatState({ allowedPrivateChatIds, allowedPrivateChatKey, cur
     setOpenChatTabs(['public']);
     setActiveChatTab('public');
     setAttentionChatTabs([]);
+    setHasUnreadChat(false);
   }, [roomId]);
+
+  /** Report whether the chat window is currently open+visible; clears unread. */
+  const setChatVisible = useCallback((visible: boolean) => {
+    chatVisibleRef.current = visible;
+    if (visible) {
+      setHasUnreadChat(false);
+    }
+  }, []);
 
   useEffect(() => {
     setOpenChatTabs((current) => {
@@ -66,6 +79,9 @@ export function useChatState({ allowedPrivateChatIds, allowedPrivateChatKey, cur
       const next = [...current, stamped];
       return next.length > MAX_CHAT_MESSAGES ? next.slice(next.length - MAX_CHAT_MESSAGES) : next;
     });
+    if (message.fromPlayerId !== currentPlayerId && !chatVisibleRef.current) {
+      setHasUnreadChat(true);
+    }
     if (tabId) {
       setOpenChatTabs((current) => (current.includes(tabId) ? current : [...current, tabId]));
       if (message.fromPlayerId !== currentPlayerId && tabId !== activeChatTab) {
@@ -109,10 +125,12 @@ export function useChatState({ allowedPrivateChatIds, allowedPrivateChatKey, cur
     attentionChatTabs,
     chatDraft,
     closeChatTab,
+    hasUnreadChat,
     openChatTabs,
     openPrivateChat,
     setActiveChatTab: selectChatTab,
     setChatDraft,
+    setChatVisible,
     visibleChatMessages,
   };
 }

@@ -7,7 +7,7 @@ changing game state, uploading assets, assigning roles, and broadcasting updates
 import base64
 from time import monotonic
 
-from fastapi import APIRouter, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, Request, Response, UploadFile
 
 from app.game.room_state import (
     AssignCharacterRequest,
@@ -182,6 +182,25 @@ async def leave_room(
         await room_hub.kick_player(room_id, player_id, "The storyteller removed you from the room.")
     await room_hub.broadcast_state(room)
     return room
+
+
+# Versioned URL (the ?v changes when the avatar changes), so the browser may
+# cache each version forever and only refetch when a new image is uploaded.
+_AVATAR_CACHE_CONTROL = "public, max-age=31536000, immutable"
+
+
+@router.get("/{room_id}/players/{player_id}/avatar")
+def get_player_avatar(room_id: str, player_id: str, request: Request):
+    """Serve one player's avatar image as a cacheable resource (public read)."""
+    result = room_store.get_player_avatar(room_id, player_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Avatar not found")
+    image_bytes, media_type, version = result
+    etag = f'"{version}"'
+    headers = {"ETag": etag, "Cache-Control": _AVATAR_CACHE_CONTROL}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=image_bytes, media_type=media_type, headers=headers)
 
 
 @router.post("/{room_id}/players/{player_id}/avatar")

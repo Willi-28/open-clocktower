@@ -8,12 +8,8 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { VoiceParticipant } from '../voiceRooms';
+import type { VoiceStreamRequest } from '../hooks/useVoiceDevices';
 import { VoiceMuteIcon } from './VoiceMuteIcon';
-
-type VoiceStreamRequest = {
-  cleanup?: () => void;
-  stream: MediaStream;
-};
 
 type SettingsPanelProps = {
   audioInputDevices: MediaDeviceInfo[];
@@ -27,6 +23,7 @@ type SettingsPanelProps = {
   joinedVoiceRoom: string | null;
   onChooseOutputDevice: () => void;
   onClose: () => void;
+  onMicTestActiveChange: (isActive: boolean) => void;
   onRefreshDevices: () => void;
   onRequestVoiceStream: (deviceId: string, soundFiltersEnabled: boolean) => Promise<VoiceStreamRequest>;
   onSelectOutputDevice: (deviceId: string) => void;
@@ -65,6 +62,7 @@ export function SettingsPanel({
   joinedVoiceRoom,
   onChooseOutputDevice,
   onClose,
+  onMicTestActiveChange,
   onRefreshDevices,
   onRequestVoiceStream,
   onSelectOutputDevice,
@@ -95,14 +93,38 @@ export function SettingsPanel({
   const micContextRef = useRef<AudioContext | null>(null);
   const micAnimationRef = useRef<number | null>(null);
   const micMeterRef = useRef<HTMLSpanElement | null>(null);
+  // Tracks the last mic-test state we reported to the parent, so we only signal
+  // real start/stop transitions (never a spurious "stopped" on mount).
+  const micTestReportedRef = useRef(false);
   const [isTestingMic, setIsTestingMic] = useState(false);
   const [testStatus, setTestStatus] = useState('');
   const [profileStatus, setProfileStatus] = useState('');
   const [activeTab, setActiveTab] = useState<'general' | 'sound' | 'board' | 'characters' | 'voice'>('general');
 
   useEffect(() => {
-    return () => stopMicTest();
+    return () => {
+      stopMicTest();
+      // Closing the panel mid-test must restore the pre-test mute state. Unmount
+      // won't re-run the transition effect below, so report the stop here.
+      if (micTestReportedRef.current) {
+        micTestReportedRef.current = false;
+        onMicTestActiveChange(false);
+      }
+    };
   }, []);
+
+  // The live microphone must not broadcast the test into the voice room, so the
+  // app mutes it while the input test runs and restores it afterwards. Report
+  // only real transitions: firing on mount (isTestingMic starts false) would
+  // spuriously "stop" a test that never ran and unmute an already-muted or
+  // deafened mic.
+  useEffect(() => {
+    if (micTestReportedRef.current === isTestingMic) {
+      return;
+    }
+    micTestReportedRef.current = isTestingMic;
+    onMicTestActiveChange(isTestingMic);
+  }, [isTestingMic]);
 
   useEffect(() => {
     if (!isTestingMic) {

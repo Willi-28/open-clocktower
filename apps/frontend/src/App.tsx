@@ -23,6 +23,7 @@ import {
 import { playDeafenToggleTone, playMuteToggleTone, playTimerAlarm, setSoundEffectsVolume } from './audio/browserAudio';
 import { ActiveVoteBar } from './game-ui/components/ActiveVoteBar';
 import { ChatPanel } from './game-ui/components/ChatPanel';
+import { ChatPopout } from './game-ui/components/ChatPopout';
 import { ConfirmActionDialog } from './game-ui/components/ConfirmActionDialog';
 import { DemonBluffBar } from './game-ui/components/DemonBluffBar';
 import { FloatingCharacterSheet } from './game-ui/components/FloatingCharacterSheet';
@@ -86,8 +87,14 @@ export function App() {
   const [clientSettings, setClientSettings] = useState<ClientSettings>(loadClientSettings);
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
+  // Deafen/undeafen and the mic test restore the mute state the player had
+  // before, so a deliberate manual mute is never silently undone.
+  const isMutedRef = useRef(false);
+  const wasMutedBeforeDeafenRef = useRef(false);
+  const wasMutedBeforeMicTestRef = useRef(false);
   const [raisedHandPlayerIds, setRaisedHandPlayerIds] = useState<string[]>([]);
   const [mutedPlayerIds, setMutedPlayerIds] = useState<string[]>([]);
+  const [deafenedPlayerIds, setDeafenedPlayerIds] = useState<string[]>([]);
   // Viewport position of the seat the interaction menu should appear beside.
   const [seatMenuAnchor, setSeatMenuAnchor] = useState<{ x: number; y: number } | null>(null);
   const [isTopBarOpen, setIsTopBarOpen] = useState(true);
@@ -103,6 +110,16 @@ export function App() {
   const [tokenMenu, setTokenMenu] = useState<{ x: number; y: number; clientX: number; clientY: number } | null>(null);
   // Floating character sheet position (null = docked in the right dashboard).
   const [floatingSheetPos, setFloatingSheetPos] = useState<{ x: number; y: number } | null>(null);
+  // Kept across reattach so the next detach restores the last adjusted size.
+  const [floatingSheetSize, setFloatingSheetSize] = useState<{ width: number; height: number } | null>(null);
+  // Text chat pop-out window, toggled from the voice panel (closed by default).
+  const [isChatPopoutOpen, setIsChatPopoutOpen] = useState(false);
+  const [isChatPopoutMinimized, setIsChatPopoutMinimized] = useState(false);
+  const [chatPopoutPos, setChatPopoutPos] = useState({ x: 24, y: 96 });
+  const [chatPopoutSize, setChatPopoutSize] = useState({ width: 360, height: 460 });
+  // The first open drops the window just below its toggle icon; later opens keep
+  // wherever the user last dragged it.
+  const chatPopoutPlacedRef = useRef(false);
   const appShellRef = useRef<HTMLElement | null>(null);
   const [error, setError] = useState<string>('');
   const [mobileWorkspaceView, setMobileWorkspaceView] = useState<MobileWorkspaceView>('table');
@@ -198,6 +215,7 @@ export function App() {
       voiceSession.setIncomingVoiceCall(null);
       setRaisedHandPlayerIds([]);
       setMutedPlayerIds([]);
+      setDeafenedPlayerIds([]);
     },
     room,
     roomId,
@@ -333,6 +351,7 @@ export function App() {
     setIsVoteCountRunning: voting.setIsVoteCountRunning,
     setRaisedHandPlayerIds,
     setMutedPlayerIds,
+    setDeafenedPlayerIds,
     setRoom,
     setSelectedPlayerId: tableUi.setSelectedPlayerId,
     setVoteCountIndex: voting.setVoteCountIndex,
@@ -435,6 +454,39 @@ export function App() {
     chat.setChatDraft('');
   }
 
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  // The chat counts as "read" only while its pop-out is open and not minimized.
+  useEffect(() => {
+    chat.setChatVisible(isChatPopoutOpen && !isChatPopoutMinimized);
+  }, [chat.setChatVisible, isChatPopoutOpen, isChatPopoutMinimized]);
+
+  /**
+   * Toggle the chat pop-out. The very first time it opens, anchor it just below
+   * the chat toggle icon (rather than the fixed top-left default) so it appears
+   * where the user summoned it; it stays put on later opens.
+   */
+  function toggleChatPopout() {
+    setIsChatPopoutOpen((open) => {
+      const next = !open;
+      if (next && !chatPopoutPlacedRef.current) {
+        chatPopoutPlacedRef.current = true;
+        const toggle = appShellRef.current?.querySelector('.chat-toggle');
+        if (toggle instanceof HTMLElement) {
+          const rect = toggle.getBoundingClientRect();
+          const x = Math.max(8, Math.min(window.innerWidth - chatPopoutSize.width - 8, rect.left));
+          // Anchor the top just under the icon; keep at least the titlebar
+          // on-screen if the icon sits low, but never rise above the icon.
+          const y = Math.min(rect.bottom + 10, window.innerHeight - 64);
+          setChatPopoutPos({ x, y });
+        }
+      }
+      return next;
+    });
+  }
+
   /** Toggle microphone mute state, play feedback, and share it with the room. */
   function toggleMuted() {
     setIsMuted((value) => {
@@ -445,14 +497,46 @@ export function App() {
     });
   }
 
-  /** Toggle deafen (mute all incoming voice audio, Discord-style). */
+  /**
+   * Toggle deafen (mute all incoming voice audio, Discord-style). Deafening
+   * also mutes the own microphone; undeafening restores the mute state the
+   * player had before deafening (a manual mute stays muted).
+   */
   function toggleDeafened() {
     setIsDeafened((value) => {
       const nextValue = !value;
       playDeafenToggleTone(nextValue);
       voicePeers.setDeafened(nextValue);
+      roomSocketRef.current?.setDeafened(nextValue);
+      if (nextValue) {
+        wasMutedBeforeDeafenRef.current = isMutedRef.current;
+        setMicMuted(true);
+      } else if (!wasMutedBeforeDeafenRef.current) {
+        setMicMuted(false);
+      }
       return nextValue;
     });
+  }
+
+  /** Set the microphone mute state directly (used by deafen and the mic test). */
+  function setMicMuted(muted: boolean) {
+    setIsMuted((current) => {
+      if (current === muted) {
+        return current;
+      }
+      roomSocketRef.current?.setMuted(muted);
+      return muted;
+    });
+  }
+
+  /** Mute the live microphone while the settings input test runs; restore after. */
+  function handleMicTestActiveChange(isActive: boolean) {
+    if (isActive) {
+      wasMutedBeforeMicTestRef.current = isMutedRef.current;
+      setMicMuted(true);
+    } else if (!wasMutedBeforeMicTestRef.current) {
+      setMicMuted(false);
+    }
   }
 
   /** Open a private chat tab after checking current chat permissions. */
@@ -562,7 +646,8 @@ export function App() {
     }
   }
 
-  /** Left-click on a seat: select the player + highlight their role. No menu. */
+  /** Click exactly on a seat's character/suspicion token: jump to that card
+   * in the character sheet (no menu). */
   function handleSeatSelect(seatIndex: number) {
     if (!room) {
       return;
@@ -576,7 +661,7 @@ export function App() {
     requestCharacterHighlight(clickedPlayer.id);
   }
 
-  /** Right-click (or touch tap) on a seat: open the interaction menu. */
+  /** Left-click on the seat body: open the player interaction menu. */
   function handleSeatMenu(seatIndex: number, clientX: number, clientY: number) {
     if (!room) {
       return;
@@ -587,7 +672,6 @@ export function App() {
       return;
     }
     tableUi.setSelectedPlayerId(clickedPlayer.id);
-    requestCharacterHighlight(clickedPlayer.id);
     if (isStoryteller) {
       if (!clickedPlayer.is_storyteller) {
         openSeatMenu(clickedPlayer.id, clientX, clientY);
@@ -815,6 +899,8 @@ export function App() {
             <VoiceRoomsPanel
               currentPlayerName={currentPlayer?.display_name ?? displayName ?? 'You'}
               currentPlayerAvatarUrl={currentPlayer?.avatar_url ?? null}
+              hasUnreadChat={chat.hasUnreadChat}
+              isChatOpen={isChatPopoutOpen}
               isDeafened={isDeafened}
               isMuted={isMuted}
               isStoryteller={isStoryteller}
@@ -824,6 +910,9 @@ export function App() {
               onEnableVoiceAudio={() => void voicePeers.enableVoiceAudio()}
               onJoinVoiceRoom={(voiceRoom) => void voiceSession.joinSelectedVoiceRoom(voiceRoom)}
               onLeaveVoiceRoom={(returnToDefault = true) => voiceSession.leaveVoiceRoom(returnToDefault)}
+              mutedPlayerIds={mutedPlayerIds}
+              deafenedPlayerIds={deafenedPlayerIds}
+              onToggleChat={toggleChatPopout}
               onToggleDeafened={toggleDeafened}
               onToggleMuted={toggleMuted}
               publicVoiceRoomsLocked={publicVoiceRoomsLocked}
@@ -833,22 +922,35 @@ export function App() {
               voiceRoomLabel={(voiceRoom) => voiceRoomLabel(voiceRoom, playerName)}
               voiceRooms={voiceRooms}
             />
-
-            <ChatPanel
-              activeChatTab={chat.activeChatTab}
-              attentionChatTabs={chat.attentionChatTabs}
-              chatDraft={chat.chatDraft}
-              closeChatTab={chat.closeChatTab}
-              currentPlayerId={currentPlayerId}
-              messages={chat.visibleChatMessages}
-              onSendMessage={submitChatMessage}
-              openChatTabs={chat.openChatTabs}
-              playerAvatarUrl={(id) => room?.players.find((player) => player.id === id)?.avatar_url ?? null}
-              playerName={playerName}
-              setActiveChatTab={chat.setActiveChatTab}
-              setChatDraft={chat.setChatDraft}
-            />
           </aside>
+
+          {isChatPopoutOpen ? (
+            <ChatPopout
+              isMinimized={isChatPopoutMinimized}
+              onClose={() => setIsChatPopoutOpen(false)}
+              onMove={setChatPopoutPos}
+              onResize={setChatPopoutSize}
+              onToggleMinimized={() => setIsChatPopoutMinimized((minimized) => !minimized)}
+              portalTarget={appPortalTarget}
+              position={chatPopoutPos}
+              size={chatPopoutSize}
+            >
+              <ChatPanel
+                activeChatTab={chat.activeChatTab}
+                attentionChatTabs={chat.attentionChatTabs}
+                chatDraft={chat.chatDraft}
+                closeChatTab={chat.closeChatTab}
+                currentPlayerId={currentPlayerId}
+                messages={chat.visibleChatMessages}
+                onSendMessage={submitChatMessage}
+                openChatTabs={chat.openChatTabs}
+                playerAvatarUrl={(id) => room?.players.find((player) => player.id === id)?.avatar_url ?? null}
+                playerName={playerName}
+                setActiveChatTab={chat.setActiveChatTab}
+                setChatDraft={chat.setChatDraft}
+              />
+            </ChatPopout>
+          ) : null}
 
           <div className="table-wrap" style={{ '--table-zoom': tableUi.tableZoom } as CSSProperties}>
             <div className={timer.timerRemaining <= 10 && timer.isTimerRunning ? 'table-timer urgent' : 'table-timer'}>
@@ -1088,10 +1190,12 @@ export function App() {
             characters={gameData.characters}
             highlight={characterHighlight}
             onMove={setFloatingSheetPos}
+            onResize={setFloatingSheetSize}
             portalTarget={appPortalTarget}
             onReattach={() => setFloatingSheetPos(null)}
             position={floatingSheetPos}
             seatedPlayerCount={seatedPlayerCounter}
+            size={floatingSheetSize}
           />
         ) : null}
         </>
@@ -1105,6 +1209,7 @@ export function App() {
           currentPlayerId={currentPlayerId}
           isMuted={isMuted}
           onClose={() => tableUi.setIsSettingsOpen(false)}
+          onMicTestActiveChange={handleMicTestActiveChange}
           onToggleMuted={toggleMuted}
           onUpdateClientSettings={setClientSettings}
           playerName={playerName}

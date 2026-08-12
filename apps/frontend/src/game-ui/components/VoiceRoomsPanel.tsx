@@ -18,6 +18,8 @@ export type VoiceOccupant = {
 type VoiceRoomsPanelProps = {
   currentPlayerName: string;
   currentPlayerAvatarUrl: string | null;
+  hasUnreadChat: boolean;
+  isChatOpen: boolean;
   isDeafened: boolean;
   isMuted: boolean;
   isStoryteller: boolean;
@@ -27,6 +29,9 @@ type VoiceRoomsPanelProps = {
   onEnableVoiceAudio: () => void;
   onJoinVoiceRoom: (voiceRoom: string) => void;
   onLeaveVoiceRoom: (returnToDefault?: boolean) => void;
+  mutedPlayerIds: string[];
+  deafenedPlayerIds: string[];
+  onToggleChat: () => void;
   onToggleDeafened: () => void;
   onToggleMuted: () => void;
   publicVoiceRoomsLocked: boolean;
@@ -62,6 +67,8 @@ function SpeakingBars() {
 export function VoiceRoomsPanel({
   currentPlayerName,
   currentPlayerAvatarUrl,
+  hasUnreadChat,
+  isChatOpen,
   isDeafened,
   isMuted,
   isStoryteller,
@@ -71,6 +78,9 @@ export function VoiceRoomsPanel({
   onEnableVoiceAudio,
   onJoinVoiceRoom,
   onLeaveVoiceRoom,
+  mutedPlayerIds,
+  deafenedPlayerIds,
+  onToggleChat,
   onToggleDeafened,
   onToggleMuted,
   publicVoiceRoomsLocked,
@@ -84,6 +94,8 @@ export function VoiceRoomsPanel({
   // the player; leaving it quietly is always allowed.
   const isPrivateCall = Boolean(joinedVoiceRoom?.includes(':private:'));
   const speakingSet = new Set(speakingPlayerIds);
+  const mutedSet = new Set(mutedPlayerIds);
+  const deafenedSet = new Set(deafenedPlayerIds);
 
   return (
     <section className="voice-panel" aria-labelledby="voice-panel-heading">
@@ -137,6 +149,25 @@ export function VoiceRoomsPanel({
                             </span>
                           )}
                           <span className="voice-occupant-name">{occupant.name}</span>
+                          {mutedSet.has(occupant.id) || deafenedSet.has(occupant.id) ? (
+                            <span className="voice-occupant-status" aria-hidden="true">
+                              <span
+                                className="voice-occupant-muted"
+                                title={deafenedSet.has(occupant.id) ? 'Muted & deafened' : 'Microphone muted'}
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.7" />
+                                  <path d="M17 11a5 5 0 0 1-.6 2.4M5 11a7 7 0 0 0 10.8 5.9M12 19v3" />
+                                  <path d="m3 3 18 18" />
+                                </svg>
+                              </span>
+                              {deafenedSet.has(occupant.id) ? (
+                                <span className="voice-occupant-muted deafened" title="Deafened (hears nobody)">
+                                  <HeadphoneIcon deafened />
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : null}
                           {isSpeaking ? <SpeakingBars /> : null}
                         </div>
                       );
@@ -178,11 +209,33 @@ export function VoiceRoomsPanel({
             </span>
             <span className="voice-user-controls">
               <button
+                className={[
+                  'voice-user-button chat-toggle',
+                  isChatOpen ? 'open' : '',
+                  hasUnreadChat ? 'unread' : '',
+                ].filter(Boolean).join(' ')}
+                onClick={onToggleChat}
+                aria-label={
+                  hasUnreadChat
+                    ? 'Open text chat window (unread messages)'
+                    : isChatOpen
+                      ? 'Close text chat window'
+                      : 'Open text chat window'
+                }
+                aria-pressed={isChatOpen}
+                title={hasUnreadChat ? 'Text chat - unread messages' : isChatOpen ? 'Close text chat' : 'Open text chat'}
+                type="button"
+              >
+                <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 11.3a7.6 7.6 0 0 1-8.2 7.5 8.6 8.6 0 0 1-3.5-.7L4 19.5l1.5-4.1a7.2 7.2 0 0 1-1-3.8A7.6 7.6 0 0 1 12.7 4 7.6 7.6 0 0 1 21 11.3Z" />
+                </svg>
+              </button>
+              <button
                 className={isMuted ? 'voice-user-button active' : 'voice-user-button'}
-                disabled={!joinedVoiceRoom}
+                disabled={!joinedVoiceRoom || isDeafened}
                 onClick={onToggleMuted}
                 aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
-                title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                title={isDeafened ? 'Microphone stays muted while deafened' : isMuted ? 'Unmute microphone' : 'Mute microphone'}
                 type="button"
               >
                 <VoiceMuteIcon isMuted={isMuted} />
