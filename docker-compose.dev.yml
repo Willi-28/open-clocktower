@@ -3,7 +3,9 @@ services:
     build:
       context: .
       target: backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers --forwarded-allow-ips "*"
+    # --reload-dir scopes the watcher to the backend source so writes under
+    # /app/data (uploads, runtime state) cannot trigger reload loops.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/apps/backend --proxy-headers --forwarded-allow-ips "*"
     ports:
       - "8000:8000"
     volumes:
@@ -18,7 +20,10 @@ services:
   frontend:
     image: node:22-alpine
     working_dir: /app/apps/frontend
-    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    # npm install (not ci) so restarts reuse the warm node_modules volume
+    # instead of wiping and reinstalling every time, while still picking up new
+    # dependencies from package.json.
+    command: sh -c "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0"
     environment:
       VITE_BACKEND_ORIGIN: http://backend:8000
     ports:
