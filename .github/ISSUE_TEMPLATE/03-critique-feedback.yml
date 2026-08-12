@@ -1,0 +1,58 @@
+name: Critique or Feedback
+description: Share friction, confusing UX, rough edges, or general criticism.
+title: "[Feedback]: "
+labels: ["feedback", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template is for feedback that is useful but not yet a concrete bug or feature request.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Feedback area
+      description: What part of the app is this about?
+      options:
+        - First-time setup
+        - Player experience
+        - Storyteller experience
+        - Table layout and visual clarity
+        - Voice and audio
+        - Chat
+        - Character packs
+        - Mobile experience
+        - Documentation
+        - Project direction
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: feedback
+    attributes:
+      label: What felt wrong, confusing, or missing?
+      description: Be specific about the moment or workflow.
+      placeholder: During a session, I noticed...
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Who was using the app, on what kind of device, and during what kind of game?
+      placeholder: Storyteller on desktop, players on mobile, 12-player game...
+    validations:
+      required: false
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested direction
+      description: Optional. If you have an idea for how this could feel better, add it here.
+    validations:
+      required: false
+  - type: checkboxes
+    id: public-safe
+    attributes:
+      label: Public report checklist
+      options:
+        - label: I have not included room codes, private notes, secrets, or sensitive uploaded content.
+          required: true

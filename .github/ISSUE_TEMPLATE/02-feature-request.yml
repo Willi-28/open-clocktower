@@ -1,0 +1,72 @@
+name: Feature Request
+description: Suggest a new capability or a meaningful improvement.
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Focus on the user problem first; implementation ideas are welcome after that.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Product area
+      description: Which part of Open Clocktower would this improve?
+      options:
+        - Setup and room joining
+        - Table, seating, and player state
+        - Storyteller tools
+        - Character sheets and night order
+        - Nominations and voting
+        - Chat
+        - Voice rooms and audio
+        - Character packs
+        - Mobile or responsive layout
+        - Deployment or self-hosting
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do, and what makes it difficult today?
+      placeholder: As a storyteller/player/server operator, I want...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior you would like to see.
+      placeholder: It would help if Open Clocktower...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: If you have tried a workaround or another tool, describe it here.
+    validations:
+      required: false
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Impact
+      description: How much would this change your use of the app?
+      options:
+        - Nice to have
+        - Would noticeably improve sessions
+        - Blocks my group from using Open Clocktower
+    validations:
+      required: true
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I would be willing to test this feature.
+          required: false
+        - label: I may be willing to help implement this feature.
+          required: false

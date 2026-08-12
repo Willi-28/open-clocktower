@@ -1,0 +1,86 @@
+name: Bug Report
+description: Report something that is broken or behaving unexpectedly.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Open Clocktower. Please do not include room codes, private notes, secrets, or uploaded character pack content unless it is safe to share publicly.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Where did you notice the problem?
+      options:
+        - Setup and room joining
+        - Table, seating, and player state
+        - Storyteller tools
+        - Character sheets and night order
+        - Nominations and voting
+        - Chat
+        - Voice rooms and audio
+        - Character pack upload
+        - Mobile or responsive layout
+        - Deployment or self-hosting
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the incorrect behavior.
+      placeholder: The app did...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: Describe what should have happened instead.
+      placeholder: I expected...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the shortest sequence that triggers the bug.
+      placeholder: |
+        1. Create or join a room
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: browser-device
+    attributes:
+      label: Browser and device
+      description: Include browser, operating system, and device type if relevant.
+      placeholder: Chrome on Windows desktop, Safari on iPhone, Firefox on Linux...
+    validations:
+      required: false
+  - type: input
+    id: deployment
+    attributes:
+      label: Deployment context
+      description: If self-hosted, include Docker image/tag, commit, reverse proxy, or hosting notes.
+      placeholder: local Docker Compose, production Docker image v0.7.0 behind Caddy...
+    validations:
+      required: false
+  - type: textarea
+    id: logs-screenshots
+    attributes:
+      label: Logs or screenshots
+      description: Add browser console output, backend logs, or screenshots if they help. Remove secrets first.
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: public-safe
+    attributes:
+      label: Public report checklist
+      options:
+        - label: I have not included room codes, private notes, secrets, or sensitive uploaded content.
+          required: true
