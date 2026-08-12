@@ -4,6 +4,14 @@ Open Clocktower is a self-hosted browser app for live, storyteller-led social de
 
 It provides a shared digital table with rooms, seats, phases, nominations, voting, reminders, private notes, text chat, voice rooms, timers, and custom character packs. The app is designed for private groups that want to host their own online or hybrid game nights.
 
+## Screenshots
+
+These screenshots show a test room with locally uploaded demo content. Open Clocktower does not ship official game content, artwork, logos, rules text, or character packs.
+
+| Storyteller view | Player view |
+| --- | --- |
+| ![Open Clocktower storyteller view with voice rooms, a shared table, night order, reminders, and storyteller dashboards.](docs/screenshots/storyteller-view.png) | ![Open Clocktower player view with voice rooms, the table, floating text chat, and the character dashboard.](docs/screenshots/player-view.png) |
+
 ## What It Provides
 
 - private rooms with short room codes

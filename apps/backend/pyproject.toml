@@ -12,7 +12,11 @@ dependencies = [
   "pydantic>=2.6,<3.0",
   "sqlalchemy>=2.0,<3.0",
   "psycopg[binary]>=3.1,<4.0",
-  "python-multipart>=0.0.9"
+  "python-multipart>=0.0.9",
+  # Security floor for a transitively-installed package (not imported directly):
+  # msgpack < 1.2.1 has an out-of-bounds read / crash on Unpacker reuse after a
+  # caught error (CVE-2026-57585 / GHSA-6v7p-g79w-8964, DoS).
+  "msgpack>=1.2.1"
 ]
 
 [tool.setuptools.packages.find]

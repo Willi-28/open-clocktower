@@ -16,9 +16,13 @@ ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_CACHE_DIR=1
 
 # Install the FastAPI backend, then copy the built frontend into the static folder.
+# pip/setuptools/wheel are build-time only; remove all three in the same layer so
+# pip's vendored SBOM does not remain in the runtime image and trigger scanner
+# findings for packages the server never imports.
 COPY apps/backend ./apps/backend
-RUN python -m pip install --upgrade pip setuptools wheel \
-    && pip install --no-cache-dir -e ./apps/backend
+RUN python -m pip install --upgrade pip "setuptools>=83.0.0" wheel \
+    && pip install --no-cache-dir -e ./apps/backend \
+    && python -m pip uninstall -y setuptools wheel pip
 COPY --from=frontend /app/apps/frontend/dist ./apps/backend/app/static
 
 ENV APP_HOST=0.0.0.0
