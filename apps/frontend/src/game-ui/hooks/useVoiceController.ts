@@ -20,10 +20,16 @@ type UseVoiceControllerOptions = {
   currentPlayer: Player | undefined;
   currentPlayerId: string;
   defaultVoiceRoom: string;
+  initialRemoteVolumes: Record<string, number>;
   isMuted: boolean;
+  onRemoteVolumesChange: (remoteVolumes: Record<string, number>) => void;
+  onSelectedAudioInputIdChange: (deviceId: string) => void;
+  onSelectedAudioOutputIdChange: (deviceId: string) => void;
   playerName: (playerId: string | undefined) => string;
   room: RoomState | null;
   roomSocketRef: MutableRefObject<ReturnType<typeof openRoomSocket> | null>;
+  selectedAudioInputId: string;
+  selectedAudioOutputId: string;
   setError: (message: string) => void;
   soundFiltersEnabled: boolean;
   storyteller: Player | undefined;
@@ -37,10 +43,16 @@ export function useVoiceController({
   currentPlayer,
   currentPlayerId,
   defaultVoiceRoom,
+  initialRemoteVolumes,
   isMuted,
+  onRemoteVolumesChange,
+  onSelectedAudioInputIdChange,
+  onSelectedAudioOutputIdChange,
   playerName,
   room,
   roomSocketRef,
+  selectedAudioInputId,
+  selectedAudioOutputId,
   setError,
   soundFiltersEnabled,
   storyteller,
@@ -62,7 +74,11 @@ export function useVoiceController({
   const activity = useVoiceActivity({ currentPlayerId, isMutedRef });
   const devices = useVoiceDevices({
     currentPlayerId,
+    initialAudioInputId: selectedAudioInputId,
+    initialAudioOutputId: selectedAudioOutputId,
     isMuted,
+    onSelectedAudioInputIdChange,
+    onSelectedAudioOutputIdChange,
     onLocalSpeakingStopped: activity.setPlayerSpeaking,
     onLocalTrackEnded: () => restartVoiceInputRef.current?.(),
     onStartVoiceLevelMonitor: activity.startVoiceLevelMonitor,
@@ -97,7 +113,9 @@ export function useVoiceController({
     currentPlayerId,
     getLocalVoiceStream: devices.getLocalVoiceStream,
     iceServers: devices.iceServers,
+    initialRemoteVolumes,
     joinedVoiceRoom: session.joinedVoiceRoom,
+    onRemoteVolumesChange,
     roomSocketRef,
     selectedAudioOutputId: devices.selectedAudioOutputId,
     startVoiceLevelMonitor: activity.startVoiceLevelMonitor,

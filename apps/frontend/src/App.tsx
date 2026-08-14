@@ -5,7 +5,7 @@
  * storyteller controls, table rendering, local settings, and confirmation UI.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -35,6 +35,7 @@ import { NominationRequestPopup } from './game-ui/components/NominationRequestPo
 import { RightControlStack } from './game-ui/components/RightControlStack';
 import { SeatActionMenu } from './game-ui/components/SeatActionMenu';
 import { SettingsPanelContainer } from './game-ui/components/SettingsPanelContainer';
+import { ServerConnectScreen } from './game-ui/components/ServerConnectScreen';
 import { SetupScreen } from './game-ui/components/SetupScreen';
 import { VoiceRoomsPanel } from './game-ui/components/VoiceRoomsPanel';
 import { ClientSettings, clientSettingsKey, loadClientSettings } from './game-ui/clientSettings';
@@ -81,10 +82,40 @@ export function App() {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [roomName, setRoomName] = useState('Clocktower');
   const [roomId, setRoomId] = useState('');
+  // The desktop (Steam) build starts on a local shell that only asks for the
+  // self-hosted server URL. After connecting, Electron keeps this bundled UI
+  // loaded while its gateway routes API/WebSocket traffic to that server.
+  const desktopBridge = (window as unknown as {
+    desktop?: {
+      changeServer: () => Promise<void>;
+      connect: (options: { url: string }) => Promise<{ url: string }>;
+      close: () => void;
+      steamName?: string;
+    };
+  }).desktop;
+  const isDesktop = Boolean(desktopBridge);
+  const isShell = isDesktop && new URLSearchParams(window.location.search).has('shell');
+  const [serverUrl, setServerUrl] = useState(isShell ? '' : window.location.origin);
+  const [isConnectingServer, setIsConnectingServer] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [currentPlayerId, setCurrentPlayerId] = useState<string>('');
   const [characterPackFile, setCharacterPackFile] = useState<File | null>(null);
   const [clientSettings, setClientSettings] = useState<ClientSettings>(loadClientSettings);
+  const rememberSelectedAudioInput = useCallback((deviceId: string) => {
+    setClientSettings((current) =>
+      current.selectedAudioInputId === deviceId ? current : { ...current, selectedAudioInputId: deviceId },
+    );
+  }, []);
+  const rememberSelectedAudioOutput = useCallback((deviceId: string) => {
+    setClientSettings((current) =>
+      current.selectedAudioOutputId === deviceId ? current : { ...current, selectedAudioOutputId: deviceId },
+    );
+  }, []);
+  const rememberRemoteVolumes = useCallback((remoteVolumes: Record<string, number>) => {
+    setClientSettings((current) =>
+      current.remoteVolumes === remoteVolumes ? current : { ...current, remoteVolumes },
+    );
+  }, []);
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
   // Deafen/undeafen and the mic test restore the mute state the player had
@@ -193,10 +224,16 @@ export function App() {
     currentPlayer,
     currentPlayerId,
     defaultVoiceRoom,
+    initialRemoteVolumes: clientSettings.remoteVolumes,
     isMuted,
+    onRemoteVolumesChange: rememberRemoteVolumes,
+    onSelectedAudioInputIdChange: rememberSelectedAudioInput,
+    onSelectedAudioOutputIdChange: rememberSelectedAudioOutput,
     playerName,
     room,
     roomSocketRef,
+    selectedAudioInputId: clientSettings.selectedAudioInputId,
+    selectedAudioOutputId: clientSettings.selectedAudioOutputId,
     setError,
     soundFiltersEnabled: clientSettings.soundFiltersEnabled,
     storyteller,
@@ -220,6 +257,7 @@ export function App() {
     room,
     roomId,
     roomName,
+    restoreSavedSession: !isShell,
     setCurrentPlayerId,
     setError,
     setRoom,
@@ -423,6 +461,8 @@ export function App() {
     : voiceSession.voiceParticipants;
   const seatedPlayerCounter = seatedPlayerCount(room);
   const isPlayerNightView = Boolean(room?.phase === 'night' && currentPlayer && !isStoryteller);
+  const showDesktopShellActions = isDesktop && (isShell || !room);
+  const showDesktopChangeServerButton = isDesktop && !isShell && !room;
   const appShellClassName = [
     'app-shell',
     room?.phase === 'night' ? 'room-night' : '',
@@ -457,6 +497,59 @@ export function App() {
   useEffect(() => {
     isMutedRef.current = isMuted;
   }, [isMuted]);
+
+  // On normal app pages, auto-join from ?room=&name=. Skipped on the desktop
+  // entry shell, where the user picks a server first.
+  useEffect(() => {
+    if (isShell) {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    const linkedRoomId = params.get('room');
+    if (!linkedRoomId) {
+      return;
+    }
+    setRoomId(linkedRoomId);
+    const linkedName = (params.get('name') ?? '').trim();
+    if (linkedName) {
+      setDisplayName(linkedName);
+    }
+    void lifecycle.openOrJoinRoom({ roomId: linkedRoomId, displayName: linkedName || undefined });
+  }, []);
+
+  /** Connect the desktop shell to the typed server; the bundled setup screen loads next. */
+  async function connectDesktopServer() {
+    if (isShell && desktopBridge) {
+      setError('');
+      setIsConnectingServer(true);
+      try {
+        await desktopBridge.connect({ url: serverUrl });
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'Could not reach that server.');
+        setIsConnectingServer(false);
+      }
+      return;
+    }
+  }
+
+  /** Return the desktop client to the server-address entry screen. */
+  async function changeDesktopServer() {
+    if (!desktopBridge?.changeServer) {
+      return;
+    }
+    setError('');
+    setIsConnectingServer(false);
+    try {
+      await desktopBridge.changeServer();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not return to the server input.');
+    }
+  }
+
+  /** Join an existing room on the currently loaded server. */
+  async function handleJoinRoom() {
+    void lifecycle.openOrJoinRoom();
+  }
 
   // The chat counts as "read" only while its pop-out is open and not minimized.
   useEffect(() => {
@@ -858,14 +951,45 @@ export function App() {
 
   return (
     <main className={appShellClassName} ref={appShellRef}>
-      {!room ? (
+      {showDesktopShellActions ? (
+        <div className="desktop-shell-actions">
+          {showDesktopChangeServerButton ? (
+            <button
+              className="desktop-change-server-button"
+              onClick={() => void changeDesktopServer()}
+              title="Change Server"
+              aria-label="Change Server"
+              type="button"
+            >
+              Change Server
+            </button>
+          ) : null}
+          <button
+            className="desktop-leave-game-button"
+            onClick={() => desktopBridge?.close()}
+            title="Leave Game"
+            aria-label="Leave Game"
+            type="button"
+          >
+            Leave Game
+          </button>
+        </div>
+      ) : null}
+      {isShell ? (
+        <ServerConnectScreen
+          isConnecting={isConnectingServer}
+          onConnect={() => void connectDesktopServer()}
+          onServerUrlChange={setServerUrl}
+          serverUrl={serverUrl}
+        />
+      ) : !room ? (
         <SetupScreen
           characterPackFile={characterPackFile}
           displayName={displayName}
           onCharacterPackFileChange={setCharacterPackFile}
           onCreateRoom={() => void lifecycle.createNewRoom()}
           onDisplayNameChange={setDisplayName}
-          onJoinRoom={() => void lifecycle.openOrJoinRoom()}
+          onJoinRoom={() => void handleJoinRoom()}
           onRoomIdChange={setRoomId}
           onRoomNameChange={setRoomName}
           roomId={roomId}

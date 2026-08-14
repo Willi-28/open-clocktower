@@ -1,9 +1,21 @@
 /**
  * Initial setup screen.
  *
- * Before joining a room, users choose their display name, enter a room code,
- * or create a new room with a required character pack upload.
+ * Before joining or creating a room, users choose their display name and either
+ * enter an existing room code or upload content for a new room.
  */
+
+import { useRef } from 'react';
+
+type PresetPackOption = {
+  id: string;
+  label: string;
+  meta: string;
+};
+
+const presetPackOptions: PresetPackOption[] = [
+  { id: 'custom', label: 'Custom ZIP upload', meta: 'Ready' },
+];
 
 type SetupScreenProps = {
   characterPackFile: File | null;
@@ -18,7 +30,7 @@ type SetupScreenProps = {
   roomName: string;
 };
 
-/** Render the create-room and join-room forms shown before a session starts. */
+/** Render the join-room and create-room forms. */
 export function SetupScreen({
   characterPackFile,
   displayName,
@@ -31,6 +43,16 @@ export function SetupScreen({
   roomId,
   roomName,
 }: SetupScreenProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const selectedPack = presetPackOptions[0];
+
+  function clearCharacterPackFile() {
+    onCharacterPackFileChange(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }
+
   return (
     <section className="setup-grid">
       <section className="panel setup-identity">
@@ -69,18 +91,41 @@ export function SetupScreen({
             Room Name
             <input value={roomName} onChange={(event) => onRoomNameChange(event.target.value)} />
           </label>
-          <label>
-            Character Pack
-            <input
-              accept=".zip,application/zip"
-              type="file"
-              onChange={(event) => onCharacterPackFileChange(event.target.files?.[0] ?? null)}
-            />
-          </label>
+          <div className="pack-field">
+            <span className="pack-field-label">Character Pack</span>
+            <div className="pack-select">
+              <div aria-label="Selected character pack source" className="pack-select-trigger static">
+                <span className="pack-select-copy">
+                  <span className="pack-select-kicker">Pack Source</span>
+                  <strong>{selectedPack.label}</strong>
+                </span>
+                <span className="pack-option-meta">{selectedPack.meta}</span>
+              </div>
+            </div>
+          </div>
+          <div className="pack-upload-row">
+            <label className="pack-upload-button">
+              <input
+                accept=".zip,application/zip"
+                ref={fileInputRef}
+                type="file"
+                onChange={(event) => onCharacterPackFileChange(event.target.files?.[0] ?? null)}
+              />
+              Upload ZIP
+            </label>
+            <span className={characterPackFile ? 'pack-upload-file selected' : 'pack-upload-file'}>
+              {characterPackFile?.name ?? 'No ZIP selected'}
+            </span>
+            {characterPackFile ? (
+              <button className="pack-clear-button" onClick={clearCharacterPackFile} type="button">
+                Clear
+              </button>
+            ) : null}
+          </div>
           {characterPackFile ? (
             <p className="helper-text">{characterPackFile.name} will be uploaded during room creation.</p>
           ) : (
-            <p className="helper-text">A character pack is required before a room can be created.</p>
+            <p className="helper-text">Upload a character pack ZIP before creating a room.</p>
           )}
           <button disabled={!displayName.trim() || !characterPackFile} type="submit">Create Room</button>
         </form>

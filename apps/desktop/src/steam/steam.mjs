@@ -54,6 +54,16 @@ export function lobbyOwnerId(lobby) {
   return String(lobby.getOwner().steamId64);
 }
 
+/** Store a value on the lobby (host advertises the room id for auto-join). */
+export function setLobbyData(lobby, key, value) {
+  lobby.setData(key, String(value));
+}
+
+/** Read a value a joiner needs from the lobby (e.g. the room id to join). */
+export function lobbyData(lobby, key) {
+  return lobby.getData(key) ?? '';
+}
+
 /** Steam must pump its callbacks regularly; call this on an interval. */
 export function startCallbackPump(client, intervalMs = 16) {
   const timer = setInterval(() => {

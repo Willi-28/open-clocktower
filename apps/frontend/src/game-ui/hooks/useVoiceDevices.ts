@@ -28,7 +28,11 @@ export type VoiceStreamRequest = {
 
 type UseVoiceDevicesOptions = {
   currentPlayerId: string;
+  initialAudioInputId: string;
+  initialAudioOutputId: string;
   isMuted: boolean;
+  onSelectedAudioInputIdChange: (deviceId: string) => void;
+  onSelectedAudioOutputIdChange: (deviceId: string) => void;
   onLocalSpeakingStopped: (playerId: string, isSpeaking: boolean) => void;
   onLocalTrackEnded: () => void;
   onStartVoiceLevelMonitor: (playerId: string, stream: MediaStream) => void;
@@ -58,7 +62,11 @@ function microphoneErrorMessage(caught: unknown) {
  */
 export function useVoiceDevices({
   currentPlayerId,
+  initialAudioInputId,
+  initialAudioOutputId,
   isMuted,
+  onSelectedAudioInputIdChange,
+  onSelectedAudioOutputIdChange,
   onLocalSpeakingStopped,
   onLocalTrackEnded,
   onStartVoiceLevelMonitor,
@@ -68,8 +76,8 @@ export function useVoiceDevices({
   const localVoiceCleanupRef = useRef<(() => void) | null>(null);
   const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedAudioInputId, setSelectedAudioInputId] = useState('');
-  const [selectedAudioOutputId, setSelectedAudioOutputId] = useState('');
+  const [selectedAudioInputId, setSelectedAudioInputId] = useState(initialAudioInputId);
+  const [selectedAudioOutputId, setSelectedAudioOutputId] = useState(initialAudioOutputId);
   const [audioDeviceStatus, setAudioDeviceStatus] = useState('');
   const [iceServers, setIceServers] = useState<RTCIceServer[]>([{ urls: 'stun:stun.l.google.com:19302' }]);
 
@@ -99,6 +107,14 @@ export function useVoiceDevices({
   useEffect(() => {
     return () => stopLocalVoiceStream();
   }, []);
+
+  useEffect(() => {
+    onSelectedAudioInputIdChange(selectedAudioInputId);
+  }, [onSelectedAudioInputIdChange, selectedAudioInputId]);
+
+  useEffect(() => {
+    onSelectedAudioOutputIdChange(selectedAudioOutputId);
+  }, [onSelectedAudioOutputIdChange, selectedAudioOutputId]);
 
   useEffect(() => {
     localStreamRef.current?.getAudioTracks().forEach((track) => {
@@ -141,17 +157,17 @@ export function useVoiceDevices({
     setAudioOutputDevices(speakers);
     setSelectedAudioInputId((current) => {
       if (!current || microphones.some((device) => device.deviceId === current)) {
-        return current || microphones[0]?.deviceId || '';
+        return current;
       }
       setAudioDeviceStatus('Selected microphone is no longer available. Using the default microphone.');
-      return microphones[0]?.deviceId || '';
+      return '';
     });
     setSelectedAudioOutputId((current) => {
       if (!current || speakers.some((device) => device.deviceId === current)) {
-        return current || speakers[0]?.deviceId || '';
+        return current;
       }
       setAudioDeviceStatus('Selected speaker is no longer available. Using the system default output.');
-      return speakers[0]?.deviceId || '';
+      return '';
     });
   }
 

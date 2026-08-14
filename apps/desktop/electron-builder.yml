@@ -3,6 +3,8 @@ productName: OpenClocktower
 directories:
   output: release
 
+afterPack: scripts/after-pack.cjs
+
 # steamworks.js ships prebuilt native (napi) binaries plus the Steam
 # redistributable — never let electron-builder try to rebuild them.
 npmRebuild: false
@@ -14,6 +16,7 @@ files:
   - "**/*"
   - "!build/**"
   - "!test/**"
+  - "!scripts/**"
   - "!server.spec"
   - "!server_entry.py"
   - "!README.md"
@@ -24,12 +27,12 @@ asar: true
 asarUnpack:
   - "**/node_modules/steamworks.js/**"
 
-# The frozen backend exe is EMBEDDED inside the single app exe (built separately:
-# pyinstaller server.spec --distpath build/server). The user never runs it; the
-# app spawns it internally, and only when a room is hosted (Create Room).
+# Join-only client: it hosts nothing, so it bundles ONLY the built frontend (the
+# gateway serves it as the local setup screen). Hosting is self-hosted (Docker) —
+# no embedded server exe, so this build does not need the PyInstaller step.
 extraResources:
-  - from: build/server
-    to: server
+  - from: ../frontend/dist
+    to: frontend
 
 # steam_appid.txt must sit next to the exe so App 480 (Spacewar) works in testing.
 # For a real Steam release you ship through Steam and can drop this.
@@ -37,10 +40,10 @@ extraFiles:
   - from: steam_appid.txt
     to: steam_appid.txt
 
-# One self-contained portable file: OpenClocktower.exe. No installer, no separate
-# server binary for the user — everything (Electron UI + embedded Python server +
-# Steam native module) ships inside this single exe.
+# One self-contained portable file: OpenClocktower.exe. No installer and no
+# embedded backend server; the desktop client connects to a self-hosted server.
 win:
+  icon: assets/icon.ico
   target: portable
   artifactName: OpenClocktower-${version}.${ext}
 portable:

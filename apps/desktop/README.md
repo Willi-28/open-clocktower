@@ -1,132 +1,116 @@
-# Open Clocktower — Steam desktop (`apps/desktop`)
+# Open Clocktower — desktop client (`apps/desktop`)
 
-A thin Electron shell that lets people play over **Steam** with no port
-forwarding and no accounts, **reusing the existing backend and frontend
-unchanged**. Docker self-hosting and the plain browser version are untouched.
+A thin Electron client for self-hosted Open Clocktower servers, distributed via
+Steam. The app is a fullscreen, frameless window that first asks for a server
+address, then opens the bundled Open Clocktower setup screen against that server.
 
-**One file.** The user runs a single `OpenClocktower.exe` (portable). The Python
-backend is built by PyInstaller and **embedded inside** that exe — never a
-separate program the user launches — and it is started **only when they host a
-room** (Create Room). Joining or connecting to a custom server starts no local
-server at all.
+The browser version and Docker self-hosting are unchanged.
 
-## How it works (transport-only split)
+## Why URL-first
 
-The backend already (a) serves the built frontend at `/`, (b) is fully
-env-configured, and (c) is talked to by the frontend purely via
-`window.location` (relative `/api/...` + `ws://<host>/ws/...`). So the whole app
-is one local process, and **which origin serves the page decides the transport**.
+Over the internet there are four connection cases:
 
-```
-Host PC (OpenClocktower.exe)                 Joiner PC (OpenClocktower.exe)
-  spawn OpenClocktowerServer.exe  ─ 127.0.0.1   local TCP listener 127.0.0.1:PORT2
-  (uvicorn + SQLite, UNCHANGED)                 Electron loads http://127.0.0.1:PORT2
-  Electron loads http://127.0.0.1:PORT          (frontend thinks it's a normal server)
-  create Steam lobby (host = owner)                     │  raw bytes (HTTP + WS)
-        │  per remote connection                        ▼
-        └────►  TCP  ⇄  Steam message tunnel  ◄──  ISteamNetworking P2P / SDR relay
-                         (protocol-agnostic byte pipe)
-```
+| # | From | To | Works? |
+|---|------|-----|--------|
+| 1 | Browser | Docker host | ✅ via URL |
+| 2 | Desktop (.exe) | Docker host | ✅ via URL |
+| 3 | Steam client | Steam P2P host | (dropped) |
+| 4 | Browser | Steam P2P host | ❌ impossible — Steam's relay is Steam-only; a browser has no URL to reach a NAT'd host |
 
-- The tunnel carries the **entire HTTP + WebSocket byte stream**, so the FastAPI
-  backend and React frontend never learn Steam exists. One shared game/room/chat/
-  voting logic; only the transport differs. → `src/transport/`
-- Steam P2P messaging routes through the **Steam Datagram Relay** when a direct
-  path is unavailable, so **no port forwarding**. → `src/steam/steam.mjs`
-- Docker/Web path is the "Connect to server" button — a normal `loadURL`.
+Case 4 can't work without public infrastructure (even WebRTC needs a public
+signaling server). So the desktop app uses the same public self-hosted server as
+the browser build: everyone joins one shared backend by URL, and rooms are
+created or joined there.
 
-Nothing under `apps/backend` or `apps/frontend` was modified for this.
+## How it works
+
+The frontend talks to `window.location` for REST (`/api/...`) and WebSocket
+(`ws://<host>/ws/...`). In the desktop build, `window.location` is a small local
+gateway that serves the bundled UI and forwards API/WebSocket traffic to the
+chosen server.
+
+1. The window opens **fullscreen + frameless** on a local entry shell, served by
+   a tiny gateway (`src/gateway.mjs`) so it can appear before any connection.
+   That shell contains only the server address bar.
+2. **Connect** validates the server (`GET /api/health`) and stores it as the
+   gateway upstream.
+3. The normal bundled setup screen lets players create a room or join an
+   existing room on the chosen server.
+4. A bottom-right desktop action row lets players **Change Server** from the
+   setup screen or **Leave Game** to quit the frameless window; Alt+F4 also works.
+
+Steam is initialised only so the app registers as running / shows the overlay -
+**no lobbies or networking**. The frontend is unchanged except small **guarded**
+hooks (server-address shell, `connect`, Leave Game button, `?room=` deep-link)
+that are inert in the browser/Docker build, where `window.desktop` is undefined.
 
 ## Layout
 
 | File | Role |
 |------|------|
-| `src/main.mjs` | Electron main: create/join/custom wiring + clean teardown |
-| `src/serverProcess.mjs` | spawn/stop the shared backend (SQLite) + health wait |
-| `src/transport/` | protocol-agnostic TCP⇄channel tunnel (host + client + framing) |
-| `src/steam/steam.mjs` | Steam lobby + a `TransportChannel` over Steam networking |
-| `src/launcher/launcher.html` | tiny pre-game screen (Create / Join / Connect) |
-| `server_entry.py` + `server.spec` | PyInstaller build of `OpenClocktowerServer.exe` |
-| `electron-builder.yml` | packages `OpenClocktower.exe` |
-| `test/tunnel.test.mjs` | runnable proof of the tunnel (no Steam/Electron needed) |
+| `src/main.mjs` | Electron main: fullscreen window, gateway, connect/close IPC, Steam init |
+| `src/gateway.mjs` | serves the bundled frontend and proxies `/api` + `/ws` to the chosen server |
+| `src/preload.cjs` | exposes `window.desktop.connect` / `close` |
+| `src/steam/steam.mjs` | Steam SDK init + callback pump (lobby/networking helpers now unused) |
+| `electron-builder.yml` | packages `OpenClocktower.exe` (bundles the frontend only) |
+| `test/{tunnel,gateway}.test.mjs` | runnable proofs (no Steam/Electron needed) |
 
-## Verified vs. needs real Steam
+Frontend touch points (guarded by `window.desktop`): `ServerConnectScreen`
+(server address only), `App` (Leave Game button, `?room=` deep-link auto-join,
+connect routing), and the normal `SetupScreen` after a server is selected.
 
-- **Verified here:** `node test/tunnel.test.mjs` passes (small + 1 MiB chunked +
-  concurrent connections round-trip through an in-memory channel); the unchanged
-  backend boots on SQLite over HTTP; and **`OpenClocktowerServer.exe` was built
-  with `server.spec` (PyInstaller) and boot-tested** — it serves `/api/health`,
-  the bundled React frontend at `/` (incl. hashed `/assets/*.js`), `/api/client-config`,
-  and create-room, all on SQLite. The transport + server-exe packaging are sound.
-- **Needs two Steam accounts on two PCs:** `src/steam/steam.mjs` is now bound to
-  the exact `steamworks.js` **0.4.0** API (declarations verified: `acceptP2PSession`,
-  `readP2PPacket -> {data,size,steamId:{steamId64}}`, `sendP2PPacket`, lobby `.id`
-  / `.getOwner().steamId64`, and the `P2PSessionRequest` / `GameLobbyJoinRequested`
-  callbacks via `client.callback.register`). Legacy P2P requires accepting the
-  session before packets flow, which the channel does automatically. Still needs a
-  real two-PC run to confirm end to end.
+The gateway prefers the stable local port `28741` (`OCT_DESKTOP_PORT` can
+override it) so browser-local settings such as theme, audio devices, and volume
+survive closing and reopening the desktop app.
+
+**Parked (unused):** the earlier Steam-P2P approach left `src/transport/`,
+`src/serverProcess.mjs`, `server_entry.py` + `server.spec`, and the
+lobby/networking functions in `steam.mjs`. They are not used by the URL-first
+client and can be deleted; kept for now in case P2P is revisited.
+
+## Verified
+
+- `npm test` passes (tunnel + gateway self-tests).
+- Frontend `npm run check` passes (typecheck + unit tests + static analysis) with
+  the guarded desktop hooks.
+- `electron-builder --dir` assembles a complete runnable app at
+  `release/win-unpacked/OpenClocktower.exe` (Electron + bundled frontend + the
+  Steam native addon unpacked). The Windows icon is applied automatically from
+  `assets/icon.ico` by the `afterPack` hook. Launching it fullscreen and the
+  actual join against a live self-hosted server still needs a manual run.
 
 ## Develop
 
 ```bash
-cd apps/desktop
-npm install
-npm test                       # tunnel self-test (no Steam)
-
-# For the shell to serve the game UI locally in dev, build the frontend into the
-# backend's static dir first (same as Docker does), then run Electron:
-cd ../frontend && npm ci && npm run build && cp -r dist ../backend/app/static
-cd ../desktop && npm start     # needs Steam running; App 480 via steam_appid.txt
+cd apps/frontend && npm ci && npm run build   # the gateway serves this dist
+cd ../desktop && npm install && npm test
+npm start                                      # opens fullscreen; Alt+F4 to quit
+npm run dist:dir                               # quick unpacked test build
 ```
-
-Dev host mode runs the server via `py -m uvicorn app.main:app` from
-`apps/backend` (see `serverProcess.mjs`), so the backend deps must be importable
-in your `py` environment.
 
 ## Package (Windows)
 
 ```bash
-# 1) build the frontend (static UI bundled into the server exe)
-cd apps/frontend && npm ci && npm run build
-
-# 2) build OpenClocktowerServer.exe (backend must be pip-installed in this env)
-cd ../backend && pip install -e .
-cd ../desktop && pyinstaller server.spec --distpath build/server
-
-# 3) build the single portable OpenClocktower.exe (embeds the server exe + steam_appid.txt)
-npm install && npm run dist        # -> release/OpenClocktower-<version>.exe  (one file, no installer)
+cd apps/frontend && npm ci && npm run build    # 1) build the frontend
+cd ../desktop && npm install && npm run dist   # 2) -> release/OpenClocktower-<version>.exe
 ```
 
-The server exe from step 2 is embedded as an internal resource; there is no
-separate binary for the user to run.
+No PyInstaller step - the desktop client bundles only the frontend.
 
-## Test over Steam with App 480 (Spacewar)
+**Note:** the single-file `portable`/`nsis` target needs permission to create
+symlinks while electron-builder unpacks its code-sign cache. If it fails with
+"cannot create symbolic link", enable Windows **Developer Mode** or run the
+terminal **as Administrator**. `npm run dist:dir` (unpacked folder) avoids that
+code-sign editing step and still writes the saved Clocktower icon via the local
+`afterPack` hook.
 
-App **480** is Valve's public test app — two different Steam accounts on two PCs
-can create/join lobbies and use networking without publishing anything.
+## Notes
 
-1. `steam_appid.txt` (already `480`) sits next to the exe (dev + packaged).
-2. Sign in to **different** Steam accounts on each PC, both with Steam running.
-3. PC A: launch → **Create Room** → a local server starts, a lobby is created,
-   the game UI loads. Note the lobby ID (or invite the other account via the
-   Steam overlay / friends — accepting fires auto-join).
-4. PC B: launch → paste the lobby ID → **Join** (or accept the invite). Traffic
-   tunnels over Steam to PC A's backend; the same room/chat/voting works.
-5. Close the room on PC A → the server + tunnels + lobby are torn down.
-
-## Notes / caveats
-
-- **Voice (WebRTC):** signaling rides the tunneled WebSocket and works; the media
-  path is still direct WebRTC and needs STUN/TURN for strict NATs (unchanged from
-  today). Routing voice over Steam too is a possible later step, out of scope here.
-- **SQLite host:** temporary hosts use SQLite (no PostgreSQL); Docker keeps
-  PostgreSQL. Same models, same code — only `DATABASE_URL` differs.
-- **steamworks.js version:** pinned to exactly `0.4.0` in `package.json` and the
-  binding in `steam.mjs` matches that version's declarations. If you bump it,
-  re-check `readP2PPacket` / `acceptP2PSession` / the callback names.
-- **Steam native libs at package time:** `electron-builder.yml` sets
-  `npmRebuild: false` (steamworks.js ships prebuilt napi binaries) and unpacks
-  `node_modules/steamworks.js/**` from the asar (its `.node` addon and the Steam
-  runtime lib cannot load from inside an asar). If Steam fails to init in the
-  packaged app, copy `node_modules/steamworks.js/sdk/redistributable_bin/win64/steam_api64.dll`
-  next to `OpenClocktower.exe` as a fallback.
+- **steamworks.js:** pinned to `0.4.0`; `npmRebuild: false` and
+  `asarUnpack: ["**/node_modules/steamworks.js/**"]` (its native `.node` can't
+  load from inside an asar). If Steam fails to init, the app still works - it just
+  won't show as "running" on Steam.
+- **Voice (WebRTC):** unchanged from the browser - direct WebRTC using the
+  server's configured STUN/TURN.
+- **steam_appid.txt** (`480`, Spacewar) ships next to the exe for testing; swap it
+  for your real App ID on release (or ship through Steam, which provides it).

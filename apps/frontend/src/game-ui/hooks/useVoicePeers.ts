@@ -57,7 +57,9 @@ type UseVoicePeersOptions = {
   currentPlayerId: string;
   getLocalVoiceStream: () => Promise<MediaStream>;
   iceServers: RTCIceServer[];
+  initialRemoteVolumes: Record<string, number>;
   joinedVoiceRoom: string | null;
+  onRemoteVolumesChange: (remoteVolumes: Record<string, number>) => void;
   roomSocketRef: RoomSocketRef;
   selectedAudioOutputId: string;
   startVoiceLevelMonitor: (playerId: string, stream: MediaStream) => void;
@@ -73,7 +75,9 @@ export function useVoicePeers({
   currentPlayerId,
   getLocalVoiceStream,
   iceServers,
+  initialRemoteVolumes,
   joinedVoiceRoom,
+  onRemoteVolumesChange,
   roomSocketRef,
   selectedAudioOutputId,
   startVoiceLevelMonitor,
@@ -88,7 +92,7 @@ export function useVoicePeers({
   const remoteBoostRef = useRef<Record<string, RemoteBoostChain>>({});
   const joinedVoiceRoomRef = useRef<string | null>(null);
   const [blockedRemoteAudioPlayerIds, setBlockedRemoteAudioPlayerIds] = useState<string[]>([]);
-  const [remoteVolumes, setRemoteVolumes] = useState<Record<string, number>>({});
+  const [remoteVolumes, setRemoteVolumes] = useState<Record<string, number>>(initialRemoteVolumes);
   const [voiceDiagnostics, setVoiceDiagnostics] = useState<Record<string, string>>({});
   const remoteVolumesRef = useRef(remoteVolumes);
   remoteVolumesRef.current = remoteVolumes;
@@ -108,6 +112,10 @@ export function useVoicePeers({
       applyRemoteVolume(playerId, audio);
     });
   }, [remoteVolumes]);
+
+  useEffect(() => {
+    onRemoteVolumesChange(remoteVolumes);
+  }, [onRemoteVolumesChange, remoteVolumes]);
 
   useEffect(() => {
     joinedVoiceRoomRef.current = joinedVoiceRoom;

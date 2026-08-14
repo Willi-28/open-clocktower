@@ -32,6 +32,7 @@ type UseRoomLifecycleOptions = {
   room: RoomState | null;
   roomId: string;
   roomName: string;
+  restoreSavedSession?: boolean;
   setCurrentPlayerId: (playerId: string) => void;
   setError: Dispatch<SetStateAction<string>>;
   setSelectedPlayerId: (playerId: string) => void;
@@ -53,6 +54,7 @@ export function useRoomLifecycle({
   room,
   roomId,
   roomName,
+  restoreSavedSession = true,
   resetRealtimeUi,
   setCurrentPlayerId,
   setError,
@@ -62,6 +64,9 @@ export function useRoomLifecycle({
   setVoiceParticipants,
 }: UseRoomLifecycleOptions) {
   useEffect(() => {
+    if (!restoreSavedSession) {
+      return;
+    }
     const savedSession = localStorage.getItem(lastSessionKey());
     if (!savedSession) {
       return;
@@ -91,7 +96,7 @@ export function useRoomLifecycle({
     } catch {
       localStorage.removeItem(lastSessionKey());
     }
-  }, []);
+  }, [restoreSavedSession]);
 
   useEffect(() => {
     if (room && currentPlayerId) {
@@ -148,14 +153,18 @@ export function useRoomLifecycle({
   /**
    * Opens an existing room or joins it as a new lobby player.
    */
-  async function openOrJoinRoom() {
+  async function openOrJoinRoom(override: { roomId?: string; displayName?: string } = {}) {
+    // Overrides let the desktop (Steam) shell auto-join a host's room after an
+    // invite; the browser/Docker call passes none and uses the entered values.
+    const targetRoomId = override.roomId ?? roomId;
+    const name = (override.displayName ?? displayName).trim();
     setError('');
-    if (!displayName.trim()) {
+    if (!name) {
       setError('Enter your name first.');
       return;
     }
     try {
-      const openedRoom = await getRoom(roomId);
+      const openedRoom = await getRoom(targetRoomId);
       const rememberedPlayerId = localStorage.getItem(sessionKey(openedRoom.id));
       const rememberedSecret = localStorage.getItem(secretKey(openedRoom.id));
       if (
@@ -170,7 +179,7 @@ export function useRoomLifecycle({
         return;
       }
 
-      const session = await joinRoom(openedRoom.id, displayName, null);
+      const session = await joinRoom(openedRoom.id, name, null);
       setActivePlayerSecret(session.player_secret);
       const hydratedRoom = await getRoom(openedRoom.id);
       setRoom(hydratedRoom);

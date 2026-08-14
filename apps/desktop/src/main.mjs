@@ -1,78 +1,127 @@
 /**
- * Electron main process — the Steam desktop shell.
+ * Electron main process — desktop server picker.
  *
- * The shell reuses the EXISTING backend and frontend unchanged. It only:
- *   Create Room -> pick a loopback port, spawn the shared server (SQLite), create
- *                  a Steam lobby (host = owner), bridge remote players in over the
- *                  Steam tunnel, then load the game UI from the local server.
- *   Join        -> join the lobby, run the local tunnel to the host, then load the
- *                  game UI from the local tunnel port (frontend is none the wiser).
- *   Custom      -> load any http(s) URL directly (Docker self-host, domain, IP) —
- *                  the plain browser path, fully preserved.
+ * Hosting is self-hosted only (Docker). This app is a fullscreen, frameless
+ * client for using a self-hosted Open Clocktower server:
  *
- * On close, the server, tunnels and lobby are torn down cleanly.
+ *   1. Opens on a local shell with only a server address bar.
+ *   2. "Connect" validates the server (backend health check), keeps the bundled
+ *      desktop UI loaded, and routes API/WebSocket traffic to that server.
+ *   3. The normal setup screen handles creating or joining rooms on that server.
+ *   4. A Leave Game button (frontend, bottom-right) quits the frameless window.
+ *
+ * Steam is initialised only so the app registers as running / shows the overlay;
+ * no lobbies or networking are used (browser and desktop join servers the same
+ * way, over normal HTTPS). The frontend is shared apart from small guarded
+ * hooks that are inert when window.desktop is undefined.
  */
 
-import net from 'node:net';
+import http from 'node:http';
+import https from 'node:https';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import electron from 'electron';
 
-import { startServer } from './serverProcess.mjs';
-import { startTunnelHost } from './transport/tunnelHost.mjs';
-import { startTunnelClient } from './transport/tunnelClient.mjs';
-import { initSteam, createRoomLobby, joinLobby, lobbyOwnerId, createSteamChannel, startCallbackPump, onLobbyInvite } from './steam/steam.mjs';
+import { startGateway } from './gateway.mjs';
+import { initSteam, startCallbackPump } from './steam/steam.mjs';
 
 const { app, BrowserWindow, ipcMain, shell } = electron;
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const STEAM_APP_ID = Number(process.env.OCT_STEAM_APPID || 480);
+const DEFAULT_GATEWAY_PORT = 28741;
 
-/** @type {{stop:Function}[]} */
-let teardownStack = [];
 let steam = null;
 let stopPump = null;
+let gateway = null;
 let mainWindow = null;
 
-/** Reserve a free loopback port by briefly binding it. */
-function freePort() {
+const hasInstanceLock = app.requestSingleInstanceLock();
+if (!hasInstanceLock) {
+  app.quit();
+}
+
+if (hasInstanceLock) {
+  app.on('second-instance', () => {
+    if (!mainWindow) {
+      return;
+    }
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.focus();
+  });
+}
+
+function frontendStaticDir() {
+  // Packaged: extraResources places the built UI under resources/frontend.
+  return app.isPackaged ? path.join(process.resourcesPath, 'frontend') : path.resolve(dirname, '..', '..', 'frontend', 'dist');
+}
+
+/** Keep the desktop origin stable so localStorage survives app restarts. */
+function configuredGatewayPort() {
+  const raw = Number(process.env.OCT_DESKTOP_PORT ?? DEFAULT_GATEWAY_PORT);
+  if (Number.isInteger(raw) && raw >= 0 && raw <= 65535) {
+    return raw;
+  }
+  return DEFAULT_GATEWAY_PORT;
+}
+
+/** Normalise a typed server URL (default https, strip trailing slash). */
+function normalizeUrl(raw) {
+  const trimmed = String(raw ?? '').trim();
+  if (!trimmed) {
+    throw new Error('Enter a server URL.');
+  }
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return withScheme.replace(/\/+$/, '');
+}
+
+/** Backend check: confirm the URL is a reachable Open Clocktower server. */
+function checkServer(baseUrl) {
   return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
-      server.close(() => resolve(port));
+    const lib = baseUrl.startsWith('https') ? https : http;
+    const healthUrl = new URL('/api/health', `${baseUrl}/`);
+    const req = lib.get(healthUrl, { timeout: 6000 }, (res) => {
+      res.resume();
+      if (res.statusCode === 200) {
+        resolve();
+      } else {
+        reject(new Error(`Server responded ${res.statusCode}. Is this an Open Clocktower server?`));
+      }
+    });
+    req.on('error', () => reject(new Error('Could not reach that server. Check the URL and that it is online.')));
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Server did not respond in time.'));
     });
   });
 }
 
-/** Tear down the current room (server + tunnels + lobby) in reverse order. */
-async function endSession() {
-  while (teardownStack.length) {
-    const handle = teardownStack.pop();
-    try {
-      await handle.stop();
-    } catch (error) {
-      console.error('[teardown]', error?.message ?? error);
-    }
-  }
-}
+ipcMain.handle('desktop:connect', async (_event, options = {}) => {
+  const base = normalizeUrl(options.url);
+  await checkServer(base);
+  gateway.setUpstream({ baseUrl: base });
+  await mainWindow.loadURL(`http://127.0.0.1:${gateway.port}/`);
+  return { url: base };
+});
 
-function serverExePath() {
-  // Packaged: extraResources places the PyInstaller build under resources/server.
-  return app.isPackaged ? path.join(process.resourcesPath, 'server', 'OpenClocktowerServer.exe') : undefined;
-}
+ipcMain.handle('desktop:close', () => {
+  app.quit();
+});
 
-function backendDevCwd() {
-  // Dev: run `py -m uvicorn` from the repo's apps/backend.
-  return path.resolve(dirname, '..', '..', 'backend');
-}
+ipcMain.handle('desktop:change-server', async () => {
+  gateway.setUpstream(null);
+  await mainWindow.loadURL(`http://127.0.0.1:${gateway.port}/?shell=1`);
+  return {};
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 820,
+    fullscreen: true,
+    frame: false,
+    autoHideMenuBar: true,
     backgroundColor: '#0b0d13',
     webPreferences: {
       preload: path.join(dirname, 'preload.cjs'),
@@ -80,108 +129,43 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
-  // External links open in the real browser, not inside the app.
+  // Open external links (e.g. the docs link) in the real browser.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
-  return mainWindow.loadFile(path.join(dirname, 'launcher', 'launcher.html'));
+  // ?shell marks the local server-address entry screen.
+  return mainWindow.loadURL(`http://127.0.0.1:${gateway.port}/?shell=1`);
 }
 
-// ── IPC: launcher actions ────────────────────────────────────────────────
+if (hasInstanceLock) {
+  app.whenReady().then(async () => {
+    try {
+      steam = initSteam(STEAM_APP_ID);
+      steam.steamworks.electronEnableSteamOverlay?.();
+      stopPump = startCallbackPump(steam.client);
+    } catch (error) {
+      // Steam not running is fine: this client joins servers over plain HTTPS.
+      console.warn('[steam] init skipped:', error?.message ?? error);
+      steam = null;
+    }
 
-ipcMain.handle('desktop:status', () => ({
-  steam: Boolean(steam),
-  steamId: steam?.steamId ?? null,
-  appId: STEAM_APP_ID,
-}));
+    gateway = await startGateway({
+      staticDir: frontendStaticDir(),
+      port: configuredGatewayPort(),
+      onCreateRoom: async () => {
+        throw new Error('Connect to a server before creating or joining rooms.');
+      },
+    });
 
-ipcMain.handle('desktop:createRoom', async (_event, options = {}) => {
-  if (!steam) {
-    throw new Error('Steam is not running. Start Steam and relaunch, or use "Connect to server".');
-  }
-  await endSession();
+    await createWindow();
+  });
+}
 
-  const port = await freePort();
-  const dataDir = path.join(app.getPath('userData'), 'server');
-  const server = await startServer({ port, dataDir, exePath: serverExePath(), devCwd: backendDevCwd() });
-  teardownStack.push(server);
-
-  const lobby = await createRoomLobby(steam.client, options);
-  teardownStack.push({ stop: () => lobby.leave?.() });
-
-  const channel = createSteamChannel(steam);
-  teardownStack.push({ stop: () => channel.close() });
-  const host = startTunnelHost({ channel, backendPort: port });
-  teardownStack.push(host);
-  steam.channel = channel;
-
-  await mainWindow.loadURL(`http://127.0.0.1:${port}/`);
-  return { port, lobbyId: String(lobby.id) };
-});
-
-ipcMain.handle('desktop:joinRoom', async (_event, lobbyId) => {
-  if (!steam) {
-    throw new Error('Steam is not running. Start Steam and relaunch, or use "Connect to server".');
-  }
-  await endSession();
-
-  const lobby = await joinLobby(steam.client, lobbyId);
-  teardownStack.push({ stop: () => lobby.leave?.() });
-  const hostPeerId = lobbyOwnerId(lobby);
-
-  const channel = createSteamChannel(steam);
-  teardownStack.push({ stop: () => channel.close() });
-  const tunnel = await startTunnelClient({ channel, hostPeerId, localPort: 0 });
-  teardownStack.push(tunnel);
-  steam.channel = channel;
-
-  await mainWindow.loadURL(`http://127.0.0.1:${tunnel.port}/`);
-  return { port: tunnel.port, hostPeerId };
-});
-
-ipcMain.handle('desktop:connectCustom', async (_event, url) => {
-  await endSession();
-  await mainWindow.loadURL(url);
-  return { url };
-});
-
-ipcMain.handle('desktop:leaveRoom', async () => {
-  await endSession();
-  await mainWindow.loadFile(path.join(dirname, 'launcher', 'launcher.html'));
-  return { ok: true };
-});
-
-// ── App lifecycle ────────────────────────────────────────────────────────
-
-app.whenReady().then(() => {
-  try {
-    steam = initSteam(STEAM_APP_ID);
-    steam.steamworks.electronEnableSteamOverlay?.();
-    stopPump = startCallbackPump(steam.client);
-    // If a friend accepts a Steam invite, join that lobby automatically.
-    onLobbyInvite(steam, (lobbyId) => mainWindow?.webContents.send('desktop:autojoin', lobbyId));
-  } catch (error) {
-    // Steam not running is not fatal: the "Connect to server" path still works.
-    console.warn('[steam] init failed:', error?.message ?? error);
-    steam = null;
-  }
-  createWindow();
-});
-
-app.on('window-all-closed', async () => {
-  await endSession();
+app.on('window-all-closed', () => {
+  gateway?.close();
   stopPump?.();
   if (process.platform !== 'darwin') {
     app.quit();
-  }
-});
-
-app.on('before-quit', async (event) => {
-  if (teardownStack.length) {
-    event.preventDefault();
-    await endSession();
-    stopPump?.();
-    app.exit(0);
   }
 });
