@@ -126,6 +126,7 @@ Current event types include:
 - `voice.call.accept`
 - `voice.call.reject`
 - `voice.signal`
+- `voice.moved`
 - `room.kicked`
 - `room.deleted`
 
@@ -150,6 +151,19 @@ Clients can send:
 - `vote_count.set`
 
 Invalid payloads are ignored or rejected without closing the whole room. Chat sends are rate-limited per player.
+
+### Sunrise gathering
+
+When the storyteller moves the room from `night` to `day`, the server puts every
+connected player - storyteller included - into the main voice room (`Town Square`,
+the first entry of `voiceRooms` in the frontend config) and sends each moved
+player a `voice.moved` event carrying the new room name.
+
+The move happens server-side rather than in each browser, so a client whose tab is
+in the background is moved at the same moment as everyone else instead of only
+catching up once it is focused again. `voice.moved` then tells that client to
+re-arm its microphone and peer connections. Only a real night → day transition
+triggers this; setting the phase to `day` again leaves people where they are.
 
 ### Voice room membership
 

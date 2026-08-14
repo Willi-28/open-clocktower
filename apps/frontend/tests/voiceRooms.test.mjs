@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { Script } from 'node:vm';
 import ts from 'typescript';
 
-function loadVoiceRooms() {
-  const source = readFileSync(new URL('../src/game-ui/voiceRooms.ts', import.meta.url), 'utf8');
+function loadModule(relativePath) {
+  const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
@@ -13,7 +13,7 @@ function loadVoiceRooms() {
     },
   }).outputText;
   const module = { exports: {} };
-  new Script(compiled, { filename: 'voiceRooms.ts' }).runInNewContext({ exports: module.exports, module });
+  new Script(compiled, { filename: relativePath }).runInNewContext({ exports: module.exports, module });
   return module.exports;
 }
 
@@ -23,7 +23,12 @@ const {
   storytellerVoiceLabel,
   voicePresenceRows,
   voiceRoomLabel,
-} = loadVoiceRooms();
+} = loadModule('../src/game-ui/voiceRooms.ts');
+
+// When day breaks the backend gathers everyone in its DEFAULT_VOICE_ROOM
+// (app/game/voice_rules.py). That name has to be a room this client shows.
+const { voiceRooms } = loadModule('../src/game-ui/gameConfig.ts');
+assert.equal(voiceRooms[0], 'Town Square');
 
 const names = new Map([
   ['alice', 'Alice'],
