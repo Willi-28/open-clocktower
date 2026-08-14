@@ -74,6 +74,12 @@ export function useVoiceDevices({
 }: UseVoiceDevicesOptions) {
   const localStreamRef = useRef<MediaStream | null>(null);
   const localVoiceCleanupRef = useRef<(() => void) | null>(null);
+  // The pre-processing stream the speaking indicator listens to. Kept so a
+  // retained microphone can re-arm its monitor without re-capturing.
+  const localMonitorStreamRef = useRef<MediaStream | null>(null);
+  // True while a retained stream is parked (night): the next handout has to
+  // re-arm it. Without this flag every peer creation would restart the monitor.
+  const localStreamSilencedRef = useRef(false);
   const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedAudioInputId, setSelectedAudioInputId] = useState(initialAudioInputId);
@@ -175,20 +181,53 @@ export function useVoiceDevices({
    * Creates or reuses the local microphone stream for the active voice session.
    */
   async function getLocalVoiceStream(deviceId = selectedAudioInputId) {
-    if (localStreamRef.current) {
-      return localStreamRef.current;
+    const retained = localStreamRef.current;
+    if (retained) {
+      if (localStreamSilencedRef.current) {
+        // The stream was parked while the player was out of voice (night) and
+        // its monitor was stopped. Re-arm both, so reusing it is equivalent to a
+        // fresh capture without touching the microphone - which is what lets a
+        // background tab rejoin without a user gesture.
+        localStreamSilencedRef.current = false;
+        retained.getAudioTracks().forEach((track) => {
+          track.enabled = !isMuted;
+        });
+        if (currentPlayerId) {
+          onStartVoiceLevelMonitor(currentPlayerId, localMonitorStreamRef.current ?? retained);
+        }
+      }
+      return retained;
     }
     const { stream, cleanup, monitorStream } = await requestVoiceStream(deviceId, soundFiltersEnabled);
     stream.getAudioTracks().forEach((track) => {
       track.enabled = !isMuted;
     });
     localStreamRef.current = stream;
+    localMonitorStreamRef.current = monitorStream ?? stream;
     localVoiceCleanupRef.current = cleanup ?? null;
     if (currentPlayerId) {
       onStartVoiceLevelMonitor(currentPlayerId, monitorStream ?? stream);
     }
     void refreshMediaDevices();
     return stream;
+  }
+
+  /**
+   * Silences the microphone without releasing it.
+   *
+   * Used when the player leaves voice for the night: `track.enabled = false`
+   * means nothing is captured or sent, but the capture pipeline (and its
+   * permission/AudioContext state) survives, so returning at sunrise needs no
+   * getUserMedia call - browsers defer or block that in a background tab.
+   */
+  function silenceLocalVoiceStream() {
+    if (!localStreamRef.current) {
+      return;
+    }
+    localStreamSilencedRef.current = true;
+    localStreamRef.current.getAudioTracks().forEach((track) => {
+      track.enabled = false;
+    });
   }
 
   /**
@@ -315,6 +354,8 @@ export function useVoiceDevices({
       track.stop();
     });
     localStreamRef.current = null;
+    localMonitorStreamRef.current = null;
+    localStreamSilencedRef.current = false;
   }
 
   /**
@@ -323,6 +364,7 @@ export function useVoiceDevices({
   function replaceLocalVoiceStream(stream: MediaStream, cleanup?: () => void, monitorStream?: MediaStream) {
     localVoiceCleanupRef.current = cleanup ?? null;
     localStreamRef.current = stream;
+    localMonitorStreamRef.current = monitorStream ?? stream;
     if (currentPlayerId) {
       onStartVoiceLevelMonitor(currentPlayerId, monitorStream ?? stream);
     }
@@ -377,6 +419,7 @@ export function useVoiceDevices({
     selectedAudioOutputId,
     setSelectedAudioInputId,
     setSelectedAudioOutputId,
+    silenceLocalVoiceStream,
     stopLocalVoiceStream,
   };
 }

@@ -103,6 +103,7 @@ export function useVoiceController({
     setError,
     setSelectedAudioInputId: devices.setSelectedAudioInputId,
     setVoiceDiagnostics: (action) => voicePeersRef.current?.setVoiceDiagnostics(action),
+    silenceLocalVoiceStream: devices.silenceLocalVoiceStream,
     stopAllVoiceLevelMonitors: activity.stopAllVoiceLevelMonitors,
     stopLocalVoiceStream: devices.stopLocalVoiceStream,
     storyteller,

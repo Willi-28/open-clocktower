@@ -39,6 +39,7 @@ type UseVoiceSessionOptions = {
   setError: (message: string) => void;
   setSelectedAudioInputId: (deviceId: string) => void;
   setVoiceDiagnostics: Dispatch<SetStateAction<Record<string, string>>>;
+  silenceLocalVoiceStream: () => void;
   stopAllVoiceLevelMonitors: () => void;
   stopLocalVoiceStream: () => void;
   storyteller: Player | undefined;
@@ -65,6 +66,7 @@ export function useVoiceSession({
   setError,
   setSelectedAudioInputId,
   setVoiceDiagnostics,
+  silenceLocalVoiceStream,
   stopAllVoiceLevelMonitors,
   stopLocalVoiceStream,
   storyteller,
@@ -94,7 +96,11 @@ export function useVoiceSession({
       joinedVoiceRoom &&
       !isStorytellerCall
     ) {
-      leaveVoiceRoom(false);
+      // Night takes players out of voice, but the microphone stays captured
+      // (silenced). Re-acquiring it at sunrise would need getUserMedia, which
+      // browsers defer or refuse while the tab is in the background - the
+      // player would then stay silent until they clicked back into the window.
+      endVoiceSession({ notifyServer: true, playTone: true, keepMicrophone: true });
     }
   }, [room?.phase, room?.allow_public_voice_during_night, currentPlayer?.id, currentPlayer?.is_storyteller, joinedVoiceRoom, storyteller?.id]);
 
@@ -229,9 +235,17 @@ export function useVoiceSession({
   }
 
   /**
-   * Fully tears down local voice state and returns whether the public fallback should be joined.
+   * Tears down local voice state and returns whether the public fallback should be joined.
+   *
+   * `keepMicrophone` retains the capture pipeline (silenced) instead of
+   * releasing it, so rejoining later needs no getUserMedia call.
    */
-  function endVoiceSession(options: { notifyServer: boolean; playTone?: boolean; returnToDefault?: boolean }) {
+  function endVoiceSession(options: {
+    notifyServer: boolean;
+    playTone?: boolean;
+    returnToDefault?: boolean;
+    keepMicrophone?: boolean;
+  }) {
     voiceActionIdRef.current += 1;
     voiceSwitchInFlightRef.current = false;
     optimisticVoiceRoomRef.current = null;
@@ -254,7 +268,11 @@ export function useVoiceSession({
     setIncomingVoiceCall(null);
     setVoiceParticipants((current) => current.filter((participant) => participant.playerId !== currentPlayerId));
     closeAllVoicePeers();
-    stopLocalVoiceStream();
+    if (options.keepMicrophone) {
+      silenceLocalVoiceStream();
+    } else {
+      stopLocalVoiceStream();
+    }
     stopAllVoiceLevelMonitors();
     setVoiceDiagnostics({});
     return shouldReturnToDefault;

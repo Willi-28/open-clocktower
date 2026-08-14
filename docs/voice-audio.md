@@ -6,6 +6,46 @@ voice room) — there is no cloud speech model or API key involved. The only
 "model" in the chain is the local [RNNoise](https://github.com/xiph/rnnoise)
 noise-suppression network, which runs as WASM inside the browser.
 
+## Night keeps the microphone
+
+When night takes a player out of voice, the capture pipeline is **silenced, not
+released**: its audio tracks are disabled (nothing is captured or transmitted)
+while `getUserMedia`, the processing graph, and the permission state stay alive.
+Rejoining at sunrise therefore needs no new capture call — browsers defer or
+refuse `getUserMedia` while a tab is in the background, which otherwise left
+backgrounded players silent in both directions until they clicked their window.
+
+Leaving voice manually, being kicked, and leaving the room still release the
+microphone. The trade-off is that the browser's recording indicator stays lit for
+the duration of the night, with the tracks disabled.
+
+## Handshake recovery
+
+Offer/answer runs over the room socket and a step can be lost (a reload, a phase
+change, a peer that was not listening yet). The result used to be a peer stuck in
+`have-local-offer`: not `failed`, so the ICE-restart path never fired, and not
+missing, so the membership effect skipped it — voice stayed silent, often in one
+direction only, until the player left and rejoined the voice room by hand.
+
+The offering side therefore supervises each handshake: if the connection is not
+`connected` after 9 s the peer is dropped and renegotiated from scratch, up to 3
+times. Only the offering side supervises, so two peers can never tear each other
+down in lockstep; the answering side is rebuilt by the retry offer. After the
+last attempt the per-player diagnostic reads `could not connect - a TURN server
+may be required`.
+
+### Reading the diagnostics
+
+**Settings → Voice → Player Volume** shows a live status line per remote player:
+
+| Status | Meaning |
+|--------|---------|
+| `audio playing` | connected, audio is flowing |
+| `connecting` / `handshake timed out - retrying` | negotiation in progress |
+| `not connected` | no peer at all — the player is not in your voice room |
+| `ICE failed` / `could not connect - a TURN server may be required` | no network path; configure TURN in `ICE_SERVERS_JSON` |
+| `audio blocked - click Enable voice audio` | browser autoplay, not a connection problem |
+
 ## Capture chain
 
 `getUserMedia` is requested with these constraints (see

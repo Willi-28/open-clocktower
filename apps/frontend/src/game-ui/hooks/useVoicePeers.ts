@@ -52,6 +52,17 @@ function tunedDescription(description: RTCSessionDescriptionInit): RTCSessionDes
 // a dead path just burns signaling.
 const maxIceRestartAttempts = 2;
 
+// Signals that arrive while this client is still joining are replayed after the
+// join. The cap keeps a misbehaving peer from growing the buffer without bound;
+// a real handshake is a handful of frames per peer.
+const maxBufferedVoiceSignals = 64;
+
+// How long a handshake may take before the peer is rebuilt. Generous enough for
+// ICE gathering over the internet (a LAN pair connects in well under a second),
+// and capped so an unreachable peer is reported instead of retried forever.
+const negotiationTimeoutMs = 9000;
+const maxNegotiationAttempts = 3;
+
 type UseVoicePeersOptions = {
   applyAudioSink: (audio: HTMLAudioElement) => Promise<void>;
   currentPlayerId: string;
@@ -91,6 +102,12 @@ export function useVoicePeers({
   const remoteStreamRef = useRef<Record<string, MediaStream>>({});
   const remoteBoostRef = useRef<Record<string, RemoteBoostChain>>({});
   const joinedVoiceRoomRef = useRef<string | null>(null);
+  const pendingVoiceSignalsRef = useRef<Array<{ fromPlayerId: string; signal: unknown }>>([]);
+  const negotiationWatchdogsRef = useRef<Record<string, number>>({});
+  const negotiationAttemptsRef = useRef<Record<string, number>>({});
+  // Bumped to re-run the membership effect when a peer was dropped without the
+  // participant list itself changing.
+  const [peerRetryNonce, setPeerRetryNonce] = useState(0);
   const [blockedRemoteAudioPlayerIds, setBlockedRemoteAudioPlayerIds] = useState<string[]>([]);
   const [remoteVolumes, setRemoteVolumes] = useState<Record<string, number>>(initialRemoteVolumes);
   const [voiceDiagnostics, setVoiceDiagnostics] = useState<Record<string, string>>({});
@@ -119,6 +136,12 @@ export function useVoicePeers({
 
   useEffect(() => {
     joinedVoiceRoomRef.current = joinedVoiceRoom;
+    if (joinedVoiceRoom) {
+      void replayPendingVoiceSignals();
+      return;
+    }
+    // Left voice entirely: anything held from the previous session is stale.
+    pendingVoiceSignalsRef.current = [];
   }, [joinedVoiceRoom]);
 
   useEffect(() => {
@@ -159,6 +182,9 @@ export function useVoicePeers({
     Object.keys(peerConnectionsRef.current).forEach((playerId) => {
       if (!sameRoomPlayers.includes(playerId)) {
         closeVoicePeer(playerId);
+        // They really left this room, so the next time they show up it is a
+        // fresh negotiation and gets its full retry budget again.
+        delete negotiationAttemptsRef.current[playerId];
       }
     });
 
@@ -169,7 +195,42 @@ export function useVoicePeers({
         });
       }
     });
-  }, [voiceParticipants, joinedVoiceRoom, currentPlayerId]);
+  }, [voiceParticipants, joinedVoiceRoom, currentPlayerId, peerRetryNonce]);
+
+  /**
+   * Watches one freshly created peer and rebuilds it if the handshake never
+   * completes.
+   *
+   * Offer/answer is a multi-step exchange over the room socket, and a step can
+   * be lost to a reload, a phase change, or a peer that was not listening yet.
+   * A half-open connection then sits in `have-local-offer` forever: it is not
+   * `failed`, so the ICE-restart path never fires, and the membership effect
+   * skips it because an entry already exists - voice stays silent (often in one
+   * direction only) until the player leaves and rejoins the room by hand.
+   * Dropping the peer here lets the effect negotiate again from scratch.
+   */
+  function armNegotiationWatchdog(playerId: string) {
+    window.clearTimeout(negotiationWatchdogsRef.current[playerId]);
+    negotiationWatchdogsRef.current[playerId] = window.setTimeout(() => {
+      const peer = peerConnectionsRef.current[playerId];
+      if (!peer || peer.connectionState === 'connected') {
+        return;
+      }
+      const attempts = negotiationAttemptsRef.current[playerId] ?? 0;
+      if (attempts >= maxNegotiationAttempts) {
+        setVoiceDiagnostics((current) => ({
+          ...current,
+          [playerId]: 'could not connect - a TURN server may be required',
+        }));
+        return;
+      }
+      negotiationAttemptsRef.current[playerId] = attempts + 1;
+      closeVoicePeer(playerId);
+      setVoiceDiagnostics((current) => ({ ...current, [playerId]: 'handshake timed out - retrying' }));
+      // Membership has not changed, so nudge the effect into running again.
+      setPeerRetryNonce((current) => current + 1);
+    }, negotiationTimeoutMs);
+  }
 
   /**
    * Creates one peer connection and optionally starts the WebRTC offer flow.
@@ -213,6 +274,9 @@ export function useVoicePeers({
       setVoiceDiagnostics((current) => ({ ...current, [playerId]: connectionStateLabel }));
       if (peer.connectionState === 'connected') {
         iceRestartAttemptsRef.current[playerId] = 0;
+        negotiationAttemptsRef.current[playerId] = 0;
+        window.clearTimeout(negotiationWatchdogsRef.current[playerId]);
+        delete negotiationWatchdogsRef.current[playerId];
         void enableVoiceAudio();
       }
       if (peer.connectionState === 'failed') {
@@ -254,6 +318,10 @@ export function useVoicePeers({
       const offer = tunedDescription(await peer.createOffer());
       await peer.setLocalDescription(offer);
       roomSocketRef.current?.sendVoiceSignal(playerId, { kind: 'offer', description: offer });
+      // Only the offering side supervises the handshake, so the two peers can
+      // never tear each other down in lockstep. The answering side is rebuilt
+      // by the retry offer that this watchdog produces.
+      armNegotiationWatchdog(playerId);
     }
     return peer;
   }
@@ -315,6 +383,17 @@ export function useVoicePeers({
   async function handleVoiceSignal(fromPlayerId: string, rawSignal: unknown) {
     try {
       if (!joinedVoiceRoomRef.current) {
+        // A peer can offer before this client has finished (re)joining: joining
+        // waits for the microphone, so whoever's device comes up first offers
+        // into a peer that is not listening yet. This is systematic at sunrise,
+        // where the server moves the whole table into the main room at the same
+        // moment. Dropping the offer stranded that peer permanently - the
+        // offerer keeps its half-open connection and never re-offers, so voice
+        // stayed one-sided until the room was switched and re-joined. Hold the
+        // signal instead and replay it once the join completes.
+        if (pendingVoiceSignalsRef.current.length < maxBufferedVoiceSignals) {
+          pendingVoiceSignalsRef.current.push({ fromPlayerId, signal: rawSignal });
+        }
         return;
       }
       const signal = rawSignal as {
@@ -322,6 +401,14 @@ export function useVoicePeers({
         description?: RTCSessionDescriptionInit;
         candidate?: RTCIceCandidateInit;
       };
+      const existing = peerConnectionsRef.current[fromPlayerId];
+      if (signal.kind === 'offer' && existing && existing.connectionState !== 'connected') {
+        // A fresh offer on a peer that never finished connecting means the other
+        // side gave up and started over; ours is stale and may not even accept a
+        // remote description in its current signaling state. Start over too.
+        // (A re-offer on a connected peer is an ICE restart and must be kept.)
+        closeVoicePeer(fromPlayerId);
+      }
       const peer = await createVoicePeer(fromPlayerId, false);
       if (signal.kind === 'offer' && signal.description) {
         await peer.setRemoteDescription(signal.description);
@@ -346,6 +433,22 @@ export function useVoicePeers({
       }
     } catch (caught) {
       setVoiceDiagnostics((current) => ({ ...current, [fromPlayerId]: `signal error - ${voiceErrorMessage(caught)}` }));
+    }
+  }
+
+  /**
+   * Replays signals that arrived while this client was still joining.
+   *
+   * Order is preserved so an offer is still applied before its candidates.
+   */
+  async function replayPendingVoiceSignals() {
+    const buffered = pendingVoiceSignalsRef.current;
+    if (buffered.length === 0) {
+      return;
+    }
+    pendingVoiceSignalsRef.current = [];
+    for (const { fromPlayerId, signal } of buffered) {
+      await handleVoiceSignal(fromPlayerId, signal);
     }
   }
 
@@ -512,6 +615,8 @@ export function useVoicePeers({
    * Tears down one remote peer and all browser audio objects attached to it.
    */
   function closeVoicePeer(playerId: string) {
+    window.clearTimeout(negotiationWatchdogsRef.current[playerId]);
+    delete negotiationWatchdogsRef.current[playerId];
     peerConnectionsRef.current[playerId]?.close();
     delete peerConnectionsRef.current[playerId];
     delete pendingIceCandidatesRef.current[playerId];
