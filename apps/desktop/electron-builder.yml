@@ -1,0 +1,49 @@
+appId: com.openclocktower.desktop
+productName: OpenClocktower
+directories:
+  output: release
+
+# steamworks.js ships prebuilt native (napi) binaries plus the Steam
+# redistributable — never let electron-builder try to rebuild them.
+npmRebuild: false
+
+# Keep electron-builder's default file set (app source + production node_modules,
+# dev deps stripped automatically) but exclude the Python build tree (the server
+# exe is added via extraResources instead) and desktop-only dev files.
+files:
+  - "**/*"
+  - "!build/**"
+  - "!test/**"
+  - "!server.spec"
+  - "!server_entry.py"
+  - "!README.md"
+
+asar: true
+# The native .node addon and the Steam runtime libs it links against cannot be
+# loaded from inside the asar, so unpack the whole module to the real filesystem.
+asarUnpack:
+  - "**/node_modules/steamworks.js/**"
+
+# The frozen backend exe is EMBEDDED inside the single app exe (built separately:
+# pyinstaller server.spec --distpath build/server). The user never runs it; the
+# app spawns it internally, and only when a room is hosted (Create Room).
+extraResources:
+  - from: build/server
+    to: server
+
+# steam_appid.txt must sit next to the exe so App 480 (Spacewar) works in testing.
+# For a real Steam release you ship through Steam and can drop this.
+extraFiles:
+  - from: steam_appid.txt
+    to: steam_appid.txt
+
+# One self-contained portable file: OpenClocktower.exe. No installer, no separate
+# server binary for the user — everything (Electron UI + embedded Python server +
+# Steam native module) ships inside this single exe.
+win:
+  target: portable
+  artifactName: OpenClocktower-${version}.${ext}
+portable:
+  artifactName: OpenClocktower-${version}.${ext}
+  # Extract to a fresh temp dir per launch; game data still persists in %APPDATA%.
+  requestExecutionLevel: user

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'" />
+    <title>Open Clocktower</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; height: 100vh; display: grid; place-items: center;
+        font-family: "Segoe UI", system-ui, sans-serif; color: #ece5d4;
+        background: radial-gradient(120% 120% at 50% 0%, #1a1f2e, #0b0d13 60%);
+      }
+      .card {
+        width: min(440px, 92vw); padding: 28px; border-radius: 16px;
+        background: rgba(20, 24, 34, 0.86); border: 1px solid rgba(216, 173, 98, 0.28);
+        box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+      }
+      h1 { font-size: 1.35rem; margin: 0 0 2px; letter-spacing: 0.02em; }
+      .sub { color: #9a9488; font-size: 0.85rem; margin: 0 0 20px; }
+      button {
+        width: 100%; padding: 12px 14px; margin-top: 10px; border-radius: 10px; cursor: pointer;
+        font-size: 0.98rem; font-weight: 600; color: #10131b;
+        background: linear-gradient(180deg, #e6c583, #cfa85a); border: 0;
+      }
+      button.secondary { background: transparent; color: #ece5d4; border: 1px solid rgba(216,173,98,0.4); }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .row { display: flex; gap: 8px; margin-top: 14px; }
+      .row input { flex: 1; min-width: 0; }
+      input {
+        padding: 11px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(0,0,0,0.3); color: #ece5d4; font-size: 0.95rem;
+      }
+      .divider { display: flex; align-items: center; gap: 10px; color: #6c6a63; margin: 20px 0 4px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; }
+      .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,0.1); }
+      .status { margin-top: 16px; font-size: 0.82rem; min-height: 1.2em; color: #9a9488; }
+      .status.error { color: #e78d8d; }
+      .steamline { font-size: 0.78rem; color: #86c98a; margin: 0 0 18px; }
+      .steamline.off { color: #d0a15a; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Open Clocktower</h1>
+      <p class="sub">Play over Steam — no port forwarding, no accounts.</p>
+      <p id="steamline" class="steamline">Checking Steam…</p>
+
+      <button id="create">Create Room (host over Steam)</button>
+
+      <div class="row">
+        <input id="lobbyId" inputmode="numeric" placeholder="Steam lobby ID to join" />
+        <button id="join" style="width:auto; padding-left:18px; padding-right:18px;">Join</button>
+      </div>
+
+      <div class="divider">or</div>
+      <div class="row">
+        <input id="customUrl" placeholder="https://your-server.example  (Docker / IP / domain)" />
+        <button id="connect" class="secondary" style="width:auto; padding-left:16px; padding-right:16px;">Connect</button>
+      </div>
+
+      <p id="status" class="status"></p>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const status = $('status');
+      const setStatus = (text, isError = false) => { status.textContent = text; status.classList.toggle('error', isError); };
+      const busy = (on) => ['create', 'join', 'connect'].forEach((id) => { $(id).disabled = on; });
+
+      async function guard(run) {
+        busy(true);
+        try { await run(); } catch (error) { setStatus(error?.message ?? String(error), true); busy(false); }
+      }
+
+      $('create').addEventListener('click', () => guard(async () => {
+        setStatus('Starting local server and creating Steam lobby…');
+        const { lobbyId } = await window.desktop.createRoom({});
+        setStatus('Room ready. Lobby ID: ' + lobbyId + ' — invite friends via Steam.');
+      }));
+
+      $('join').addEventListener('click', () => guard(async () => {
+        const id = $('lobbyId').value.trim();
+        if (!id) { setStatus('Enter a lobby ID (or accept a Steam invite).', true); busy(false); return; }
+        setStatus('Joining lobby ' + id + ' over Steam…');
+        await window.desktop.joinRoom(id);
+      }));
+
+      $('connect').addEventListener('click', () => guard(async () => {
+        let url = $('customUrl').value.trim();
+        if (!url) { setStatus('Enter a server URL.', true); busy(false); return; }
+        if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+        setStatus('Connecting to ' + url + '…');
+        await window.desktop.connectCustom(url);
+      }));
+
+      window.desktop.onAutojoin((lobbyId) => guard(async () => {
+        setStatus('Accepting Steam invite for lobby ' + lobbyId + '…');
+        await window.desktop.joinRoom(lobbyId);
+      }));
+
+      window.desktop.status().then((info) => {
+        const line = $('steamline');
+        if (info.steam) {
+          line.textContent = 'Steam connected (id ' + info.steamId + ', app ' + info.appId + ').';
+        } else {
+          line.textContent = 'Steam not detected — hosting/joining disabled. "Connect" still works.';
+          line.classList.add('off');
+          $('create').disabled = true;
+          $('join').disabled = true;
+        }
+      });
+    </script>
+  </body>
+</html>

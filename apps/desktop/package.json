@@ -1,0 +1,20 @@
+{
+  "name": "open-clocktower-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Steam desktop shell for Open Clocktower (spawns the shared backend and tunnels other players in over Steam networking).",
+  "type": "module",
+  "main": "src/main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/tunnel.test.mjs",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "steamworks.js": "0.4.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}

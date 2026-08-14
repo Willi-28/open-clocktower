@@ -29,6 +29,13 @@ dist/
 apps/frontend/node_modules/
 apps/frontend/dist/
 
+# Desktop (Steam) build artifacts
+apps/desktop/node_modules/
+apps/desktop/release/
+apps/desktop/build/
+# Frozen server bundles the built frontend here; it is a build output, not source
+apps/backend/app/static/
+
 data/*
 !data/.gitkeep
 
