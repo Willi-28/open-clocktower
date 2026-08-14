@@ -53,9 +53,27 @@ POSTGRES_DB=open_clocktower
 POSTGRES_USER=open_clocktower
 POSTGRES_PASSWORD=use-a-long-random-password
 FORCE_HTTPS=true
+FORWARDED_ALLOW_IPS=172.16.0.0/12
 ```
 
 Keep `.env` private. It contains database credentials and may contain TURN credentials.
+
+### `FORWARDED_ALLOW_IPS`
+
+The app reads the client IP from `X-Forwarded-For` and uses it for the per-IP
+rate limits on room create/join. `FORWARDED_ALLOW_IPS` decides **which peers are
+allowed to set that header**, and it defaults to `127.0.0.1` (trust nobody).
+
+Set it to the address or network the reverse proxy connects from - the Docker
+bridge range `172.16.0.0/12` covers a standard Compose + Traefik setup. Verify it
+against your own network if you customised it:
+
+```bash
+docker network inspect traefik_proxy --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+```
+
+Never set it to `*`. Uvicorn then trusts the header from any source and takes the
+first entry, so any client could pick its own IP and walk past the rate limits.
 
 Use `latest` for normal deployments unless you intentionally pin a known-good image for rollback. Avoid keeping multiple conflicting `OPEN_CLOCKTOWER_IMAGE` entries in the same `.env` file.
 

@@ -26,6 +26,9 @@ export type RoomSocketEvent =
   | { type: 'voice.call.reject'; payload: { fromPlayerId: string } }
   | { type: 'voice.signal'; payload: { fromPlayerId: string; signal: unknown } }
   | { type: 'voice.state'; payload: { participants: Array<{ playerId: string; voiceRoom: string }> } }
+  // The server moved this player into a voice room (day breaks -> everyone
+  // gathers in the main room), so the client must follow and rebuild its peers.
+  | { type: 'voice.moved'; payload: { voiceRoom: string } }
   | { type: 'room.kicked'; payload: { roomId: string; reason: string } }
   | { type: 'room.deleted'; payload: { roomId: string } };
 

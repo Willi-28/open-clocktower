@@ -151,6 +151,20 @@ Clients can send:
 
 Invalid payloads are ignored or rejected without closing the whole room. Chat sends are rate-limited per player.
 
+### Voice room membership
+
+A private voice room is identified by `<playerA>:private:<playerB>`, built from
+two player IDs that are public in the room snapshot. The server therefore never
+trusts the room name a client sends:
+
+- `voice.join` is only accepted for a private room when the joining player is one
+  of the two named parties. This holds for the storyteller too, so nobody can
+  slip into someone else's call as a silent third listener.
+- At night a private room additionally has to include the storyteller, and public
+  rooms are only reachable when `allow_public_voice_during_night` is set.
+- For `voice.call.request` / `voice.call.accept` the server derives the room name
+  from the two participants and ignores any `voiceRoom` in the payload.
+
 ## Security Notes
 
 - Treat `player_secret` like a session token.
@@ -158,3 +172,4 @@ Invalid payloads are ignored or rejected without closing the whole room. Chat se
 - Do not expose private TURN credentials through anything except the intended browser ICE configuration.
 - Add reverse-proxy rate limiting or access control if running a public instance.
 - Do not assume room codes alone are authentication; the private player secret is what authorizes player actions.
+- The WebSocket handshake carries `player_secret` in the query string, because browsers cannot set headers on a WebSocket. Under `wss://` it is encrypted in transit, but reverse-proxy and server access logs record full URLs - disable access logging for `/ws/` or scrub it if those logs are retained or shipped elsewhere.

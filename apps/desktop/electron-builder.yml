@@ -10,15 +10,13 @@ afterPack: scripts/after-pack.cjs
 npmRebuild: false
 
 # Keep electron-builder's default file set (app source + production node_modules,
-# dev deps stripped automatically) but exclude the Python build tree (the server
-# exe is added via extraResources instead) and desktop-only dev files.
+# dev deps stripped automatically) minus the desktop-only dev files.
 files:
   - "**/*"
   - "!build/**"
+  - "!release/**"
   - "!test/**"
   - "!scripts/**"
-  - "!server.spec"
-  - "!server_entry.py"
   - "!README.md"
 
 asar: true

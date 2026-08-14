@@ -59,13 +59,29 @@ def cache_control_for_path(path: str) -> str | None:
     return None
 
 
+# Baseline browser hardening. These are cheap and apply to every response:
+# - nosniff stops a browser from re-interpreting an uploaded avatar as HTML/JS,
+# - the framing rules block clickjacking of the game table and its controls,
+# - no-referrer keeps room ids out of Referer headers sent to third parties,
+# - the permissions policy denies the mic/camera to any embedded third party.
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "frame-ancestors 'none'",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), geolocation=(), microphone=(self)",
+}
+
+
 @app.middleware("http")
 async def set_browser_cache_policy(request: Request, call_next):
-    """Attach cache and transport-security headers to every response."""
+    """Attach cache, framing, and transport-security headers to every response."""
     response = await call_next(request)
     cache_control = cache_control_for_path(request.url.path)
     if cache_control is not None:
         response.headers["Cache-Control"] = cache_control
+    for header, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(header, value)
     if settings.force_https:
         # HTTPS-only deployments should pin browsers to HTTPS (HSTS).
         response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
@@ -78,14 +94,16 @@ if settings.force_https:
     app.add_middleware(HTTPSRedirectMiddleware)
 
 # Allows the local Vite dev server to call the backend from the browser.
-# In production, the frontend is served by the same container and does not need this.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# In production the frontend is served by the same container, so cross-origin
+# access is not registered at all - a deployed server should not answer calls
+# from a page running on somebody's localhost.
+if settings.app_env != "production":
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 @app.get("/api/health")

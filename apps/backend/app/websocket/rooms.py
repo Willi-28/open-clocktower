@@ -4,34 +4,19 @@ This module accepts browser WebSockets, validates room/player identity, and
 forwards realtime chat, voice, timer, bell, hand, and vote-count events.
 """
 
-from time import monotonic
-
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.game.chat_rules import can_chat, find_player
 from app.game.store import room_store
+from app.game.voice_rules import MAX_VOICE_ROOM_LENGTH, can_join_voice_room, private_voice_room_for
+from app.rate_limit import SlidingWindowLimiter
 from app.websocket.room_hub import room_hub
 
 router = APIRouter()
 
 # Flood protection: one player may send at most this many chat messages within
 # the sliding window; messages beyond the cap are silently dropped.
-MAX_CHAT_BURST = 8
-CHAT_WINDOW_SECONDS = 5.0
-_chat_message_times: dict[tuple[str, str], list[float]] = {}
-
-
-def _chat_rate_ok(room_id: str, player_id: str) -> bool:
-    """Return whether this player may send another chat message right now."""
-    now = monotonic()
-    key = (room_id, player_id)
-    recent = [stamp for stamp in _chat_message_times.get(key, []) if now - stamp < CHAT_WINDOW_SECONDS]
-    if len(recent) >= MAX_CHAT_BURST:
-        _chat_message_times[key] = recent
-        return False
-    recent.append(now)
-    _chat_message_times[key] = recent
-    return True
+_chat_messages = SlidingWindowLimiter(limit=8, window_seconds=5.0)
 
 
 @router.websocket("/ws/rooms/{room_id}")
@@ -99,7 +84,7 @@ async def _dispatch_message(room_id: str, player_id: str | None, message: dict) 
     elif message_type == "deafen.set":
         await room_hub.set_deafened(room_id, player_id, bool(payload.get("isDeafened")))
     elif message_type == "voice.join":
-        voice_room = str(payload.get("voiceRoom", "")).strip() or None
+        voice_room = str(payload.get("voiceRoom", ""))[:MAX_VOICE_ROOM_LENGTH].strip() or None
         if _can_join_voice_room(room_id, player_id, voice_room):
             await room_hub.set_voice_room(room_id, player_id, voice_room)
     elif message_type == "voice.leave":
@@ -122,7 +107,7 @@ async def _dispatch_message(room_id: str, player_id: str | None, message: dict) 
 
 async def _handle_chat_message(room_id: str, player_id: str, payload: dict) -> None:
     """Validate and forward a public or private chat message."""
-    if not _chat_rate_ok(room_id, player_id):
+    if not _chat_messages.allow((room_id, player_id)):
         return
     room = room_store.get_room(room_id)
     target_player_id = payload.get("toPlayerId")
@@ -161,10 +146,12 @@ async def _handle_chat_message(room_id: str, player_id: str, payload: dict) -> N
 async def _forward_voice_call(room_id: str, player_id: str, payload: dict, event_type: str) -> None:
     """Forward a private voice call request or acceptance to the target player."""
     target_player_id = payload.get("toPlayerId")
-    voice_room = str(payload.get("voiceRoom", "")).strip()
-    if isinstance(target_player_id, str) and voice_room and _players_are_in_room(room_id, player_id, target_player_id):
+    if isinstance(target_player_id, str) and target_player_id != player_id and _players_are_in_room(room_id, player_id, target_player_id):
         if not _call_allowed_now(room_id, player_id, target_player_id):
             return
+        # The room id is derived here rather than taken from the payload, so a
+        # caller cannot talk a target into joining an unrelated private call.
+        voice_room = private_voice_room_for(player_id, target_player_id)
         await room_hub.send_to_players(
             room_id,
             {target_player_id},
@@ -239,16 +226,10 @@ def _players_are_in_room(room_id: str, player_id: str, target_player_id: str) ->
 
 def _can_join_voice_room(room_id: str, player_id: str, voice_room: str | None) -> bool:
     """Return whether a player may join a public or private voice room now."""
+    if voice_room is None:
+        return True
     room = room_store.get_room(room_id)
     sender = find_player(room.players, player_id) if room else None
-    if room is None or sender is None or voice_room is None:
-        return voice_room is None
-    if sender.is_storyteller or room.phase != "night":
-        return True
-    # Night: players cannot roam voice rooms. Private calls only exist when the
-    # storyteller is one of the two parties (i.e. the storyteller called them);
-    # public rooms only stay reachable when night voice is explicitly allowed.
-    if ":private:" in voice_room:
-        storyteller = next((player for player in room.players if player.is_storyteller), None)
-        return storyteller is not None and storyteller.id in voice_room.split(":private:")
-    return room.allow_public_voice_during_night
+    if room is None or sender is None:
+        return False
+    return can_join_voice_room(room, sender, voice_room)

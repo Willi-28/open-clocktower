@@ -80,10 +80,12 @@ apps/backend/app/
 │  ├─ media_validation.py        Avatar upload validation
 │  ├─ room_state.py              Request and response models
 │  ├─ rules.py                   Pure game rule checks
-│  └─ store.py                   Persistence and room state transitions
+│  ├─ store.py                   Persistence and room state transitions
+│  └─ voice_rules.py             Who may enter which voice room
 ├─ websocket/
 │  ├─ room_hub.py                Connected clients and room broadcasts
 │  └─ rooms.py                   WebSocket endpoint and message handling
+├─ rate_limit.py                 In-process sliding-window abuse limits
 └─ main.py                       App assembly, middleware, cleanup, static files
 ```
 

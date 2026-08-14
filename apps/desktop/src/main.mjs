@@ -68,6 +68,29 @@ function configuredGatewayPort() {
   return DEFAULT_GATEWAY_PORT;
 }
 
+/** The one origin the window is allowed to stay on. */
+function gatewayOrigin() {
+  return `http://127.0.0.1:${gateway.port}`;
+}
+
+/** Return a URL's origin, or null when it cannot be parsed. */
+function originOf(rawUrl) {
+  try {
+    return new URL(rawUrl).origin;
+  } catch {
+    return null;
+  }
+}
+
+/** Return whether a URL is a plain web link that may be opened externally. */
+function isWebUrl(rawUrl) {
+  try {
+    return ['http:', 'https:'].includes(new URL(rawUrl).protocol);
+  } catch {
+    return false;
+  }
+}
+
 /** Normalise a typed server URL (default https, strip trailing slash). */
 function normalizeUrl(raw) {
   const trimmed = String(raw ?? '').trim();
@@ -75,6 +98,9 @@ function normalizeUrl(raw) {
     throw new Error('Enter a server URL.');
   }
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  if (!isWebUrl(withScheme)) {
+    throw new Error('Enter an http(s) server address.');
+  }
   return withScheme.replace(/\/+$/, '');
 }
 
@@ -103,7 +129,7 @@ ipcMain.handle('desktop:connect', async (_event, options = {}) => {
   const base = normalizeUrl(options.url);
   await checkServer(base);
   gateway.setUpstream({ baseUrl: base });
-  await mainWindow.loadURL(`http://127.0.0.1:${gateway.port}/`);
+  await mainWindow.loadURL(`${gatewayOrigin()}/`);
   return { url: base };
 });
 
@@ -113,7 +139,7 @@ ipcMain.handle('desktop:close', () => {
 
 ipcMain.handle('desktop:change-server', async () => {
   gateway.setUpstream(null);
-  await mainWindow.loadURL(`http://127.0.0.1:${gateway.port}/?shell=1`);
+  await mainWindow.loadURL(`${gatewayOrigin()}/?shell=1`);
   return {};
 });
 
@@ -129,13 +155,29 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
-  // Open external links (e.g. the docs link) in the real browser.
+  // Open external links (e.g. the docs link) in the real browser - but only
+  // real web links. shell.openExternal() hands any other scheme (file:, ms-*,
+  // smb:) straight to Windows, which is a local code-execution risk.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    if (isWebUrl(url)) {
+      void shell.openExternal(url);
+    }
     return { action: 'deny' };
   });
+  // The window must stay on the local gateway origin: that is where the app is
+  // served from and where its localStorage session lives. Anything else (a
+  // redirect, an injected link) is handed to the browser instead.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (originOf(url) === gatewayOrigin()) {
+      return;
+    }
+    event.preventDefault();
+    if (isWebUrl(url)) {
+      void shell.openExternal(url);
+    }
+  });
   // ?shell marks the local server-address entry screen.
-  return mainWindow.loadURL(`http://127.0.0.1:${gateway.port}/?shell=1`);
+  return mainWindow.loadURL(`${gatewayOrigin()}/?shell=1`);
 }
 
 if (hasInstanceLock) {
@@ -153,9 +195,6 @@ if (hasInstanceLock) {
     gateway = await startGateway({
       staticDir: frontendStaticDir(),
       port: configuredGatewayPort(),
-      onCreateRoom: async () => {
-        throw new Error('Connect to a server before creating or joining rooms.');
-      },
     });
 
     await createWindow();

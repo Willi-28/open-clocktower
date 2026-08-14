@@ -50,10 +50,10 @@ that are inert in the browser/Docker build, where `window.desktop` is undefined.
 |------|------|
 | `src/main.mjs` | Electron main: fullscreen window, gateway, connect/close IPC, Steam init |
 | `src/gateway.mjs` | serves the bundled frontend and proxies `/api` + `/ws` to the chosen server |
-| `src/preload.cjs` | exposes `window.desktop.connect` / `close` |
-| `src/steam/steam.mjs` | Steam SDK init + callback pump (lobby/networking helpers now unused) |
+| `src/preload.cjs` | exposes `window.desktop.connect` / `changeServer` / `close` |
+| `src/steam/steam.mjs` | Steam SDK init + callback pump (presence only) |
 | `electron-builder.yml` | packages `OpenClocktower.exe` (bundles the frontend only) |
-| `test/{tunnel,gateway}.test.mjs` | runnable proofs (no Steam/Electron needed) |
+| `test/gateway.test.mjs` | runnable proof (no Steam/Electron needed) |
 
 Frontend touch points (guarded by `window.desktop`): `ServerConnectScreen`
 (server address only), `App` (Leave Game button, `?room=` deep-link auto-join,
@@ -63,14 +63,24 @@ The gateway prefers the stable local port `28741` (`OCT_DESKTOP_PORT` can
 override it) so browser-local settings such as theme, audio devices, and volume
 survive closing and reopening the desktop app.
 
-**Parked (unused):** the earlier Steam-P2P approach left `src/transport/`,
-`src/serverProcess.mjs`, `server_entry.py` + `server.spec`, and the
-lobby/networking functions in `steam.mjs`. They are not used by the URL-first
-client and can be deleted; kept for now in case P2P is revisited.
+## Hardening
+
+The renderer runs with `contextIsolation: true` and `nodeIntegration: false`, and
+on top of that:
+
+- The window is pinned to the gateway origin. `will-navigate` to anything else is
+  cancelled, and both it and `setWindowOpenHandler` only pass `http(s)` links to
+  `shell.openExternal` - other schemes would let a link start local programs.
+- The gateway listens on loopback *and* requires a loopback `Host` header, so a
+  hostname that resolves to `127.0.0.1` (DNS rebinding) cannot claim this origin
+  and read the stored player session out of its localStorage.
+- Static serving resolves inside the bundled `dist` and rejects any path that
+  escapes it.
 
 ## Verified
 
-- `npm test` passes (tunnel + gateway self-tests).
+- `npm test` passes (gateway self-test: bundled UI, 503 before connect, server
+  proxy, SPA fallback, path traversal blocked, host pinned, fixed port).
 - Frontend `npm run check` passes (typecheck + unit tests + static analysis) with
   the guarded desktop hooks.
 - `electron-builder --dir` assembles a complete runnable app at
@@ -95,7 +105,8 @@ cd apps/frontend && npm ci && npm run build    # 1) build the frontend
 cd ../desktop && npm install && npm run dist   # 2) -> release/OpenClocktower-<version>.exe
 ```
 
-No PyInstaller step - the desktop client bundles only the frontend.
+The desktop client bundles only the frontend; there is no embedded server, so
+there is no Python build step.
 
 **Note:** the single-file `portable`/`nsis` target needs permission to create
 symlinks while electron-builder unpacks its code-sign cache. If it fails with

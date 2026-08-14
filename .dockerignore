@@ -1,33 +1,54 @@
+# The image is built from apps/frontend + apps/backend only. Everything else is
+# kept out of the build context so no local state, build output, or secret ever
+# reaches the Docker daemon or an image layer.
+
 .git
+.github
 .codex
 .agents
+
+# Python
 .venv
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-*.log
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
 .pytest_cache
 .mypy_cache
 .ruff_cache
 .coverage
 htmlcov
 
-apps/frontend/node_modules
-apps/frontend/dist
-node_modules
-dist
-.vite
-.npm-cache
+# Node / build output. The bare names only match the context root, so the
+# recursive form is required for the per-app folders.
+**/node_modules
+**/dist
+**/.vite
+**/.npm-cache
+# The frontend build is copied in from the frontend stage, never from context.
+apps/backend/app/static
 
+# The Electron/Steam client is not part of the server image, and its release
+# folder is hundreds of megabytes.
+apps/desktop
+
+# Local runtime state and secrets
 data
+**/*.log
+**/*.db
+**/*.db-*
+**/*.sqlite
+**/*.sqlite3
+**/*.sqlite3-*
 .env
 .env.*
 !.env.example
 
+# Docs, tooling, and compose files are not needed to build or run the image
 docs
 scripts
 shared
 README.md
+SECURITY.md
 LICENSE
 docker-compose*.yml

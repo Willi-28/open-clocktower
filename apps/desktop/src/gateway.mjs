@@ -9,7 +9,6 @@
  *
  * This keeps Steam/Desktop UI changes inside the desktop bundle instead of
  * depending on the remote Docker server already serving the newest frontend.
- * Legacy loopback upstreams are still supported for the existing gateway tests.
  */
 
 import http from 'node:http';
@@ -18,6 +17,21 @@ import net from 'node:net';
 import tls from 'node:tls';
 import fs from 'node:fs';
 import path from 'node:path';
+
+// The server only listens on loopback, but a browser can still be pointed at it
+// by a hostname that resolves to 127.0.0.1 (DNS rebinding), which would put an
+// attacker's page on this origin - and therefore on the localStorage holding the
+// player session. Requests must address the gateway by its loopback name.
+const ALLOWED_HOST_NAMES = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
+
+/** Return whether a Host header addresses this gateway on loopback. */
+function isLoopbackHost(hostHeader) {
+  if (!hostHeader) {
+    return false;
+  }
+  const hostName = String(hostHeader).replace(/:\d+$/, '');
+  return ALLOWED_HOST_NAMES.has(hostName);
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -36,36 +50,27 @@ const MIME = {
 /**
  * @param {object}   opts
  * @param {string}   opts.staticDir           bundled frontend dist
- * @param {Function} [opts.onCreateRoom]      legacy async () => ({ port })
- * @param {Function} [opts.onRoomCreated]     legacy (roomId) => void
  * @param {number}   [opts.port]              preferred loopback port
  * @returns {Promise<{port,setUpstream,getUpstream,close}>}
  */
-export function startGateway({ staticDir, onCreateRoom, onRoomCreated, port = 0 }) {
-  let upstream = null; // { baseUrl } for self-hosted servers, or legacy { port }
-  let starting = null; // in-flight legacy lazy host start
+export function startGateway({ staticDir, port = 0 }) {
+  let upstream = null; // { baseUrl } of the selected self-hosted server
 
-  const server = http.createServer(async (req, res) => {
+  const server = http.createServer((req, res) => {
+    if (!isLoopbackHost(req.headers.host)) {
+      res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Forbidden');
+      return;
+    }
     const url = req.url || '/';
     const pathname = url.split('?')[0];
     if (pathname.startsWith('/api') || pathname.startsWith('/ws')) {
-      if (!upstream && req.method === 'POST' && pathname === '/api/rooms' && onCreateRoom) {
-        try {
-          starting = starting || onCreateRoom();
-          upstream = await starting;
-        } catch (error) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ detail: `Could not connect to server: ${error?.message ?? error}` }));
-          return;
-        }
-      }
       if (!upstream) {
         res.writeHead(503, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ detail: 'Not connected to a server yet.' }));
         return;
       }
-      const tapRoomId = req.method === 'POST' && pathname === '/api/rooms';
-      proxyHttp(req, res, upstream, tapRoomId ? onRoomCreated : null);
+      proxyHttp(req, res, upstream);
       return;
     }
     serveStatic(url, res, staticDir);
@@ -73,7 +78,7 @@ export function startGateway({ staticDir, onCreateRoom, onRoomCreated, port = 0 
 
   server.on('upgrade', (req, socket, head) => {
     const pathname = (req.url || '/').split('?')[0];
-    if (!pathname.startsWith('/ws') || !upstream) {
+    if (!pathname.startsWith('/ws') || !upstream || !isLoopbackHost(req.headers.host)) {
       socket.destroy();
       return;
     }
@@ -117,18 +122,15 @@ export function startGateway({ staticDir, onCreateRoom, onRoomCreated, port = 0 
 }
 
 function targetFor(upstream, requestUrl, websocket = false) {
-  if (upstream?.baseUrl) {
-    const baseUrl = `${String(upstream.baseUrl).replace(/\/+$/, '')}/`;
-    const target = new URL(requestUrl, baseUrl);
-    if (websocket) {
-      target.protocol = target.protocol === 'https:' ? 'wss:' : 'ws:';
-    }
-    return target;
-  }
-  if (typeof upstream?.port !== 'number') {
+  if (!upstream?.baseUrl) {
     throw new Error('Invalid gateway upstream.');
   }
-  return new URL(`${websocket ? 'ws' : 'http'}://127.0.0.1:${upstream.port}${requestUrl}`);
+  const baseUrl = `${String(upstream.baseUrl).replace(/\/+$/, '')}/`;
+  const target = new URL(requestUrl, baseUrl);
+  if (websocket) {
+    target.protocol = target.protocol === 'https:' ? 'wss:' : 'ws:';
+  }
+  return target;
 }
 
 function headersForTarget(req, target) {
@@ -138,8 +140,8 @@ function headersForTarget(req, target) {
   };
 }
 
-/** Forward an HTTP request to the upstream server; optionally sniff room.id. */
-function proxyHttp(req, res, upstream, onRoomCreated) {
+/** Forward an HTTP request to the upstream server. */
+function proxyHttp(req, res, upstream) {
   const target = targetFor(upstream, req.url || '/');
   const transport = target.protocol === 'https:' ? https : http;
   const outbound = transport.request(
@@ -152,26 +154,7 @@ function proxyHttp(req, res, upstream, onRoomCreated) {
     },
     (upRes) => {
       res.writeHead(upRes.statusCode ?? 502, upRes.headers);
-      if (!onRoomCreated) {
-        upRes.pipe(res);
-        return;
-      }
-      const chunks = [];
-      upRes.on('data', (chunk) => {
-        chunks.push(chunk);
-        res.write(chunk);
-      });
-      upRes.on('end', () => {
-        res.end();
-        try {
-          const roomId = JSON.parse(Buffer.concat(chunks).toString('utf8'))?.room?.id;
-          if (roomId) {
-            onRoomCreated(String(roomId));
-          }
-        } catch {
-          // Non-JSON or error responses do not carry a room id.
-        }
-      });
+      upRes.pipe(res);
     },
   );
   outbound.on('error', () => {
@@ -220,16 +203,25 @@ function proxyWebSocket(req, socket, head, upstream) {
 
 /** Serve a static file from the frontend dist, falling back to index.html (SPA). */
 function serveStatic(url, res, staticDir) {
-  const clean = decodeURIComponent(url.split('?')[0]);
-  let filePath = path.join(staticDir, clean === '/' ? 'index.html' : clean);
-  // Prevent path traversal outside the static root.
-  if (!filePath.startsWith(staticDir)) {
-    filePath = path.join(staticDir, 'index.html');
+  const indexPath = path.join(staticDir, 'index.html');
+  let clean = '/';
+  try {
+    clean = decodeURIComponent(url.split('?')[0]);
+  } catch {
+    // A malformed percent-escape is not a real asset request.
+    clean = '/';
+  }
+  let filePath = path.resolve(staticDir, `.${path.posix.resolve('/', clean)}`);
+  // Prevent path traversal outside the static root. A prefix check is not
+  // enough on its own ("<root>-other" also starts with "<root>").
+  const relative = path.relative(staticDir, filePath);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    filePath = indexPath;
   }
   fs.readFile(filePath, (error, data) => {
     if (error) {
       // SPA fallback: unknown non-file route -> index.html
-      fs.readFile(path.join(staticDir, 'index.html'), (fallbackError, html) => {
+      fs.readFile(indexPath, (fallbackError, html) => {
         if (fallbackError) {
           res.writeHead(404);
           res.end('Not found');

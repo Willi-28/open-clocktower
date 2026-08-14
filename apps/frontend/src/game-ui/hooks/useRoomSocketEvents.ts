@@ -176,6 +176,11 @@ export function useRoomSocketEvents({
       if (event.type === 'voice.state') {
         handlers.applyVoiceParticipants(event.payload.participants);
       }
+      if (event.type === 'voice.moved') {
+        // Server-side move (sunrise). The server already holds this player in
+        // the new room, so joining locally only re-arms the mic and peers.
+        void handlers.joinSelectedVoiceRoom(event.payload.voiceRoom);
+      }
       if (event.type === 'voice.call.request') {
         handlers.setIncomingVoiceCall(event.payload);
         playVoiceTone('call');

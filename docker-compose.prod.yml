@@ -9,6 +9,10 @@ services:
       UPLOAD_DIR: /app/data/uploads
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-open_clocktower}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-open_clocktower}
       FORCE_HTTPS: ${FORCE_HTTPS:-true}
+      # Traefik reaches the app from the Docker bridge network, so only that
+      # range may set X-Forwarded-For/-Proto. Never set this to "*": the client
+      # IP behind the per-IP rate limits would become attacker-controlled.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-172.16.0.0/12}
       ICE_SERVERS_JSON: ${ICE_SERVERS_JSON:-}
       ROOM_IDLE_TTL_SECONDS: ${ROOM_IDLE_TTL_SECONDS:-3600}
       ROOM_CLEANUP_INTERVAL_SECONDS: ${ROOM_CLEANUP_INTERVAL_SECONDS:-300}

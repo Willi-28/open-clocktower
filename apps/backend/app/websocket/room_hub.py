@@ -178,6 +178,30 @@ class RoomHub:
                 await self.broadcast_room_event(room_id, {"type": "deafen.state", "payload": {"playerIds": sorted(deafened)}})
         await self.broadcast_voice_state(room_id)
 
+    async def gather_everyone_in_voice_room(self, room_id: str, voice_room: str) -> list[str]:
+        """Move every connected player of a room into one shared voice room.
+
+        Used when day breaks: night side rooms and private calls end and everyone,
+        storyteller included, returns to the main voice room. The move is decided
+        here rather than in each browser so a backgrounded tab is moved at the
+        same moment as everyone else instead of only catching up once refocused.
+
+        Returns the ids that actually changed room, so the caller can tell those
+        clients to re-establish their voice peers.
+        """
+        connected_player_ids = {player_id for player_id in self._rooms.get(room_id, {}).values() if player_id}
+        room_voice = self._voice_rooms.setdefault(room_id, {})
+        moved = sorted(player_id for player_id in connected_player_ids if room_voice.get(player_id) != voice_room)
+        for player_id in moved:
+            room_voice[player_id] = voice_room
+        if moved:
+            await self.send_to_players(
+                room_id,
+                set(moved),
+                {"type": "voice.moved", "payload": {"voiceRoom": voice_room}},
+            )
+        return moved
+
     async def close_public_voice_rooms(self, room_id: str) -> None:
         """Remove players from public voice rooms when night restrictions apply."""
         # Night restrictions only close public rooms; private storyteller calls stay active.

@@ -1,6 +1,7 @@
 /**
- * Proves the gateway serves the real frontend before any server exists, and only
- * starts the host on the frontend's Create Room POST — no Steam/Electron needed.
+ * Proves the local gateway serves the bundled frontend, refuses API traffic
+ * until a server is selected, proxies to the selected server afterwards, and
+ * does not hand its origin to non-loopback hosts or to path traversal.
  *
  * Run: node apps/desktop/test/gateway.test.mjs
  */
@@ -16,15 +17,15 @@ import { startGateway } from '../src/gateway.mjs';
 const staticDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octgw-'));
 fs.writeFileSync(path.join(staticDir, 'index.html'), '<!doctype html><div id="root">landing</div>');
 fs.writeFileSync(path.join(staticDir, 'app.js'), 'console.log(1)');
+// A file next to (but outside) the static root: traversal must never reach it.
+const secretPath = path.join(staticDir, '..', `octgw-secret-${process.pid}.txt`);
+fs.writeFileSync(secretPath, 'TOP-SECRET');
 
-// Stand-in backend: answers create-room and health like the real one.
+// Stand-in for a self-hosted Open Clocktower server.
 const backend = await new Promise((resolve) => {
   const s = http.createServer((req, res) => {
-    if (req.method === 'POST' && req.url === '/api/rooms') {
+    if (req.url === '/api/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ room: { id: 'ROOM1' }, player_id: 'p1', player_secret: 'sekret' }));
-    } else if (req.url === '/api/health') {
-      res.writeHead(200);
       res.end('{"status":"ok"}');
     } else {
       res.writeHead(404);
@@ -34,64 +35,61 @@ const backend = await new Promise((resolve) => {
   s.listen(0, '127.0.0.1', () => resolve({ port: s.address().port, close: () => s.close() }));
 });
 
-let created = 0;
-let roomIdSeen = null;
-const gw = await startGateway({
-  staticDir,
-  onCreateRoom: async () => { created += 1; return { port: backend.port }; },
-  onRoomCreated: (id) => { roomIdSeen = id; },
-});
+const gw = await startGateway({ staticDir });
 
-function req(method, p, body, port = gw.port) {
+function req(method, p, { port = gw.port, host } = {}) {
   return new Promise((resolve, reject) => {
-    const r = http.request({ host: '127.0.0.1', port, method, path: p }, (res) => {
+    const headers = host ? { Host: host } : undefined;
+    const r = http.request({ host: '127.0.0.1', port, method, path: p, headers }, (res) => {
       let b = '';
       res.on('data', (d) => (b += d));
       res.on('end', () => resolve({ status: res.statusCode, body: b, ct: res.headers['content-type'] }));
     });
     r.on('error', reject);
-    r.end(body);
+    r.end();
   });
 }
 
-// 1) real landing page served before any server exists
+// 1) the bundled landing page is served before any server is selected
 const idx = await req('GET', '/');
 assert.equal(idx.status, 200);
 assert.match(idx.body, /landing/);
 assert.match(idx.ct, /html/);
 assert.match((await req('GET', '/app.js')).ct, /javascript/);
 
-// 2) /api before hosting/joining -> 503 (no upstream yet, no server started)
+// 2) /api before connecting -> 503, never a silent failure
 assert.equal((await req('GET', '/api/health')).status, 503);
-assert.equal(created, 0);
 
-// 3) Create Room POST lazily starts the host, proxies, and taps the room id
-const create = await req('POST', '/api/rooms', JSON.stringify({ name: 'x' }));
-assert.equal(create.status, 200);
-assert.match(create.body, /ROOM1/);
-assert.equal(created, 1);
-assert.equal(roomIdSeen, 'ROOM1');
-
-// 4) now proxied through to the backend
+// 3) after selecting a server, API traffic is proxied there
+gw.setUpstream({ baseUrl: `http://127.0.0.1:${backend.port}` });
 assert.equal((await req('GET', '/api/health')).status, 200);
+gw.setUpstream(null);
+assert.equal((await req('GET', '/api/health')).status, 503);
+gw.setUpstream({ baseUrl: `http://127.0.0.1:${backend.port}` });
 
-// 5) SPA fallback for unknown routes
+// 4) SPA fallback for unknown routes
 const spa = await req('GET', '/deep/route');
 assert.equal(spa.status, 200);
 assert.match(spa.body, /landing/);
 
-// 6) Desktop URL-first mode: keep the local UI, proxy API to a selected server
-const remoteGw = await startGateway({ staticDir });
-remoteGw.setUpstream({ baseUrl: `http://127.0.0.1:${backend.port}` });
-const remoteIdx = await req('GET', '/', undefined, remoteGw.port);
-assert.equal(remoteIdx.status, 200);
-assert.match(remoteIdx.body, /landing/);
-assert.equal((await req('GET', '/api/health', undefined, remoteGw.port)).status, 200);
-remoteGw.setUpstream(null);
-assert.equal((await req('GET', '/api/health', undefined, remoteGw.port)).status, 503);
+// 5) path traversal cannot escape the static root (encoded or not)
+for (const attack of [
+  `/../${path.basename(secretPath)}`,
+  `/..%2f${path.basename(secretPath)}`,
+  `/%2e%2e/${path.basename(secretPath)}`,
+  '/../../../../../../etc/passwd',
+]) {
+  const escaped = await req('GET', attack);
+  assert.doesNotMatch(escaped.body, /TOP-SECRET/, `traversal leaked via ${attack}`);
+}
 
-// 7) Desktop persistence mode: a preferred gateway port is honored so the
-// browser origin, and therefore localStorage, stays stable across app restarts.
+// 6) DNS rebinding: only loopback host names may use this origin
+assert.equal((await req('GET', '/', { host: 'attacker.example' })).status, 403);
+assert.equal((await req('GET', '/api/health', { host: 'attacker.example' })).status, 403);
+assert.equal((await req('GET', '/', { host: 'localhost' })).status, 200);
+
+// 7) a preferred gateway port is honored so the browser origin - and therefore
+// localStorage - stays stable across app restarts
 const preferredPort = await new Promise((resolve) => {
   const s = http.createServer();
   s.listen(0, '127.0.0.1', () => {
@@ -102,10 +100,10 @@ const preferredPort = await new Promise((resolve) => {
 const fixedGw = await startGateway({ staticDir, port: preferredPort });
 assert.equal(fixedGw.port, preferredPort);
 
-console.log('gateway.test: OK - local UI, 503 pre-connect, legacy create-room proxy, remote server proxy, SPA fallback');
+console.log('gateway.test: OK - bundled UI, 503 pre-connect, server proxy, SPA fallback, traversal blocked, host pinned, fixed port');
 fixedGw.close();
-remoteGw.close();
 gw.close();
 backend.close();
 fs.rmSync(staticDir, { recursive: true, force: true });
+fs.rmSync(secretPath, { force: true });
 process.exit(0);

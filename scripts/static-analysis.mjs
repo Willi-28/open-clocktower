@@ -21,11 +21,10 @@ const ignoredDirs = new Set([
   'htmlcov',
   'node_modules',
   '__pycache__',
-  // Desktop (Electron/PyInstaller) build outputs — bundled/minified artifacts,
-  // not source (gitignored). Scanning them trips the risky-pattern rules.
+  // Desktop (Electron) build outputs — bundled/minified artifacts, not source
+  // (gitignored). Scanning them trips the risky-pattern rules.
   'build',
   'release',
-  'release-fix',
 ]);
 const sourceExtensions = new Set(['.ts', '.tsx', '.js', '.mjs', '.py', '.css', '.json', '.md', '.yml', '.yaml']);
 const riskyPatterns = [

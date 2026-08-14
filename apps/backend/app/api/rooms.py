@@ -5,7 +5,6 @@ changing game state, uploading assets, assigning roles, and broadcasting updates
 """
 
 import base64
-from time import monotonic
 
 from fastapi import APIRouter, File, Form, Header, HTTPException, Request, Response, UploadFile
 
@@ -29,6 +28,8 @@ from app.game.room_state import (
 from app.game.character_packs import MAX_PACK_BYTES, parse_character_pack
 from app.game.media_validation import MAX_PROFILE_IMAGE_BYTES, validate_profile_image
 from app.game.store import room_store
+from app.game.voice_rules import DEFAULT_VOICE_ROOM
+from app.rate_limit import SlidingWindowLimiter
 from app.websocket.room_hub import room_hub
 
 # HTTP API for everything that happens in an MVP room.
@@ -40,23 +41,18 @@ _UPLOAD_CHUNK_BYTES = 64 * 1024
 # Brute-force and spam protection (CWE-307) for the two endpoints that mint
 # credentials without authentication: sliding per-IP windows keep room-code
 # guessing and room/player spam infeasible without hurting normal use.
-_CREATE_ATTEMPT_LIMIT = 5
-_JOIN_ATTEMPT_LIMIT = 12
+# The client IP is only as trustworthy as the proxy configuration behind it -
+# see FORWARDED_ALLOW_IPS in the Dockerfile.
 _ATTEMPT_WINDOW_SECONDS = 60.0
-_attempt_times: dict[tuple[str, str], list[float]] = {}
+_create_attempts = SlidingWindowLimiter(limit=5, window_seconds=_ATTEMPT_WINDOW_SECONDS)
+_join_attempts = SlidingWindowLimiter(limit=12, window_seconds=_ATTEMPT_WINDOW_SECONDS)
 
 
-def _require_attempt_budget(kind: str, http_request: Request, limit: int) -> None:
+def _require_attempt_budget(limiter: SlidingWindowLimiter, http_request: Request) -> None:
     """Raise 429 when one client IP exceeds its create/join attempt budget."""
     client_ip = http_request.client.host if http_request.client else "unknown"
-    now = monotonic()
-    key = (kind, client_ip)
-    recent = [stamp for stamp in _attempt_times.get(key, []) if now - stamp < _ATTEMPT_WINDOW_SECONDS]
-    if len(recent) >= limit:
-        _attempt_times[key] = recent
+    if not limiter.allow(client_ip):
         raise HTTPException(status_code=429, detail="Too many attempts - wait a moment and try again")
-    recent.append(now)
-    _attempt_times[key] = recent
 
 
 async def _read_upload_capped(file: UploadFile, max_bytes: int) -> bytes:
@@ -82,7 +78,7 @@ async def _read_upload_capped(file: UploadFile, max_bytes: int) -> bytes:
 @router.post("")
 async def create_room(request: CreateRoomRequest, http_request: Request):
     """Create a new room and return the founder's private session credentials."""
-    _require_attempt_budget("create", http_request, _CREATE_ATTEMPT_LIMIT)
+    _require_attempt_budget(_create_attempts, http_request)
     session = room_store.create_room(request)
     await room_hub.broadcast_state(session.room)
     return session
@@ -115,7 +111,7 @@ async def update_room(room_id: str, request: UpdateRoomRequest, x_player_secret:
 @router.post("/{room_id}/players")
 async def join_room(room_id: str, request: JoinRoomRequest, http_request: Request):
     """Join an existing room and return the new player's private session credentials."""
-    _require_attempt_budget("join", http_request, _JOIN_ATTEMPT_LIMIT)
+    _require_attempt_budget(_join_attempts, http_request)
     try:
         session = room_store.join_room(room_id, request)
     except ValueError as error:
@@ -234,6 +230,9 @@ async def upload_player_avatar(
 @router.post("/{room_id}/phase")
 async def set_phase(room_id: str, request: PhaseRequest, x_player_secret: str | None = Header(default=None)):
     """Move the room between lobby, day, and night phases."""
+    # Read the outgoing phase first (two scalar queries) so the handler can tell
+    # a real night -> day sunrise apart from a repeated "set day".
+    was_night, _ = room_store.night_voice_info(room_id)
     try:
         room = room_store.set_phase(room_id, request, x_player_secret)
     except ValueError as error:
@@ -242,6 +241,10 @@ async def set_phase(room_id: str, request: PhaseRequest, x_player_secret: str | 
         raise HTTPException(status_code=404, detail="Room not found")
     if room.phase == "night" and not room.allow_public_voice_during_night:
         await room_hub.close_public_voice_rooms(room_id)
+    if was_night and room.phase == "day":
+        # Sunrise: the night's private calls and side rooms end and the whole
+        # table - storyteller included - gathers in the main voice room again.
+        await room_hub.gather_everyone_in_voice_room(room_id, DEFAULT_VOICE_ROOM)
     # Day/night flips change what voice presence each player may see.
     await room_hub.broadcast_voice_state(room_id)
     await room_hub.broadcast_state(room)

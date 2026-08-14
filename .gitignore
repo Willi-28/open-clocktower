@@ -29,15 +29,24 @@ dist/
 apps/frontend/node_modules/
 apps/frontend/dist/
 
-# Desktop (Steam) build artifacts
+# Desktop (Steam) build artifacts. release* also covers alternate output dirs
+# (electron-builder -c.directories.output=...) used to work around locked files.
 apps/desktop/node_modules/
-apps/desktop/release/
+apps/desktop/release*/
 apps/desktop/build/
+apps/desktop/dist/
 # Frozen server bundles the built frontend here; it is a build output, not source
 apps/backend/app/static/
 
 data/*
 !data/.gitkeep
 
+# Editor / OS state
+.vscode/
+.idea/
+*.swp
 .DS_Store
 Thumbs.db
+
+# TypeScript incremental build info
+*.tsbuildinfo

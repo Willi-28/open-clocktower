@@ -102,13 +102,20 @@ class CharacterAssignment(BaseModel):
 
 
 class SharedReminderToken(BaseModel):
-    """Storyteller reminder token snapshot shared with selected players."""
+    """Storyteller reminder token snapshot shared with selected players.
 
-    id: str
-    tokenId: str | None = None
-    label: str
-    x: float
-    y: float
+    Every field is bounded: this list is persisted and then re-broadcast inside
+    every room snapshot, so unbounded text (or a non-finite coordinate, which
+    serializes to invalid JSON) would be amplified to all connected clients.
+    """
+
+    id: str = Field(max_length=120)
+    tokenId: str | None = Field(default=None, max_length=120)
+    label: str = Field(max_length=200)
+    # Normalized table position in percent; the range is generous on purpose so
+    # dragging past the table edge still works, while rejecting inf/NaN.
+    x: float = Field(ge=-1000, le=1000)
+    y: float = Field(ge=-1000, le=1000)
 
 
 class RoomState(BaseModel):
@@ -160,8 +167,10 @@ class UpdateRoomRequest(BaseModel):
     seat_count: int | None = Field(default=None, ge=5, le=20)
     allow_public_voice_during_night: bool | None = None
     show_board: bool | None = None
-    shared_grimoire_player_ids: list[str] | None = None
-    shared_grimoire_reminders: list[SharedReminderToken] | None = None
+    # Bounded because both lists are stored and rebroadcast in every snapshot;
+    # a room holds at most 20 seats and far fewer grimoire tokens than this.
+    shared_grimoire_player_ids: list[str] | None = Field(default=None, max_length=64)
+    shared_grimoire_reminders: list[SharedReminderToken] | None = Field(default=None, max_length=300)
 
 
 class JoinRoomRequest(BaseModel):
