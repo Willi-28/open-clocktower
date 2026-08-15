@@ -165,6 +165,13 @@ catching up once it is focused again. `voice.moved` then tells that client to
 re-arm its microphone and peer connections. Only a real night → day transition
 triggers this; setting the phase to `day` again leaves people where they are.
 
+**Ordering matters.** `game.updated` carrying the new phase is always broadcast
+*before* any voice event derived from it. Clients decide locally who may be in
+voice during night, so a `voice.moved` that arrives while a client still believes
+it is night makes it leave the room it was just moved into and rejoin a moment
+later — and that churn cancels WebRTC handshakes that were already under way,
+leaving players stuck in `connecting`.
+
 ### Voice room membership
 
 A private voice room is identified by `<playerA>:private:<playerB>`, built from

@@ -63,6 +63,15 @@ The gateway prefers the stable local port `28741` (`OCT_DESKTOP_PORT` can
 override it) so browser-local settings such as theme, audio devices, and volume
 survive closing and reopening the desktop app.
 
+## The bundled frontend is a snapshot
+
+`extraResources` copies `apps/frontend/dist` into the app, so the client ships a
+**frozen** build of the UI. Frontend changes only reach the desktop app after
+`cd apps/frontend && npm run build` followed by a repackage — until then the .exe
+keeps running the code it was packaged with, and can behave differently from
+browsers on the same server (voice negotiation in particular is peer-to-peer, so
+one outdated participant affects everyone it talks to).
+
 ## Hardening
 
 The renderer runs with `contextIsolation: true` and `nodeIntegration: false`, and

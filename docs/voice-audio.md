@@ -27,12 +27,49 @@ change, a peer that was not listening yet). The result used to be a peer stuck i
 missing, so the membership effect skipped it — voice stayed silent, often in one
 direction only, until the player left and rejoined the voice room by hand.
 
-The offering side therefore supervises each handshake: if the connection is not
-`connected` after 9 s the peer is dropped and renegotiated from scratch, up to 3
-times. Only the offering side supervises, so two peers can never tear each other
-down in lockstep; the answering side is rebuilt by the retry offer. After the
-last attempt the per-player diagnostic reads `could not connect - a TURN server
-may be required`.
+The offering side therefore supervises each handshake, in two stages, because a
+stall has two causes with very different natural durations:
+
+| Stage | Budget | Condition | Action |
+|-------|--------|-----------|--------|
+| Answer | 3 s, up to 4× | still `have-local-offer` | **re-send the same offer** |
+| ICE | +8 s | answered but not `connected` | rebuild the peer (up to 2×) |
+
+The split matters. Waiting for an answer must never build a new connection: the
+answering client buffers the offer until it has joined with a live microphone,
+which was measured at **over ten seconds** on a cold browser window. Replacing
+the connection in the meantime means the late answer arrives for a session that
+no longer exists — that produced `InvalidStateError`, and connections that went
+`connecting → failed` within milliseconds because the DTLS fingerprint belonged
+to the discarded peer.
+
+Re-sending the *same* offer is idempotent instead: whether the answer was lost or
+merely slow, it stays valid for the connection that is waiting for it. That is
+what makes it safe to retry early and often. Only once an answer has arrived and
+ICE still fails to connect is a real renegotiation the right move — by then no
+answer is in flight.
+
+Two mechanisms keep this exact:
+
+- every offer carries a `negotiationId`; the answer echoes it, and an answer that
+  names a *different* negotiation is dropped. An answer carrying **no** id is
+  accepted — it comes from a client that does not send one (an older build, or a
+  packaged desktop bundle), and refusing those would silence voice against that
+  peer entirely, which is far worse than the rare late answer this catches;
+- the answering side caches its last answer, so a retransmitted offer is
+  answered from that cache rather than renegotiating a working connection.
+
+A single combined timeout would either abort healthy connections (ICE checks
+retransmit with backoff, and a TURN allocation adds a round trip, so several
+seconds is normal) or make the common lost-answer case wait through a budget it
+does not need. A near-instant timeout would abort *every* connection before it
+could finish and voice would never come up at all.
+
+Up to 3 attempts are made, then the diagnostic reads `could not connect - a TURN
+server may be required`. Only the offering side supervises, so two peers can
+never tear each other down in lockstep; the answering side is rebuilt by the
+retry offer. A rebuilt peer also picks up ICE servers that arrived from
+`/api/client-config` after the first attempt was already under way.
 
 ### Reading the diagnostics
 
@@ -41,7 +78,10 @@ may be required`.
 | Status | Meaning |
 |--------|---------|
 | `audio playing` | connected, audio is flowing |
-| `connecting` / `handshake timed out - retrying` | negotiation in progress |
+| `connecting` | negotiation in progress |
+| `waiting for answer` | the offer is being re-sent; the other side has not answered yet |
+| `no answer - retrying` | still unanswered after every retransmission (signaling problem) |
+| `no media path - retrying` | answered, but ICE found no route (network problem) |
 | `not connected` | no peer at all — the player is not in your voice room |
 | `ICE failed` / `could not connect - a TURN server may be required` | no network path; configure TURN in `ICE_SERVERS_JSON` |
 | `audio blocked - click Enable voice audio` | browser autoplay, not a connection problem |

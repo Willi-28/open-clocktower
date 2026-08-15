@@ -139,6 +139,14 @@ export function useVoiceSession({
     if (voiceSwitchInFlightRef.current && joinedVoiceRoomRef.current !== voiceRoom) {
       return;
     }
+    // Already in - or already joining - exactly this room. The server's
+    // voice.moved and the local auto-join rule can both ask for the main room
+    // within the same millisecond at sunrise; joining twice re-announces
+    // presence and briefly drops this player out of everyone's participant
+    // list, which cancels handshakes that were already running.
+    if (joinedVoiceRoomRef.current === voiceRoom || optimisticVoiceRoomRef.current === voiceRoom) {
+      return;
+    }
     const actionId = voiceActionIdRef.current + 1;
     voiceActionIdRef.current = actionId;
     voiceSwitchInFlightRef.current = true;
@@ -169,11 +177,19 @@ export function useVoiceSession({
         ];
       });
       setSelectedVoiceRoom(voiceRoom);
+      // Updated here as well as in the effect below: the effect only runs after
+      // the next render, and at sunrise the server's voice.moved and the local
+      // auto-join rule land in the same millisecond - the guard above has to see
+      // this join immediately or the room is joined twice.
+      joinedVoiceRoomRef.current = voiceRoom;
       setJoinedVoiceRoom(voiceRoom);
       roomSocketRef.current?.joinVoiceRoom(voiceRoom);
       playVoiceTone('join');
     } catch (caught) {
       if (voiceActionIdRef.current === actionId) {
+        // Release the pending marker, otherwise the guard above would treat this
+        // room as "already joining" forever and refuse every later attempt.
+        optimisticVoiceRoomRef.current = null;
         setError(caught instanceof Error ? caught.message : 'Could not access microphone');
       }
     } finally {
@@ -263,6 +279,7 @@ export function useVoiceSession({
     if (options.notifyServer) {
       roomSocketRef.current?.leaveVoiceRoom();
     }
+    joinedVoiceRoomRef.current = null;
     setJoinedVoiceRoom(null);
     setSelectedVoiceRoom(defaultVoiceRoom);
     setIncomingVoiceCall(null);

@@ -130,7 +130,9 @@ export function VoiceRoomsPanel({
                   type="button"
                 >
                   <span className="voice-room-body">
-                    <span className="voice-room-name">{voiceRoom}</span>
+                    {/* Public rooms render as their own name; a private call
+                        becomes "Private Call: A + B" instead of its raw id. */}
+                    <span className="voice-room-name">{voiceRoomLabel(voiceRoom)}</span>
                     {occupants.length === 0 ? <span className="voice-room-sub">silence reigns…</span> : null}
                   </span>
                   {isJoined ? <span className="voice-room-marker" aria-hidden="true">◆</span> : null}

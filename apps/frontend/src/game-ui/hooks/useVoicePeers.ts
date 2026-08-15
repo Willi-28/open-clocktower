@@ -57,11 +57,27 @@ const maxIceRestartAttempts = 2;
 // a real handshake is a handful of frames per peer.
 const maxBufferedVoiceSignals = 64;
 
-// How long a handshake may take before the peer is rebuilt. Generous enough for
-// ICE gathering over the internet (a LAN pair connects in well under a second),
-// and capped so an unreachable peer is reported instead of retried forever.
-const negotiationTimeoutMs = 9000;
-const maxNegotiationAttempts = 3;
+// A handshake can stall for two very different reasons, and they need opposite
+// treatments:
+//
+// 1. No answer yet. The answering client may simply be slow - it buffers the
+//    offer until it has joined the room with a live microphone, which was
+//    measured at over ten seconds on a cold browser window. So this case is
+//    handled by RE-SENDING THE SAME OFFER, never by building a new connection:
+//    a late answer still belongs to the offer it is answering, so nothing can
+//    be applied to the wrong session. Retransmitting is idempotent, which is
+//    what makes it safe to do early and often.
+// 2. The answer arrived but ICE never connected. Now no answer is in flight and
+//    a genuine renegotiation is the only way forward. STUN checks retransmit
+//    with backoff and a TURN allocation adds a round trip, so this budget has
+//    to be generous.
+//
+// Anything near-instant (0.1 s) would abort every healthy connection before it
+// could finish and never let voice come up at all.
+const answerTimeoutMs = 3000;
+const maxOfferResends = 4;
+const iceTimeoutMs = 8000;
+const maxNegotiationAttempts = 2;
 
 type UseVoicePeersOptions = {
   applyAudioSink: (audio: HTMLAudioElement) => Promise<void>;
@@ -105,6 +121,15 @@ export function useVoicePeers({
   const pendingVoiceSignalsRef = useRef<Array<{ fromPlayerId: string; signal: unknown }>>([]);
   const negotiationWatchdogsRef = useRef<Record<string, number>>({});
   const negotiationAttemptsRef = useRef<Record<string, number>>({});
+  // Identifies the offer a peer is currently waiting on. Rebuilding a peer while
+  // its answer is still travelling would otherwise apply that answer to the new
+  // connection, which belongs to a different session.
+  const negotiationIdsRef = useRef<Record<string, string>>({});
+  // How often the current offer has been retransmitted while waiting for its answer.
+  const offerResendsRef = useRef<Record<string, number>>({});
+  // The last answer sent per peer, so a retransmitted offer can be answered
+  // again without renegotiating a connection that may already be working.
+  const lastAnswersRef = useRef<Record<string, { negotiationId?: string; description: RTCSessionDescriptionInit }>>({});
   // Bumped to re-run the membership effect when a peer was dropped without the
   // participant list itself changing.
   const [peerRetryNonce, setPeerRetryNonce] = useState(0);
@@ -216,20 +241,52 @@ export function useVoicePeers({
       if (!peer || peer.connectionState === 'connected') {
         return;
       }
-      const attempts = negotiationAttemptsRef.current[playerId] ?? 0;
-      if (attempts >= maxNegotiationAttempts) {
-        setVoiceDiagnostics((current) => ({
-          ...current,
-          [playerId]: 'could not connect - a TURN server may be required',
-        }));
+      if (peer.signalingState === 'have-local-offer') {
+        // Still waiting for the answer. Re-send the very same offer instead of
+        // renegotiating: whether the answer was lost or merely slow, the reply
+        // stays valid for this connection either way.
+        const resends = offerResendsRef.current[playerId] ?? 0;
+        if (resends < maxOfferResends && peer.localDescription) {
+          offerResendsRef.current[playerId] = resends + 1;
+          roomSocketRef.current?.sendVoiceSignal(playerId, {
+            kind: 'offer',
+            description: peer.localDescription,
+            negotiationId: negotiationIdsRef.current[playerId],
+          });
+          setVoiceDiagnostics((current) => ({ ...current, [playerId]: 'waiting for answer' }));
+          armNegotiationWatchdog(playerId);
+          return;
+        }
+        retryNegotiation(playerId, 'no answer - retrying');
         return;
       }
-      negotiationAttemptsRef.current[playerId] = attempts + 1;
-      closeVoicePeer(playerId);
-      setVoiceDiagnostics((current) => ({ ...current, [playerId]: 'handshake timed out - retrying' }));
-      // Membership has not changed, so nudge the effect into running again.
-      setPeerRetryNonce((current) => current + 1);
-    }, negotiationTimeoutMs);
+      // The answer is in and ICE is probing. Give it the room it needs.
+      negotiationWatchdogsRef.current[playerId] = window.setTimeout(() => {
+        const probing = peerConnectionsRef.current[playerId];
+        if (!probing || probing.connectionState === 'connected') {
+          return;
+        }
+        retryNegotiation(playerId, 'no media path - retrying');
+      }, iceTimeoutMs);
+    }, answerTimeoutMs);
+  }
+
+  /** Drop a stalled peer so the membership effect negotiates it again. */
+  function retryNegotiation(playerId: string, message: string) {
+    const attempts = negotiationAttemptsRef.current[playerId] ?? 0;
+    if (attempts >= maxNegotiationAttempts) {
+      setVoiceDiagnostics((current) => ({
+        ...current,
+        [playerId]: 'could not connect - a TURN server may be required',
+      }));
+      return;
+    }
+    negotiationAttemptsRef.current[playerId] = attempts + 1;
+    closeVoicePeer(playerId);
+    setVoiceDiagnostics((current) => ({ ...current, [playerId]: message }));
+    // Membership has not changed, so nudge the effect into running again. The
+    // rebuilt peer also picks up ICE servers that arrived after the first try.
+    setPeerRetryNonce((current) => current + 1);
   }
 
   /**
@@ -317,7 +374,7 @@ export function useVoicePeers({
     if (shouldOffer) {
       const offer = tunedDescription(await peer.createOffer());
       await peer.setLocalDescription(offer);
-      roomSocketRef.current?.sendVoiceSignal(playerId, { kind: 'offer', description: offer });
+      sendOffer(playerId, offer);
       // Only the offering side supervises the handshake, so the two peers can
       // never tear each other down in lockstep. The answering side is rebuilt
       // by the retry offer that this watchdog produces.
@@ -347,7 +404,7 @@ export function useVoicePeers({
       }
       const offer = tunedDescription(await peer.createOffer(hasRestartIce ? {} : { iceRestart: true }));
       await peer.setLocalDescription(offer);
-      roomSocketRef.current?.sendVoiceSignal(playerId, { kind: 'offer', description: offer });
+      sendOffer(playerId, offer);
     } catch (caught) {
       setVoiceDiagnostics((current) => ({ ...current, [playerId]: `restart failed - ${voiceErrorMessage(caught)}` }));
     }
@@ -400,13 +457,26 @@ export function useVoicePeers({
         kind?: 'offer' | 'answer' | 'candidate';
         description?: RTCSessionDescriptionInit;
         candidate?: RTCIceCandidateInit;
+        negotiationId?: string;
       };
+      const alreadyAnswered = lastAnswersRef.current[fromPlayerId];
+      if (signal.kind === 'offer' && alreadyAnswered && alreadyAnswered.negotiationId === signal.negotiationId) {
+        // This offer was already answered; the other side just did not hear us.
+        // Repeat the same answer rather than renegotiating.
+        roomSocketRef.current?.sendVoiceSignal(fromPlayerId, {
+          kind: 'answer',
+          description: alreadyAnswered.description,
+          negotiationId: signal.negotiationId,
+        });
+        return;
+      }
       const existing = peerConnectionsRef.current[fromPlayerId];
-      if (signal.kind === 'offer' && existing && existing.connectionState !== 'connected') {
-        // A fresh offer on a peer that never finished connecting means the other
-        // side gave up and started over; ours is stale and may not even accept a
-        // remote description in its current signaling state. Start over too.
-        // (A re-offer on a connected peer is an ICE restart and must be kept.)
+      if (signal.kind === 'offer' && existing && !canApplyRemoteOffer(existing)) {
+        // Only rebuild when this peer genuinely cannot take the offer. A repeat
+        // offer usually means the other side started over, and applying it as a
+        // renegotiation keeps the ICE checks that are already running - tearing
+        // the peer down instead threw away handshakes that were about to
+        // succeed and left both sides stuck in "connecting".
         closeVoicePeer(fromPlayerId);
       }
       const peer = await createVoicePeer(fromPlayerId, false);
@@ -415,9 +485,27 @@ export function useVoicePeers({
         await flushPendingIceCandidates(fromPlayerId, peer);
         const answer = tunedDescription(await peer.createAnswer());
         await peer.setLocalDescription(answer);
-        roomSocketRef.current?.sendVoiceSignal(fromPlayerId, { kind: 'answer', description: answer });
+        lastAnswersRef.current[fromPlayerId] = { negotiationId: signal.negotiationId, description: answer };
+        // Echo the offer's id so the other side can tell this answer apart from
+        // one belonging to an offer it has already given up on.
+        roomSocketRef.current?.sendVoiceSignal(fromPlayerId, {
+          kind: 'answer',
+          description: answer,
+          negotiationId: signal.negotiationId,
+        });
       }
       if (signal.kind === 'answer' && signal.description) {
+        const awaiting = negotiationIdsRef.current[fromPlayerId];
+        // Only reject an answer that names a DIFFERENT negotiation. An answer
+        // without an id comes from a client that does not send one (an older
+        // build, or the packaged desktop bundle); rejecting those would silence
+        // voice against that peer completely, which is far worse than the rare
+        // late answer this check exists to catch.
+        if (signal.negotiationId !== undefined && signal.negotiationId !== awaiting) {
+          // Applying it would hand the current connection a description from a
+          // different session - the InvalidStateError and instant "failed".
+          return;
+        }
         await peer.setRemoteDescription(signal.description);
         await flushPendingIceCandidates(fromPlayerId, peer);
       }
@@ -434,6 +522,30 @@ export function useVoicePeers({
     } catch (caught) {
       setVoiceDiagnostics((current) => ({ ...current, [fromPlayerId]: `signal error - ${voiceErrorMessage(caught)}` }));
     }
+  }
+
+  /**
+   * Send an offer and remember which negotiation it starts.
+   *
+   * Every offer gets a fresh id that the answering side echoes back, so an
+   * answer to a superseded offer can be recognised and dropped instead of
+   * corrupting the connection that replaced it.
+   */
+  function sendOffer(playerId: string, description: RTCSessionDescriptionInit) {
+    const negotiationId = crypto.randomUUID();
+    negotiationIdsRef.current[playerId] = negotiationId;
+    offerResendsRef.current[playerId] = 0;
+    roomSocketRef.current?.sendVoiceSignal(playerId, { kind: 'offer', description, negotiationId });
+  }
+
+  /**
+   * Whether a remote offer can still be applied to this peer.
+   *
+   * `stable` and `have-remote-offer` accept one (a renegotiation); `have-local-
+   * offer` is glare and `closed` is unusable, so those need a fresh peer.
+   */
+  function canApplyRemoteOffer(peer: RTCPeerConnection) {
+    return peer.signalingState === 'stable' || peer.signalingState === 'have-remote-offer';
   }
 
   /**
@@ -617,6 +729,9 @@ export function useVoicePeers({
   function closeVoicePeer(playerId: string) {
     window.clearTimeout(negotiationWatchdogsRef.current[playerId]);
     delete negotiationWatchdogsRef.current[playerId];
+    delete negotiationIdsRef.current[playerId];
+    delete offerResendsRef.current[playerId];
+    delete lastAnswersRef.current[playerId];
     peerConnectionsRef.current[playerId]?.close();
     delete peerConnectionsRef.current[playerId];
     delete pendingIceCandidatesRef.current[playerId];

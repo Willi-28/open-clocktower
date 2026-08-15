@@ -102,9 +102,11 @@ async def update_room(room_id: str, request: UpdateRoomRequest, x_player_secret:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
+    # Same ordering rule as set_phase: clients need the new night-voice setting
+    # before they see voice changes derived from it.
+    await room_hub.broadcast_state(room)
     if room.phase == "night" and not room.allow_public_voice_during_night:
         await room_hub.close_public_voice_rooms(room_id)
-    await room_hub.broadcast_state(room)
     return room
 
 
@@ -239,6 +241,12 @@ async def set_phase(room_id: str, request: PhaseRequest, x_player_secret: str | 
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
+    # The new phase goes out FIRST. Clients decide locally who may be in voice
+    # during night, so a voice change that arrives while they still believe it
+    # is night makes them leave the room they were just moved into and rejoin a
+    # moment later - the resulting churn cancels handshakes that were already
+    # under way and leaves players stuck in "connecting".
+    await room_hub.broadcast_state(room)
     if room.phase == "night" and not room.allow_public_voice_during_night:
         await room_hub.close_public_voice_rooms(room_id)
     if was_night and room.phase == "day":
@@ -247,7 +255,6 @@ async def set_phase(room_id: str, request: PhaseRequest, x_player_secret: str | 
         await room_hub.gather_everyone_in_voice_room(room_id, DEFAULT_VOICE_ROOM)
     # Day/night flips change what voice presence each player may see.
     await room_hub.broadcast_voice_state(room_id)
-    await room_hub.broadcast_state(room)
     return room
 
 

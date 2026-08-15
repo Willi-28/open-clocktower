@@ -459,6 +459,13 @@ export function App() {
   const visibleVoiceParticipants = hideNightVoicePresence
     ? voiceSession.voiceParticipants.filter((participant) => participant.voiceRoom === voiceSession.joinedVoiceRoom)
     : voiceSession.voiceParticipants;
+  // A private call is not one of the fixed public rooms, so while one is active
+  // it is appended to the list. Without a block of its own the call has no
+  // occupant rows at all - which is why nobody showed a speaking ring in it.
+  const visibleVoiceRooms = useMemo(() => {
+    const joined = voiceSession.joinedVoiceRoom;
+    return joined && !voiceRooms.includes(joined) ? [...voiceRooms, joined] : voiceRooms;
+  }, [voiceSession.joinedVoiceRoom]);
   const seatedPlayerCounter = seatedPlayerCount(room);
   const isPlayerNightView = Boolean(room?.phase === 'night' && currentPlayer && !isStoryteller);
   const showDesktopShellActions = isDesktop && (isShell || !room);
@@ -799,11 +806,11 @@ export function App() {
     }
   }
 
-  /** Return current occupants (name + avatar) for one public voice room. */
+  /** Return current occupants (name + avatar) for one voice room. */
   function publicVoiceOccupants(voiceRoom: string) {
-    // At night the panel shows no occupant names at all - own-room presence
-    // data still exists locally (WebRTC needs it) but must not be displayed.
-    if (hideNightVoicePresence) {
+    // At night the panel must not reveal who is where - except for the room this
+    // player is in themselves, whose occupants they can already hear anyway.
+    if (hideNightVoicePresence && voiceRoom !== voiceSession.joinedVoiceRoom) {
       return [];
     }
     return visibleVoiceParticipants
@@ -1044,7 +1051,7 @@ export function App() {
               roomPhase={room.phase}
               speakingPlayerIds={voiceActivity.speakingPlayerIds}
               voiceRoomLabel={(voiceRoom) => voiceRoomLabel(voiceRoom, playerName)}
-              voiceRooms={voiceRooms}
+              voiceRooms={visibleVoiceRooms}
             />
           </aside>
 
