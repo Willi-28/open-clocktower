@@ -21,7 +21,7 @@ export type ClientSettings = {
 
 export const defaultClientSettings: ClientSettings = {
   showTable: true,
-  appTheme: 'classic',
+  appTheme: 'retro-rpg',
   nightEffect: 'subtle',
   soundVolume: 1,
   soundFiltersEnabled: true,

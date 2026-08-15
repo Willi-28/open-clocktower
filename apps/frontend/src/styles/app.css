@@ -517,6 +517,22 @@ h2 {
   color: #18080d;
 }
 
+/* Classic's library scene stays scoped to this theme; Dark and Light retain
+ * their own CSS surfaces without a photographic layer. */
+.app-shell.theme-classic.background-classic::before {
+  background:
+    linear-gradient(180deg, rgba(20, 5, 8, 0.06), rgba(8, 2, 4, 0.24)),
+    url("../assets/classic-background.png") center / cover no-repeat;
+  content: "";
+  filter: saturate(0.94) brightness(0.94) contrast(1.04);
+  image-rendering: auto;
+  inset: 0;
+  opacity: 0.98;
+  pointer-events: none;
+  position: fixed;
+  z-index: 0;
+}
+
 .app-shell.background-space::before {
   background:
     radial-gradient(ellipse at 52% 48%, rgba(42, 72, 118, 0.08), transparent 34rem),

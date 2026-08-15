@@ -66,6 +66,15 @@ import { openRoomSocket } from './websocket/roomSocket';
 
 const defaultVoiceRoom = voiceRooms[0];
 const autoDismissErrorMessage = 'dead player has no vote remaining';
+const appThemeBackgroundClasses: Record<ClientSettings['appTheme'], string> = {
+  classic: 'background-classic',
+  dark: '',
+  light: '',
+  universe: 'background-space',
+  magic: 'background-magic',
+  island: 'background-island',
+  'retro-rpg': 'background-retro-rpg',
+};
 
 type PendingConfirmation = {
   confirmLabel: string;
@@ -470,11 +479,12 @@ export function App() {
   const isPlayerNightView = Boolean(room?.phase === 'night' && currentPlayer && !isStoryteller);
   const showDesktopShellActions = isDesktop && (isShell || !room);
   const showDesktopChangeServerButton = isDesktop && !isShell && !room;
+  const appThemeBackgroundClass = appThemeBackgroundClasses[clientSettings.appTheme];
   const appShellClassName = [
     'app-shell',
     room?.phase === 'night' ? 'room-night' : '',
     isPlayerNightView ? 'player-night' : '',
-    `background-${clientSettings.appTheme === 'universe' ? 'space' : clientSettings.appTheme === 'magic' ? 'magic' : clientSettings.appTheme === 'island' ? 'island' : clientSettings.appTheme === 'retro-rpg' ? 'retro-rpg' : 'classic'}`,
+    appThemeBackgroundClass,
     `theme-${clientSettings.appTheme}`,
     `night-effect-${clientSettings.nightEffect}`,
     clientSettings.showTable ? '' : 'table-hidden',
