@@ -2,6 +2,7 @@
 name = "open-clocktower-backend"
 version = "0.1.0"
 description = "Backend for Open Clocktower"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
   # Compatible-release ranges: keep production builds reproducible and prevent a

@@ -86,6 +86,18 @@ For the full setup, security checklist, voice/TURN notes, and backup guidance, s
 - [Character Packs](docs/character-packs.md)
 - [API & Events](docs/api-events.md)
 - [Voice Audio](docs/voice-audio.md)
+- [Steam Release](docs/steam-release.md)
+
+## License
+
+Open Clocktower is released under the [MIT License](LICENSE).
+
+The bundled artwork was generated with AI image tools, in some cases starting
+from reference material, and large parts of the source were written with AI
+assistance. Third-party components and the attribution their licenses require —
+Twemoji (CC-BY 4.0), the Cinzel and Alegreya fonts (OFL 1.1), Electron, React,
+and the server dependencies — are listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Operational Status
 

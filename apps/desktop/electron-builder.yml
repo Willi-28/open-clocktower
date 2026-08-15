@@ -17,7 +17,12 @@ files:
   - "!release/**"
   - "!test/**"
   - "!scripts/**"
+  - "!steam/**"
   - "!README.md"
+  # Dev-only Steam testing file. It must never reach a shipped build: placed next
+  # to the exe it OVERRIDES the App ID Steam passes in, so a copy of it would
+  # make every customer's client announce itself as the wrong app.
+  - "!steam_appid.txt"
 
 asar: true
 # The native .node addon and the Steam runtime libs it links against cannot be
@@ -32,11 +37,14 @@ extraResources:
   - from: ../frontend/dist
     to: frontend
 
-# steam_appid.txt must sit next to the exe so App 480 (Spacewar) works in testing.
-# For a real Steam release you ship through Steam and can drop this.
+# Attribution that must ship with the binary: the bundled Twemoji icons are
+# CC-BY 4.0 and the fonts are OFL 1.1, both of which require the notice to
+# travel with the distributed copy.
 extraFiles:
-  - from: steam_appid.txt
-    to: steam_appid.txt
+  - from: ../../LICENSE
+    to: LICENSE.txt
+  - from: ../../THIRD-PARTY-NOTICES.md
+    to: THIRD-PARTY-NOTICES.txt
 
 # One self-contained portable file: OpenClocktower.exe. No installer and no
 # embedded backend server; the desktop client connects to a self-hosted server.

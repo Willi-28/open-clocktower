@@ -29,7 +29,6 @@ import { initSteam, startCallbackPump } from './steam/steam.mjs';
 
 const { app, BrowserWindow, ipcMain, shell } = electron;
 const dirname = path.dirname(fileURLToPath(import.meta.url));
-const STEAM_APP_ID = Number(process.env.OCT_STEAM_APPID || 480);
 const DEFAULT_GATEWAY_PORT = 28741;
 
 let steam = null;
@@ -57,6 +56,16 @@ if (hasInstanceLock) {
 function frontendStaticDir() {
   // Packaged: extraResources places the built UI under resources/frontend.
   return app.isPackaged ? path.join(process.resourcesPath, 'frontend') : path.resolve(dirname, '..', '..', 'frontend', 'dist');
+}
+
+/**
+ * The Steam App ID to initialise with, or undefined to let the Steam SDK read
+ * it from the environment. Undefined is the normal case for a shipped build;
+ * OCT_STEAM_APPID only exists so a developer can force one while testing.
+ */
+function configuredSteamAppId() {
+  const raw = Number(process.env.OCT_STEAM_APPID);
+  return Number.isInteger(raw) && raw > 0 ? raw : undefined;
 }
 
 /** Keep the desktop origin stable so localStorage survives app restarts. */
@@ -183,7 +192,7 @@ function createWindow() {
 if (hasInstanceLock) {
   app.whenReady().then(async () => {
     try {
-      steam = initSteam(STEAM_APP_ID);
+      steam = initSteam(configuredSteamAppId());
       steam.steamworks.electronEnableSteamOverlay?.();
       stopPump = startCallbackPump(steam.client);
     } catch (error) {

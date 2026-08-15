@@ -1,0 +1,7 @@
+{
+  "_comment": "Steamworks IDs for the depot upload. Fill these in once partner.steamgames.com has issued the App ID; the client itself needs no App ID (Steam passes it at launch).",
+  "appId": null,
+  "depotId": null,
+  "branch": "",
+  "steamcmdAccount": ""
+}
