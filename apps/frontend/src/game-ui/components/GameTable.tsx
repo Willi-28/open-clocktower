@@ -544,6 +544,11 @@ export function GameTable({
         panDragRef.current = null;
         setIsPanning(false);
       }}
+      onContextMenuCapture={(event) => {
+        // The table owns right-click interactions. Suppress the browser menu on
+        // the stable stage as well as the individual interactive children.
+        event.preventDefault();
+      }}
       onDoubleClick={() => setTablePan({ x: 0, y: 0 })}
     >
       <div
@@ -562,34 +567,22 @@ export function GameTable({
             ((event.clientY - bounds.top) / bounds.height) * 100,
           );
         }}
-        onPointerDown={(event) => {
-          // Open the token picker the instant the right button is pressed, not on
-          // release - the native contextmenu event only fires on mouseup.
-          if (event.pointerType === 'mouse' && event.button === 2) {
-            // The picker only pops up on free table spots: right-clicking an
-            // existing token removes it (the token handles that itself), and
-            // right-clicks on seats do nothing.
-            if (event.target instanceof Element && event.target.closest('.reminder-token, .seat')) {
-              return;
-            }
-            event.preventDefault();
-            // pointerdown is a discrete event, so React flushes this state update
-            // synchronously and the token menu's outside-close listener attaches
-            // mid-event; stop propagation so this same pointerdown does not reach
-            // document and immediately close the menu we are opening.
-            event.stopPropagation();
-            const bounds = event.currentTarget.getBoundingClientRect();
-            onFieldContextMenu(
-              ((event.clientX - bounds.left) / bounds.width) * 100,
-              ((event.clientY - bounds.top) / bounds.height) * 100,
-              event.clientX,
-              event.clientY,
-            );
-          }
-        }}
         onContextMenu={(event) => {
-          // The picker already opened on pointerdown; just suppress the native menu.
           event.preventDefault();
+          // Existing tokens and seats own their right-click behavior. Free table
+          // space opens the picker only after the native menu is suppressed, so
+          // mounting the portaled picker cannot steal this contextmenu event.
+          if (event.target instanceof Element && event.target.closest('.reminder-token, .seat')) {
+            return;
+          }
+          event.stopPropagation();
+          const bounds = event.currentTarget.getBoundingClientRect();
+          onFieldContextMenu(
+            ((event.clientX - bounds.left) / bounds.width) * 100,
+            ((event.clientY - bounds.top) / bounds.height) * 100,
+            event.clientX,
+            event.clientY,
+          );
         }}
       >
         {room.phase !== 'lobby' || voteCountIndex >= 0 ? (

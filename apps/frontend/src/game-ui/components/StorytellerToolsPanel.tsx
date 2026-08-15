@@ -133,7 +133,7 @@ export function StorytellerToolsPanel({
 
   return (
     <div className="storyteller-tools">
-      <div className="button-row">
+      <div className="button-row phase-button-row">
         <button disabled={!isLobby && !room.show_board} onClick={onStartGame} type="button">
           Start Game
         </button>

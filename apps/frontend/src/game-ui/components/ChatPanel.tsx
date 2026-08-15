@@ -265,7 +265,7 @@ export function ChatPanel({
   return (
     <section className="chat-panel">
       <div className="chat-heading">
-        <span className="chat-heading-text">
+        <span className={activeChatTab === 'public' ? 'chat-heading-text public' : 'chat-heading-text'}>
           <strong>{activeChatTab === 'public' ? 'Town Chat' : playerName(activeChatTab)}</strong>
           <small>{activeChatTab === 'public' ? '#public' : 'private whisper'}</small>
         </span>

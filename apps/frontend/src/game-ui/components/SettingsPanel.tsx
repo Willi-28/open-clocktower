@@ -394,6 +394,7 @@ export function SettingsPanel({
                 <option value="universe">Universe</option>
                 <option value="magic">Magic</option>
                 <option value="island">Island</option>
+                <option value="retro-rpg">Retro RPG</option>
               </select>
             </label>
             <label>

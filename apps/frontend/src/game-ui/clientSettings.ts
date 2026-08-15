@@ -9,7 +9,7 @@ export const clientSettingsKey = 'open-clocktower.client-settings.v1';
 
 export type ClientSettings = {
   showTable: boolean;
-  appTheme: 'classic' | 'dark' | 'light' | 'universe' | 'magic' | 'island';
+  appTheme: 'classic' | 'dark' | 'light' | 'universe' | 'magic' | 'island' | 'retro-rpg';
   nightEffect: 'subtle' | 'fog' | 'none';
   soundVolume: number;
   soundFiltersEnabled: boolean;
@@ -51,7 +51,7 @@ export function loadClientSettings(): ClientSettings {
     const soundVolume = typeof stored.soundVolume === 'number' && Number.isFinite(stored.soundVolume)
       ? Math.max(0, Math.min(2, stored.soundVolume))
       : defaultClientSettings.soundVolume;
-    const appTheme = ['classic', 'dark', 'light', 'universe', 'magic', 'island'].includes(String(stored.appTheme))
+    const appTheme = ['classic', 'dark', 'light', 'universe', 'magic', 'island', 'retro-rpg'].includes(String(stored.appTheme))
       ? stored.appTheme as ClientSettings['appTheme']
       : defaultClientSettings.appTheme;
     const nightEffect = ['subtle', 'fog', 'none'].includes(String(stored.nightEffect))

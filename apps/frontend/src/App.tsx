@@ -474,13 +474,15 @@ export function App() {
     'app-shell',
     room?.phase === 'night' ? 'room-night' : '',
     isPlayerNightView ? 'player-night' : '',
-    `background-${clientSettings.appTheme === 'universe' ? 'space' : clientSettings.appTheme === 'magic' ? 'magic' : clientSettings.appTheme === 'island' ? 'island' : 'classic'}`,
+    `background-${clientSettings.appTheme === 'universe' ? 'space' : clientSettings.appTheme === 'magic' ? 'magic' : clientSettings.appTheme === 'island' ? 'island' : clientSettings.appTheme === 'retro-rpg' ? 'retro-rpg' : 'classic'}`,
     `theme-${clientSettings.appTheme}`,
     `night-effect-${clientSettings.nightEffect}`,
     clientSettings.showTable ? '' : 'table-hidden',
     room ? (isTopBarOpen ? 'topbar-open' : 'topbar-collapsed') : '',
   ].filter(Boolean).join(' ');
   const appPortalTarget = appShellRef.current ?? document.body;
+  const tokenMenuViewportWidth = clientSettings.appTheme === 'retro-rpg' ? 380 : 256;
+  const tokenMenuViewportHeight = clientSettings.appTheme === 'retro-rpg' ? 480 : 308;
 
   /** Send the current chat draft over the socket or append it locally if offline. */
   function submitChatMessage() {
@@ -1202,10 +1204,11 @@ export function App() {
               ? createPortal(
                   <div
                     className="token-context-menu"
+                    onContextMenu={(event) => event.preventDefault()}
                     style={{
                       position: 'fixed',
-                      left: Math.min(Math.max(12, tokenMenu.clientX), window.innerWidth - 268),
-                      top: Math.min(Math.max(12, tokenMenu.clientY), window.innerHeight - 320),
+                      left: Math.max(12, Math.min(tokenMenu.clientX, window.innerWidth - tokenMenuViewportWidth - 12)),
+                      top: Math.max(12, Math.min(tokenMenu.clientY, window.innerHeight - tokenMenuViewportHeight - 12)),
                     }}
                   >
                     <strong>Place reminder</strong>

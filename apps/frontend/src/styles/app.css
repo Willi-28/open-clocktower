@@ -563,6 +563,21 @@ h2 {
   z-index: 0;
 }
 
+.app-shell.background-retro-rpg::before {
+  background:
+    linear-gradient(90deg, rgba(8, 3, 2, 0.36), transparent 24%, transparent 76%, rgba(8, 3, 2, 0.36)),
+    linear-gradient(180deg, rgba(17, 6, 3, 0.06), rgba(8, 3, 2, 0.24)),
+    url("../assets/retro-rpg/tavern-background.png") center / cover no-repeat;
+  content: "";
+  filter: saturate(1.02) brightness(0.92) contrast(1.04);
+  image-rendering: pixelated;
+  inset: 0;
+  opacity: 1;
+  pointer-events: none;
+  position: fixed;
+  z-index: 0;
+}
+
 .app-shell.player-night::after {
   content: "";
   display: none !important;
@@ -1378,6 +1393,80 @@ h2 {
     linear-gradient(180deg, #0a6f7e, #073041);
 }
 
+.app-shell.theme-retro-rpg {
+  --display-font: ui-monospace, "Cascadia Mono", "Courier New", monospace;
+  --body-font: ui-monospace, "Cascadia Mono", "Courier New", monospace;
+  --mono-font: ui-monospace, "Cascadia Mono", "Courier New", monospace;
+  --display-tracking: 0;
+  --radius-panel: 0;
+  --radius-card: 0;
+  --radius-inner: 0;
+  --radius-pill: 0;
+  --bg-0: #090302;
+  --bg-1: #180806;
+  --bg-2: #2d100d;
+  --panel-0: #2b1013;
+  --panel-1: #100607;
+  --burgundy: #74162d;
+  --burgundy-soft: #9b2941;
+  --burgundy-dark: #26070e;
+  --wine-shadow: rgba(83, 13, 25, 0.62);
+  --gold: #d89c36;
+  --gold-bright: #ffe08a;
+  --gold-muted: #a66d2d;
+  --cream: #ffe8b4;
+  --muted: #c69a67;
+  --button-bg: linear-gradient(180deg, #5a1025, #26070f);
+  --button-bg-hover: linear-gradient(180deg, #861836, #3a0918);
+  --input-bg: #1a0b0b;
+  --panel-bg: linear-gradient(180deg, rgba(48, 17, 18, 0.98), rgba(15, 6, 7, 0.99)), #1a0a0b;
+  --panel-border: rgba(223, 157, 50, 0.76);
+  --inner-bg: linear-gradient(180deg, rgba(54, 19, 20, 0.96), rgba(20, 7, 8, 0.98)), #210b0e;
+  --tab-active-bg: linear-gradient(180deg, #74162d, #340913);
+  --message-text: #ffe7bd;
+  --theme-glow: rgba(178, 67, 30, 0.3);
+  --table-bg:
+    linear-gradient(180deg, rgba(59, 17, 8, 0.05), rgba(10, 3, 2, 0.18)),
+    url("../assets/retro-rpg/table.png") center / 100% 100% no-repeat;
+  --table-border: transparent;
+  --table-shadow:
+    inset 0 0 68px rgba(16, 4, 2, 0.28),
+    0 34px 74px rgba(0, 0, 0, 0.7),
+    0 0 34px rgba(173, 62, 20, 0.18);
+  --table-line: rgba(231, 170, 70, 0.3);
+  --table-shine: rgba(255, 224, 138, 0.06);
+  --vote-hand-core: #160705;
+  --vote-hand-dark: #32100b;
+  --vote-hand-mid: #6a2b15;
+  --vote-hand-ridge: #b56b24;
+  --vote-hand-accent: rgba(255, 204, 86, 0.48);
+  --vote-hand-accent-soft: rgba(213, 145, 47, 0.34);
+  --vote-hand-highlight: rgba(255, 232, 166, 0.34);
+  --vote-hand-center: #71311a;
+  --vote-hand-center-light: #ffe6a3;
+  --vote-hand-border: rgba(223, 157, 50, 0.72);
+  --seat-bg: linear-gradient(180deg, #301113, #100607), #1a090b;
+  --seat-bg-character: linear-gradient(180deg, #64112b, #260711), #3a0a18;
+  --seat-border: rgba(223, 157, 50, 0.82);
+  --seat-overlay: linear-gradient(180deg, rgba(18, 6, 4, 0.06), rgba(15, 4, 4, 0.72));
+  --seat-text: #fff0c5;
+  --demon-bar-bg: linear-gradient(180deg, #3b1018, #140609);
+  --demon-bar-border: rgba(223, 157, 50, 0.7);
+  --demon-slot-bg: linear-gradient(180deg, #70152d, #2d0812);
+  --demon-slot-border: rgba(244, 183, 70, 0.82);
+  --chat-bg: #1d0a0c;
+  --chat-border: rgba(223, 157, 50, 0.74);
+  --chat-tab-bg: #3d1119;
+  --chat-tab-active: linear-gradient(180deg, #74162d, #320913);
+  --chat-input-bg: #100607;
+  --chat-line: rgba(223, 157, 50, 0.42);
+  background: #090302;
+  color: var(--cream);
+  font-family: var(--body-font);
+  image-rendering: pixelated;
+  text-rendering: geometricPrecision;
+}
+
 .workspace > * {
   min-width: 0;
   position: relative;
@@ -1415,6 +1504,13 @@ h2 {
     radial-gradient(ellipse at 48% 48%, rgba(255, 222, 139, 0.12), transparent 38rem),
     radial-gradient(ellipse at 30% 78%, rgba(28, 175, 186, 0.14), transparent 30rem),
     linear-gradient(90deg, rgba(6, 48, 63, 0.42), rgba(16, 96, 104, 0.08) 45%, rgba(5, 42, 58, 0.46));
+}
+
+.app-shell.background-retro-rpg,
+.app-shell.background-retro-rpg .workspace {
+  background:
+    linear-gradient(90deg, rgba(8, 3, 2, 0.26), transparent 23%, transparent 77%, rgba(8, 3, 2, 0.26)),
+    linear-gradient(180deg, rgba(14, 5, 3, 0.04), rgba(7, 2, 2, 0.16));
 }
 
 .panel,
@@ -6244,6 +6340,778 @@ details.voice-panel[open] > summary::before {
   box-shadow:
     0 0 0 1px var(--gold),
     0 0 16px var(--theme-glow);
+}
+
+/* Retro RPG uses the supplied pixel-art sheets as a scoped skin. The existing
+ * component layout and interaction states stay intact; only their surfaces are
+ * replaced with reusable 9-slice frames and fixed atlas labels. */
+.app-shell.theme-retro-rpg * {
+  letter-spacing: 0;
+}
+
+.app-shell.theme-retro-rpg :is(h1, h2, h3, .tool-section-heading, .voice-room-name, .character-team-heading) {
+  color: var(--gold-bright);
+  font-family: var(--display-font);
+  text-shadow: 2px 2px 0 #2b0905, 0 0 8px rgba(223, 157, 50, 0.24);
+}
+
+/* Keep the pixel face for short labels, while longer instructions use the
+ * bundled book serif so they remain comfortable to scan. */
+.app-shell.theme-retro-rpg :is(.night-order-list li span, .character-card p) {
+  font-family: "Alegreya", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  font-size: 0.98rem;
+  font-weight: 500;
+  line-height: 1.45;
+  text-rendering: optimizeLegibility;
+}
+
+.app-shell.theme-retro-rpg :is(.setup-grid, .server-connect-content)::before {
+  aspect-ratio: 520 / 88;
+  background: url("../assets/retro-rpg/title-clocktower.png") center / contain no-repeat;
+  content: "";
+  display: block;
+  grid-column: 1 / -1;
+  justify-self: center;
+  max-width: 520px;
+  pointer-events: none;
+  width: min(520px, 88vw);
+}
+
+.app-shell.theme-retro-rpg :is(
+  .panel,
+  .left-edge > details,
+  .left-edge > .voice-panel,
+  .chat-panel,
+  .floating-sheet,
+  .chat-popout,
+  .settings-panel,
+  .confirm-dialog,
+  .seat-action-menu,
+  .token-context-menu,
+  .server-connect-help,
+  .server-address-bar,
+  .lobby-info
+) {
+  background: #1d0a0c;
+  background-clip: padding-box;
+  border: 12px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 28 fill;
+  border-image-source: url("../assets/retro-rpg/panel-frame.png");
+  border-image-width: 12px;
+  border-radius: 0;
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.58), 0 0 18px rgba(128, 40, 15, 0.2);
+}
+
+.app-shell.theme-retro-rpg .chat-popout .chat-panel {
+  background: transparent;
+  border: 0;
+  border-image: none;
+  box-shadow: none;
+}
+
+.app-shell.theme-retro-rpg :is(.panel details, .character-card, .role-card, .sheet-detached-note) {
+  background: #1a090b;
+  background-clip: padding-box;
+  border: 8px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 28 fill;
+  border-image-source: url("../assets/retro-rpg/panel-frame.png");
+  border-image-width: 8px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.app-shell.theme-retro-rpg .game-top-bar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: linear-gradient(180deg, rgba(52, 17, 15, 0.98), rgba(16, 6, 5, 0.98));
+  border-bottom: 3px solid #b97826;
+  box-shadow: inset 0 -2px 0 #4d180d, 0 5px 0 rgba(8, 2, 1, 0.56);
+}
+
+.app-shell.theme-retro-rpg .dashboard-tabs,
+.app-shell.theme-retro-rpg :is(.chat-heading, .chat-popout-titlebar, .floating-sheet-titlebar) {
+  background: linear-gradient(180deg, #351015, #160708);
+  border-bottom: 2px solid #9d6221;
+  box-shadow: inset 0 -2px 0 #351008;
+}
+
+.app-shell.theme-retro-rpg button,
+.app-shell.theme-retro-rpg .pack-upload-button {
+  background: #351016;
+  background-clip: padding-box;
+  border: 7px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 22 fill;
+  border-image-source: url("../assets/retro-rpg/button.png");
+  border-image-width: 7px;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--cream);
+  text-shadow: 1px 1px 0 #210605;
+}
+
+.app-shell.theme-retro-rpg .dashboard-tab:not(.dashboard-tab-characters) {
+  background: #1d1107;
+  border-image-slice: 22;
+}
+
+.app-shell.theme-retro-rpg button:where(:not(.seat):not(.dashboard-tab-characters):not(.reminder-token):not(.reminder-symbol)):hover:not(:disabled),
+.app-shell.theme-retro-rpg .pack-upload-button:hover {
+  background: #2b1709;
+  border-color: transparent;
+  border-image-slice: 22;
+  border-image-source: url("../assets/retro-rpg/button.png");
+  color: #fff2bd;
+  filter: brightness(1.13) saturate(0.92) drop-shadow(0 0 4px rgba(231, 166, 50, 0.38));
+}
+
+.app-shell.theme-retro-rpg :is(
+  .dashboard-tab.active:not(.dashboard-tab-characters),
+  .settings-tabs button.active,
+  .hand-button.raised
+) {
+  background: #2b1709;
+  border-color: transparent;
+  border-image-slice: 22;
+  border-image-source: url("../assets/retro-rpg/button.png");
+  color: #fff4c2;
+  filter: brightness(1.18) saturate(0.9) drop-shadow(0 0 5px rgba(236, 173, 57, 0.56));
+  text-shadow: 1px 1px 0 #210605, 0 0 5px rgba(255, 224, 138, 0.38);
+}
+
+.app-shell.theme-retro-rpg :is(
+  .voice-room,
+  .chat-simple-targets button,
+  .chat-minimize,
+  .chat-panel-open-button,
+  .top-bar-reopen,
+  .dashboard-edge-handle,
+  .reminder-token.image-token,
+  .emoji-picker-grid button,
+  .demon-bluff-picker button
+) {
+  background: transparent;
+  border: 0;
+  border-image: none;
+  box-shadow: none;
+}
+
+.app-shell.theme-retro-rpg :is(
+  .voice-room,
+  .chat-simple-targets button,
+  .chat-minimize,
+  .chat-panel-open-button,
+  .top-bar-reopen,
+  .dashboard-edge-handle
+):hover:not(:disabled) {
+  background: transparent;
+  border: 0;
+  border-image: none;
+  box-shadow: none;
+  filter: none;
+}
+
+.app-shell.theme-retro-rpg .voice-room-block:not(.active) .voice-room:hover:not(:disabled) {
+  background: rgba(216, 156, 54, 0.07);
+}
+
+.app-shell.theme-retro-rpg .chat-simple-targets button.active {
+  background: rgba(137, 86, 24, 0.48);
+  box-shadow: inset 0 -3px 0 var(--gold-bright);
+}
+
+.app-shell.theme-retro-rpg .chat-simple-targets button.active:hover:not(:disabled) {
+  background: rgba(163, 108, 31, 0.56);
+  box-shadow: inset 0 -3px 0 var(--gold-bright);
+}
+
+.app-shell.theme-retro-rpg .settings-tabs {
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  width: 100%;
+}
+
+.app-shell.theme-retro-rpg .settings-tabs button {
+  border-width: 5px;
+  border-image-width: 5px;
+  font-size: 0.68rem;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 2px;
+  text-overflow: clip;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.app-shell.theme-retro-rpg .phase-button-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(0, 0.75fr));
+  width: 100%;
+}
+
+.app-shell.theme-retro-rpg .phase-button-row button {
+  border-width: 5px;
+  border-image-width: 5px;
+  font-size: 0.78rem;
+  min-width: 0;
+  padding: 0 4px;
+  width: 100%;
+}
+
+.app-shell.theme-retro-rpg :is(
+  .voice-user-button,
+  .chat-input-row button,
+  .chat-popout-buttons button,
+  .floating-sheet-reattach,
+  .top-bar-icon,
+  .role-dist-step,
+  .demon-bluff-slot button
+) {
+  border-width: 4px;
+  border-image-width: 4px;
+  padding: 0;
+}
+
+.app-shell.theme-retro-rpg .segmented-control {
+  background: #120607;
+  border: 2px solid #754719;
+  border-radius: 0;
+  gap: 4px;
+  padding: 3px;
+}
+
+.app-shell.theme-retro-rpg .segmented-control button,
+.app-shell.theme-retro-rpg .segmented-control button:hover:not(:disabled) {
+  background: transparent;
+  border: 0;
+  border-image: none;
+  box-shadow: none;
+  filter: none;
+}
+
+.app-shell.theme-retro-rpg .segmented-control button:hover:not(:disabled) {
+  background: rgba(216, 156, 54, 0.12);
+  color: #fff2bd;
+}
+
+.app-shell.theme-retro-rpg .segmented-control button.active {
+  background: #2b1709;
+  box-shadow: inset 0 0 0 1px #b97826;
+  color: var(--gold-bright);
+}
+
+.app-shell.theme-retro-rpg :is(.emoji-picker-grid button, .demon-bluff-picker button):hover:not(:disabled) {
+  background: rgba(216, 156, 54, 0.12);
+  border: 0;
+  border-image: none;
+  box-shadow: none;
+  filter: none;
+}
+
+.app-shell.theme-retro-rpg .reminder-token.image-token:hover:not(:disabled) {
+  background: transparent;
+  border: 0;
+  border-image: none;
+  box-shadow: none;
+  filter: brightness(1.08);
+}
+
+.app-shell.theme-retro-rpg .token-context-menu {
+  gap: 12px;
+  max-height: min(480px, calc(100vh - 24px));
+  padding: 12px;
+  width: min(380px, calc(100vw - 24px));
+}
+
+.app-shell.theme-retro-rpg .token-context-menu > strong {
+  font-size: 0.84rem;
+}
+
+.app-shell.theme-retro-rpg .token-context-grid {
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+  max-height: min(404px, calc(100vh - 100px));
+  padding-right: 4px;
+}
+
+.app-shell.theme-retro-rpg .token-context-grid button {
+  background: #160708;
+  background-clip: padding-box;
+  border: 2px solid #87531c;
+  border-image: none;
+  border-radius: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 138, 0.06);
+  filter: none;
+  gap: 5px;
+  grid-template-rows: 44px minmax(2.2em, auto);
+  min-height: 86px;
+  padding: 7px 5px 6px;
+}
+
+.app-shell.theme-retro-rpg .token-context-grid button:hover:not(:disabled) {
+  background: #241407;
+  border-color: #d09534;
+  border-image: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 138, 0.16), 0 0 10px rgba(216, 156, 54, 0.28);
+  filter: brightness(1.08);
+}
+
+.app-shell.theme-retro-rpg .token-context-grid button img {
+  height: 44px;
+  width: 44px;
+}
+
+.app-shell.theme-retro-rpg .token-context-grid button small {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--cream);
+  display: -webkit-box;
+  font-size: 0.58rem;
+  line-height: 1.1;
+  min-height: 2.2em;
+  overflow: hidden;
+  white-space: normal;
+}
+
+.app-shell.theme-retro-rpg .reminder-symbol-grid {
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+}
+
+.app-shell.theme-retro-rpg .reminder-symbol,
+.app-shell.theme-retro-rpg .reminder-symbol:hover:not(.selected) {
+  background: #160708;
+  background-clip: padding-box;
+  border: 2px solid #87531c;
+  border-image: none;
+  border-radius: 0;
+  box-shadow: none;
+  filter: none;
+  min-height: 84px;
+  padding: 6px;
+  transform: none;
+}
+
+.app-shell.theme-retro-rpg .reminder-symbol:hover:not(.selected) {
+  background: #241407;
+  border-color: #d09534;
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 138, 0.16), 0 0 10px rgba(216, 156, 54, 0.28);
+  filter: brightness(1.06);
+}
+
+.app-shell.theme-retro-rpg .reminder-symbol.selected {
+  background: #2b1709;
+  border-color: #c8872c;
+  border-image: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 138, 0.16), 0 0 12px rgba(216, 156, 54, 0.34);
+}
+
+.app-shell.theme-retro-rpg :is(
+  .token-context-grid button img,
+  .reminder-symbol img,
+  .reminder-token img,
+  .character-card img,
+  .seat-avatar
+) {
+  image-rendering: auto;
+}
+
+.app-shell.theme-retro-rpg :is(
+  .token-context-grid button img,
+  .reminder-symbol img,
+  .reminder-token img,
+  .character-card img
+) {
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.62));
+}
+
+.app-shell.theme-retro-rpg .character-card img {
+  object-fit: contain;
+}
+
+.app-shell.theme-retro-rpg :is(
+  input:not([type="checkbox"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea,
+  .pack-select-trigger,
+  .pack-upload-file
+) {
+  background: #160909;
+  background-clip: padding-box;
+  border: 8px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 20 fill;
+  border-image-source: url("../assets/retro-rpg/input.png");
+  border-image-width: 8px;
+  border-radius: 0;
+  color: var(--cream);
+  outline: none;
+}
+
+.app-shell.theme-retro-rpg :is(input, select, textarea):focus {
+  filter: brightness(1.16);
+}
+
+.app-shell.theme-retro-rpg .chat-input-row::before {
+  background: #100607;
+  border: 7px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 20 fill;
+  border-image-source: url("../assets/retro-rpg/input.png");
+  border-image-width: 7px;
+  border-radius: 0;
+}
+
+.app-shell.theme-retro-rpg .chat-input-row textarea {
+  background: transparent;
+  border: 0;
+  border-image: none;
+  filter: none;
+}
+
+.app-shell.theme-retro-rpg .voice-panel-heading strong {
+  aspect-ratio: 390 / 88;
+  background: url("../assets/retro-rpg/title-voice-rooms.png") center / contain no-repeat;
+  color: transparent;
+  display: block;
+  font-size: 0;
+  max-width: 100%;
+  text-shadow: none;
+  width: 230px;
+}
+
+.app-shell.theme-retro-rpg .chat-heading-text.public strong {
+  aspect-ratio: 390 / 88;
+  background: url("../assets/retro-rpg/title-town-chat.png") center / contain no-repeat;
+  color: transparent;
+  display: block;
+  font-size: 0;
+  max-width: 100%;
+  text-shadow: none;
+  width: 190px;
+}
+
+.app-shell.theme-retro-rpg .floating-sheet-titlebar strong {
+  aspect-ratio: 390 / 92;
+  background: url("../assets/retro-rpg/title-characters.png") center / contain no-repeat;
+  color: transparent;
+  display: block;
+  font-size: 0;
+  max-width: calc(100% - 42px);
+  width: 190px;
+}
+
+.app-shell.theme-retro-rpg .dashboard-tab-characters {
+  background: transparent;
+  border: 0;
+  border-image: none;
+  box-shadow: none;
+  color: transparent;
+  min-width: 153px;
+  padding: 0;
+  position: relative;
+  text-shadow: none;
+}
+
+.app-shell.theme-retro-rpg .dashboard-tab-characters::before {
+  background: url("../assets/retro-rpg/title-characters.png") center / contain no-repeat;
+  content: "";
+  height: 36px;
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 153px;
+}
+
+.app-shell.theme-retro-rpg .dashboard-tab-characters:hover:not(:disabled)::before,
+.app-shell.theme-retro-rpg .dashboard-tab-characters.active::before {
+  filter: brightness(1.14);
+}
+
+.app-shell.theme-retro-rpg .dashboard-tab-characters .dashboard-tab-detach-hint {
+  color: var(--gold-bright);
+  position: relative;
+  z-index: 1;
+}
+
+.app-shell.theme-retro-rpg .table-surface {
+  background: var(--table-bg);
+  border: 0;
+  border-radius: 50%;
+  box-shadow: var(--table-shadow);
+  image-rendering: pixelated;
+}
+
+.app-shell.theme-retro-rpg .table-surface::before {
+  background: radial-gradient(ellipse at 38% 22%, rgba(255, 216, 118, 0.08), transparent 34%);
+  mix-blend-mode: screen;
+  opacity: 0.65;
+}
+
+.app-shell.theme-retro-rpg .table-surface::after {
+  box-shadow: inset 0 0 64px rgba(15, 4, 2, 0.28), 0 0 0 2px rgba(224, 153, 47, 0.28);
+}
+
+.app-shell.theme-retro-rpg .table-inlay {
+  display: none;
+}
+
+.app-shell.theme-retro-rpg .table-center {
+  background: #1a090a;
+  border: 9px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 28 fill;
+  border-image-source: url("../assets/retro-rpg/panel-frame.png");
+  border-image-width: 9px;
+  border-radius: 0;
+  box-shadow: 0 7px 0 rgba(8, 2, 1, 0.42);
+}
+
+.app-shell.theme-retro-rpg .table-center:has(.table-phase) {
+  background: transparent;
+  border: 0;
+  border-image: none;
+  box-shadow: none;
+  min-width: 0;
+  padding: 0;
+}
+
+.app-shell.theme-retro-rpg .table-phase .table-phase-icon {
+  display: none;
+}
+
+.app-shell.theme-retro-rpg .table-phase-label {
+  aspect-ratio: 1;
+  background-position: center;
+  background-repeat: no-repeat;
+  color: transparent;
+  display: block;
+  font-size: 0;
+  width: clamp(88px, 12cqi, 124px);
+}
+
+.app-shell.theme-retro-rpg .table-phase[data-phase="day"] .table-phase-label {
+  background-image: url("../assets/retro-rpg/phase-day.png");
+  background-size: auto 108%;
+}
+
+.app-shell.theme-retro-rpg .table-phase[data-phase="night"] .table-phase-label {
+  background-image: url("../assets/retro-rpg/phase-night.png");
+  background-size: auto 124%;
+}
+
+.app-shell.theme-retro-rpg .table-stage.phase-night .table-surface {
+  filter: brightness(0.72) saturate(0.78);
+}
+
+.app-shell.theme-retro-rpg .table-surface.table-surface-hidden {
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-shell.theme-retro-rpg .table-surface.table-surface-hidden::before,
+.app-shell.theme-retro-rpg .table-surface.table-surface-hidden::after,
+.app-shell.theme-retro-rpg .table-surface.table-surface-hidden .table-inlay,
+.app-shell.theme-retro-rpg .table-surface.table-surface-hidden .table-center {
+  display: none;
+}
+
+.app-shell.theme-retro-rpg .seat {
+  background: #190809;
+  background-clip: padding-box;
+  border: 14px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 34 fill;
+  border-image-source: url("../assets/retro-rpg/seat-frame.png");
+  border-image-width: 14px;
+  border-radius: 0;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.42);
+  isolation: isolate;
+}
+
+.app-shell.theme-retro-rpg .seat.has-character {
+  background-color: #4b0c20;
+  border-image-slice: 30 fill;
+  border-image-source: url("../assets/retro-rpg/role-card-frame.png");
+}
+
+.app-shell.theme-retro-rpg .seat:has(.seat-avatar) {
+  background-color: #100607;
+  border-image: none;
+  box-shadow: none;
+}
+
+.app-shell.theme-retro-rpg .seat.has-character:has(.seat-avatar) {
+  border-image: none;
+}
+
+.app-shell.theme-retro-rpg .seat:has(.seat-avatar)::before {
+  border: 14px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 30;
+  border-image-source: url("../assets/retro-rpg/role-card-frame.png");
+  border-image-width: 14px;
+  box-sizing: border-box;
+  content: "";
+  inset: -14px;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+.app-shell.theme-retro-rpg .seat:hover,
+.app-shell.theme-retro-rpg .seat.occupied {
+  border-color: transparent;
+  filter: none;
+}
+
+.app-shell.theme-retro-rpg .seat:hover {
+  box-shadow: 0 0 16px rgba(223, 157, 50, 0.42), 0 12px 24px rgba(0, 0, 0, 0.42);
+}
+
+.app-shell.theme-retro-rpg .seat:has(.seat-avatar):hover {
+  box-shadow: none;
+}
+
+.app-shell.theme-retro-rpg .seat:has(.seat-avatar):hover::before {
+  filter: brightness(1.1) saturate(0.94) drop-shadow(0 0 3px rgba(231, 166, 50, 0.34));
+}
+
+.app-shell.theme-retro-rpg .seat.speaking-seat,
+.app-shell.theme-retro-rpg .table-stage.phase-night .seat.speaking-seat {
+  border-color: transparent;
+  box-shadow: 0 0 24px rgba(73, 226, 108, 0.66), 0 8px 0 rgba(8, 2, 1, 0.56);
+  filter: none;
+  outline: 3px solid #79f28d;
+  outline-offset: -9px;
+}
+
+.app-shell.theme-retro-rpg .seat.speaking-seat:has(.seat-avatar),
+.app-shell.theme-retro-rpg .table-stage.phase-night .seat.speaking-seat:has(.seat-avatar) {
+  box-shadow: none;
+  outline: none;
+}
+
+.app-shell.theme-retro-rpg .seat.speaking-seat:has(.seat-avatar)::before,
+.app-shell.theme-retro-rpg .table-stage.phase-night .seat.speaking-seat:has(.seat-avatar)::before {
+  filter:
+    drop-shadow(0 0 1px #b8ffc5)
+    drop-shadow(0 0 3px #61e77f)
+    drop-shadow(0 0 9px rgba(73, 226, 108, 0.74));
+}
+
+.app-shell.theme-retro-rpg .seat-avatar,
+.app-shell.theme-retro-rpg .seat.occupied:has(.seat-avatar)::after {
+  border-radius: 0;
+}
+
+.app-shell.theme-retro-rpg .seat-avatar {
+  display: block;
+  height: calc(100% + 4px);
+  inset: -2px auto auto -2px;
+  max-height: none;
+  max-width: none;
+  object-fit: cover;
+  opacity: 1;
+  pointer-events: none;
+  width: calc(100% + 4px);
+  z-index: 3;
+}
+
+.app-shell.theme-retro-rpg .seat.occupied:has(.seat-avatar)::after {
+  inset: -2px;
+  z-index: 4;
+}
+
+.app-shell.theme-retro-rpg .seat :is(
+  .nomination-role,
+  .raised-hand-indicator,
+  .dead-vote-token,
+  .seat-initials,
+  .seat-empty-icon,
+  .seat-character-token,
+  .seat-suspicion-token
+) {
+  position: relative;
+  z-index: 5;
+}
+
+.app-shell.theme-retro-rpg .seat-nameplate {
+  background: url("../assets/retro-rpg/nameplate.png") center / 100% 100% no-repeat;
+  border: 0;
+  border-radius: 0;
+  min-height: calc(29px * var(--seat-scale));
+  padding: calc(5px * var(--seat-scale)) calc(17px * var(--seat-scale));
+  z-index: 5;
+}
+
+.app-shell.theme-retro-rpg .storyteller-seat-tag {
+  z-index: 5;
+}
+
+.app-shell.theme-retro-rpg :is(.voice-room-block.active, .chat-bubble) {
+  border-radius: 0;
+}
+
+.app-shell.theme-retro-rpg .voice-room-block.active {
+  background: #2c0e12;
+  border: 5px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 20 fill;
+  border-image-source: url("../assets/retro-rpg/input.png");
+  border-image-width: 5px;
+  box-shadow: none;
+}
+
+.app-shell.theme-retro-rpg .chat-bubble {
+  background: #351016;
+  border-color: #7e4d1e;
+  box-shadow: 2px 2px 0 rgba(8, 2, 1, 0.6);
+}
+
+.app-shell.theme-retro-rpg .chat-group.own .chat-bubble {
+  background: #5b1127;
+}
+
+.app-shell.theme-retro-rpg .chat-log,
+.app-shell.theme-retro-rpg .dashboard-body,
+.app-shell.theme-retro-rpg .voice-panel-shell {
+  background: rgba(17, 6, 7, 0.82);
+}
+
+.app-shell.theme-retro-rpg * {
+  scrollbar-color: #e0a33b #1a0909;
+  scrollbar-width: auto;
+}
+
+.app-shell.theme-retro-rpg ::-webkit-scrollbar {
+  height: 11px;
+  width: 11px;
+}
+
+.app-shell.theme-retro-rpg ::-webkit-scrollbar-track {
+  background: #160707;
+  border: 2px solid #6f4218;
+  border-radius: 0;
+}
+
+.app-shell.theme-retro-rpg ::-webkit-scrollbar-thumb {
+  background: url("../assets/retro-rpg/scrollbar-thumb.png") center / 100% 100% no-repeat;
+  border: 0;
+  border-radius: 0;
+  min-height: 34px;
 }
 
 /* Voice rooms: mark the joined room with a gold edge rail. */

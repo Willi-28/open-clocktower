@@ -66,11 +66,10 @@ survive closing and reopening the desktop app.
 ## The bundled frontend is a snapshot
 
 `extraResources` copies `apps/frontend/dist` into the app, so the client ships a
-**frozen** build of the UI. Frontend changes only reach the desktop app after
-`cd apps/frontend && npm run build` followed by a repackage — until then the .exe
-keeps running the code it was packaged with, and can behave differently from
-browsers on the same server (voice negotiation in particular is peer-to-peer, so
-one outdated participant affects everyone it talks to).
+**frozen** build of the UI. The desktop `start`, `dist`, and `dist:dir` scripts
+now rebuild that frontend snapshot automatically before launching or packaging.
+An already-created `.exe` still needs to be packaged again before it contains
+new UI changes.
 
 ## Hardening
 
@@ -101,17 +100,18 @@ on top of that:
 ## Develop
 
 ```bash
-cd apps/frontend && npm ci && npm run build   # the gateway serves this dist
+cd apps/frontend && npm ci              # one-time frontend dependencies
 cd ../desktop && npm install && npm test
-npm start                                      # opens fullscreen; Alt+F4 to quit
-npm run dist:dir                               # quick unpacked test build
+npm start          # rebuilds the frontend, then opens fullscreen; Alt+F4 to quit
+npm run dist:dir   # rebuilds the frontend, then creates the unpacked test build
 ```
 
 ## Package (Windows)
 
 ```bash
-cd apps/frontend && npm ci && npm run build    # 1) build the frontend
-cd ../desktop && npm install && npm run dist   # 2) -> release/OpenClocktower-<version>.exe
+cd apps/frontend && npm ci              # one-time frontend dependencies
+cd ../desktop && npm install
+npm run dist   # rebuilds frontend -> release/OpenClocktower-<version>.exe
 ```
 
 The desktop client bundles only the frontend; there is no embedded server, so
