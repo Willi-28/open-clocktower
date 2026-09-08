@@ -42,6 +42,11 @@ my-pack.zip
 {
   "schemaVersion": 1,
   "name": "My Custom Pack",
+  "credits": {
+    "author": "Alice Example",
+    "license": "CC BY-SA 4.0",
+    "entries": [{ "name": "Bob", "role": "Artwork" }]
+  },
   "defaultLocale": "en",
   "supportedLocales": [
     { "code": "en", "name": "English" },
@@ -112,6 +117,87 @@ Optional character fields:
 - `translations`: per-language overrides for `name`, `team`, `category`, `ability`, `firstNightReminder`, and `otherNightReminder`
 
 The character sheet groups roles by `category`. Keep category values consistent inside a pack so the dashboard stays readable.
+
+## Credits
+
+Packs should declare who made them. The app has a credits screen — reachable
+from the setup screen footer and from the `Credits` tab in client settings —
+that shows the active room's pack attribution above Open Clocktower's own
+third-party notices. A pack without a `credits` block still appears there, but
+only by name.
+
+Add an optional `credits` object to the manifest root:
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "My Custom Pack",
+  "credits": {
+    "author": "Alice Example",
+    "url": "https://example.com/my-pack",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "notice": "Please keep this attribution when redistributing.",
+    "entries": [
+      { "name": "Bob", "role": "Artwork", "url": "https://bob.example" },
+      { "name": "Carol", "role": "Translation" }
+    ]
+  }
+}
+```
+
+All fields are optional:
+
+- `author`: who made the pack
+- `url`: where the pack comes from
+- `license` and `licenseUrl`: the terms the pack is shared under
+- `notice`: free text, shown verbatim — use it for attribution wording a license requires
+- `entries`: individual contributors, each `{ "name", "role", "url" }`
+
+A bare string is also accepted and shown as the notice:
+
+```json
+{ "credits": "Made by the Tuesday group." }
+```
+
+### Per-character credits
+
+When artwork comes from different people, credit it on the character instead of
+repeating one entry per role:
+
+```json
+{
+  "id": "character-a",
+  "name": "Character A",
+  "credits": { "name": "Bob", "role": "Artwork" }
+}
+```
+
+A bare string works here too (`"credits": "Bob"`), and `artist` is accepted as
+an alias for the field.
+
+Per-character credits are folded into the pack-level list: one entry per person
+and role, listing every character they are credited for. So the two examples
+above produce a single `Bob — Artwork — Character A, Character B` line rather
+than one line per character. Matching is case-insensitive, and a per-character
+credit merges into a pack-level entry of the same name and role, keeping the
+URL declared there.
+
+### Limits and safety
+
+- `author`, `license`, and contributor names are capped at 120 characters,
+  roles at 80, `notice` at 2000, and the list at 200 entries. Longer text is
+  truncated rather than rejected, so an oversized field never fails an upload.
+- URLs must be `http://` or `https://`. Anything else — `javascript:`, `data:`,
+  `file:` — is dropped, because credit URLs are rendered as clickable links.
+- Credits are replaced together with the pack. Uploading a new pack into a room
+  never leaves the previous pack's attribution behind.
+
+The credits of the current room are also available over the API:
+
+```text
+GET /api/rooms/{room_id}/credits
+```
 
 ## Languages
 

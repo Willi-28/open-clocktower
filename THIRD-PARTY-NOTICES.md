@@ -6,10 +6,17 @@ those licenses require to travel with a distributed copy.
 
 ## About Open Clocktower's own content
 
-Open Clocktower ships **no** official Blood on the Clocktower content: no
-artwork, logos, rules text, character names, or character packs from that game
-or any other published game. Character packs are uploaded per room by the
-people running an instance, who are responsible for the content they upload.
+Open Clocktower is an unofficial fan project. It provides a digital table for
+storyteller-led social deduction games such as Blood on the Clocktower by
+The Pandemonium Institute, and is not affiliated with, endorsed by, or sponsored
+by them.
+
+It ships **no** official game content: no official artwork, logos, rules text,
+character names, or character packs from that game or any other published game.
+The character packs bundled with the app are unofficial fan-made content,
+distributed under their authors' own terms and credited to them in the app.
+Further packs are uploaded per room by the people running an instance, who are
+responsible for the content they upload.
 
 The artwork bundled with this project (backgrounds, table surfaces, UI frames,
 icons) was **generated with AI image tools**, in some cases starting from
@@ -36,6 +43,7 @@ The desktop client also contains the web frontend below.
 | [@shiguredo/rnnoise-wasm](https://github.com/shiguredo/rnnoise-wasm) | 2025.1.5 | Apache-2.0 | Copyright 2020-2025 Shiguredo Inc. Wraps [RNNoise](https://gitlab.xiph.org/xiph/rnnoise) (BSD-3-Clause, Copyright (c) 2017-2018 Mozilla, Copyright (c) 2007-2017 Jean-Marc Valin, Xiph.Org Foundation and contributors). |
 | [Twemoji](https://github.com/jdecked/twemoji) graphics (`src/assets/twemoji`) | — | **CC-BY 4.0** | Copyright 2020 Twitter, Inc and other contributors. Graphics licensed under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/). |
 | [Cinzel](https://fonts.google.com/specimen/Cinzel) (`src/assets/fonts`) | — | SIL Open Font License 1.1 | Copyright 2011 The Cinzel Project Authors. |
+| [Pixelify Sans](https://fonts.google.com/specimen/Pixelify+Sans) (`src/assets/fonts`) | — | SIL Open Font License 1.1 | Copyright 2021 The Pixelify Sans Project Authors. |
 | [Alegreya](https://fonts.google.com/specimen/Alegreya) (`src/assets/fonts`) | — | SIL Open Font License 1.1 | Copyright 2011 The Alegreya Project Authors. |
 
 The Twemoji attribution above is the notice required by CC-BY 4.0 and is the

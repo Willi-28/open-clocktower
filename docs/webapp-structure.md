@@ -27,7 +27,10 @@ Important areas:
 apps/frontend/src/
 ├─ api/client.ts                 Typed HTTP client
 ├─ audio/                        Browser audio capture, effects, and filtering
-├─ assets/                       Images, tables, backgrounds, sounds, fonts
+├─ assets/
+│  ├─ themes/                  One folder per visual theme, plus shared theme art
+│  ├─ fonts/                   Bundled fonts and licenses
+│  └─ twemoji/                 Local emoji artwork
 ├─ game-ui/
 │  ├─ components/                Panels, dialogs, table, controls
 │  ├─ hooks/                     Stateful room, voice, vote, and UI logic
@@ -35,6 +38,7 @@ apps/frontend/src/
 │  ├─ utils/                     Pure player and table helpers
 │  ├─ chatRules.ts               Client-side chat visibility helper
 │  ├─ clientSettings.ts          Browser-local settings
+│  ├─ appCredits.ts             App-level third-party attribution data
 │  ├─ emojis.ts                  Chat emoji definitions and search data
 │  ├─ gameConfig.ts              Static UI defaults
 │  ├─ gameText.ts                Character display helpers
@@ -75,7 +79,7 @@ apps/backend/app/
 │  ├─ models.py                  SQLAlchemy models
 │  └─ session.py                 Engine, sessions, and schema bootstrap
 ├─ game/
-│  ├─ character_packs.py         Character pack ZIP parsing and validation
+│  ├─ character_packs.py         Character pack ZIP parsing, validation, and credits
 │  ├─ chat_rules.py              Private chat rules
 │  ├─ media_validation.py        Avatar upload validation
 │  ├─ room_state.py              Request and response models

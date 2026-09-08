@@ -6,7 +6,7 @@ It provides a shared digital table with rooms, seats, phases, nominations, votin
 
 ## Screenshots
 
-These screenshots show a test room with locally uploaded demo content. Open Clocktower does not ship official game content, artwork, logos, rules text, or character packs.
+These screenshots show a test room with locally uploaded demo content. See [Content](#content) for what the app does and does not ship.
 
 | Storyteller view | Player view |
 | --- | --- |
@@ -28,7 +28,9 @@ Players do not need accounts. A browser receives private session credentials whe
 
 ## Content
 
-Open Clocktower does not include official game content, protected artwork, logos, rules text, or character packs. Server operators and storytellers are responsible for the content they upload to their own instance.
+Open Clocktower is an unofficial fan project. It provides a digital table for storyteller-led social deduction games such as Blood on the Clocktower by The Pandemonium Institute, and is not affiliated with, endorsed by, or sponsored by them.
+
+The app ships no official game content: no official artwork, logos, rules text, or character packs. Character packs bundled with the app are unofficial fan-made content and are credited to their authors on the credits screen. Server operators and storytellers are responsible for any further content they upload to their own instance.
 
 Character packs are uploaded per room and may contain custom scripts, homebrew content, translated text, icons, reminder tokens, and night order data.
 
@@ -86,7 +88,6 @@ For the full setup, security checklist, voice/TURN notes, and backup guidance, s
 - [Character Packs](docs/character-packs.md)
 - [API & Events](docs/api-events.md)
 - [Voice Audio](docs/voice-audio.md)
-- [Steam Release](docs/steam-release.md)
 
 ## License
 
