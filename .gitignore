@@ -3,6 +3,7 @@
 !.env.production.example
 
 .agents/
+.claude/
 .codex/
 
 .venv/
@@ -29,12 +30,26 @@ dist/
 apps/frontend/node_modules/
 apps/frontend/dist/
 
+# Locally bundled character packs are not redistributed with the source.
+apps/frontend/src/packs/*.zip
+apps/frontend/src/packs/**/*.zip
+
 # Desktop (Steam) build artifacts. release* also covers alternate output dirs
 # (electron-builder -c.directories.output=...) used to work around locked files.
 apps/desktop/node_modules/
 apps/desktop/release*/
 apps/desktop/build/
 apps/desktop/dist/
+# Private Steam distribution tooling and local Steamworks metadata.
+apps/desktop/scripts/steam-*.mjs
+apps/desktop/steam/
+apps/desktop/**/steam.config*.json
+apps/desktop/**/steam_appid.txt
+apps/desktop/**/*.vdf
+docs/steam-release*.md
+steamcmd/
+steamworks_sdk/
+/release-commands.local.txt
 # Frozen server bundles the built frontend here; it is a build output, not source
 apps/backend/app/static/
 
@@ -50,3 +65,7 @@ Thumbs.db
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Local security audit output. Names internal controls and residual risks, so it
+# stays out of the repository and out of any published image.
+SECURITY-CWE-COVERAGE.txt

@@ -53,8 +53,6 @@ that are inert in the browser/Docker build, where `window.desktop` is undefined.
 | `src/preload.cjs` | exposes `window.desktop.connect` / `changeServer` / `close` |
 | `src/steam/steam.mjs` | Steam SDK init + callback pump (presence only) |
 | `electron-builder.yml` | packages `OpenClocktower.exe` (bundles the frontend only) |
-| `scripts/steam-build.mjs` | clean depot build + verification + SteamPipe scripts |
-| `steam/steam.config.json` | the only place a Steam App/Depot ID exists |
 | `test/gateway.test.mjs` | runnable proof (no Steam/Electron needed) |
 
 Frontend touch points (guarded by `window.desktop`): `ServerConnectScreen`
@@ -69,32 +67,18 @@ survive closing and reopening the desktop app.
 
 `extraResources` copies `apps/frontend/dist` into the app, so the client ships a
 **frozen** build of the UI. The desktop `start`, `dist`, and `dist:dir` scripts
-rebuild that frontend snapshot automatically before launching or packaging, and
-`npm run steam:build` additionally verifies byte-for-byte that the packaged
-snapshot equals `apps/frontend/dist`. An already-created `.exe` still needs to be
-packaged again before it contains new UI changes.
+rebuild that frontend snapshot automatically before launching or packaging. An
+already-created `.exe` still needs to be packaged again before it contains new
+UI changes.
 
-## Steam builds
+## Steam integration
 
-```bash
-npm run steam:build        # clean rebuild -> release/win-unpacked (depot content)
-npm run steam:build:test   # same + steam_appid.txt, for local overlay testing only
-```
-
-Steam depots take a **folder**, not the single-file `portable` exe: that target
-unpacks ~390 MB to `%TEMP%` on every launch and relaunches itself, which breaks
-Steam's process tracking. `npm run dist` still builds the portable exe for
-distribution outside Steam.
-
-**No App ID is baked into the build.** `initSteam()` is called without one, so
-`SteamAPI_Init()` takes the id from the environment Steam sets when it launches
-the app. A `steam_appid.txt` next to the exe would *override* that, which is why
-it is excluded from packaging and the build fails if one appears. It exists only
-for testing outside Steam, where `steam:build:test` places it.
-
-The full release procedure — Steamworks setup, content survey answers, reviewer
-instructions, store page requirements — is in
-[docs/steam-release.md](../../docs/steam-release.md).
+Steam is optional and only provides running status and overlay support. The
+client does not use Steam lobbies, relay networking, authentication, or game
+state APIs. No App ID is committed or bundled: Steam supplies it when launching
+the packaged client, while developers can set `OCT_STEAM_APPID` for a local
+integration test. Packaging also excludes the conventional `steam_appid.txt`
+development file.
 
 ## Hardening
 
@@ -157,6 +141,5 @@ code-sign editing step and still writes the saved Clocktower icon via the local
   won't show as "running" on Steam.
 - **Voice (WebRTC):** unchanged from the browser - direct WebRTC using the
   server's configured STUN/TURN.
-- **steam_appid.txt** (`480`, Spacewar) is a dev-only file. It is never packaged;
-  `npm run steam:build:test` copies it next to the exe so the overlay can be
-  tested without a real App ID.
+- **Steam App ID:** supplied by Steam at runtime. For local integration testing,
+  set `OCT_STEAM_APPID`; no identifier is required for the regular desktop mode.
