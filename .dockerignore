@@ -6,6 +6,7 @@
 .github
 .codex
 .agents
+.claude
 
 # Python
 .venv
@@ -25,12 +26,20 @@ htmlcov
 **/dist
 **/.vite
 **/.npm-cache
+**/*.tsbuildinfo
 # The frontend build is copied in from the frontend stage, never from context.
 apps/backend/app/static
+
+# Character packs are supplied locally and are not baked into public images.
+apps/frontend/src/packs/*.zip
+apps/frontend/src/packs/**/*.zip
 
 # The Electron/Steam client is not part of the server image, and its release
 # folder is hundreds of megabytes.
 apps/desktop
+steamcmd
+steamworks_sdk
+release-commands.local.txt
 
 # Local runtime state and secrets
 data
@@ -44,6 +53,12 @@ data
 .env.*
 !.env.example
 
+# Local editor and operating-system metadata
+.vscode
+.idea
+**/.DS_Store
+**/Thumbs.db
+
 # Docs, tooling, and compose files are not needed to build or run the image
 docs
 scripts
@@ -52,3 +67,6 @@ README.md
 SECURITY.md
 LICENSE
 docker-compose*.yml
+
+# Local security audit output - never belongs in a published image.
+SECURITY-CWE-COVERAGE.txt

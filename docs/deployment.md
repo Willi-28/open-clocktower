@@ -154,3 +154,34 @@ Run exactly one app container for the current architecture. WebSocket connection
 - The HTML shell is served with no-store/no-cache headers so new deployments load current assets.
 - Uploaded character pack ZIPs, icons, and profile images are size- and type-validated.
 - SVG uploads are not accepted for character pack icons because SVG requires sanitization before it is safe to serve.
+
+## Keeping images patched
+
+Two things decide whether a deployed image carries known CVEs.
+
+**Build with a fresh base.** Both stages of the `Dockerfile` run `apk upgrade`
+first, so a build inherits patched OS packages even from a stale cached base
+layer. An audit found nine openssl advisories - two critical - in an image built
+from a cached `python:3.12-alpine`, while the freshly pulled tag was clean. Pass
+`--pull` as well when you rebuild:
+
+```bash
+docker build --pull -t willi28/open-clocktower:latest .
+```
+
+**Pull the database image regularly.** `postgres:17-alpine` is used as published
+and currently carries upstream advisories in openssl and a bundled Go binary.
+They are not fixable from this repository, and the alternatives are no better
+(`postgres:17` on Debian and `postgres:18-alpine` both scan worse). The exposure
+is limited: in `docker-compose.prod.yml` the database joins only the `internal`
+network and publishes no port, so it cannot be reached from outside the host at
+all - reaching it means already being inside the app container. Refresh it with
+the rest of the stack:
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Note that `docker-compose.dev.yml` does publish `5432:5432` for local tooling.
+That is a development convenience; do not copy it into a production file.
