@@ -1,7 +1,7 @@
 {
   "name": "open-clocktower-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.8.1",
   "description": "Steam desktop shell for connecting to self-hosted Open Clocktower servers.",
   "author": "Open Clocktower",
   "license": "MIT",
