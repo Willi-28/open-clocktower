@@ -58,6 +58,7 @@ class RoomModel(Base):
         passive_deletes=True,
     )
     demon_bluffs: Mapped[list["DemonBluffModel"]] = relationship(back_populates="room", cascade="all, delete-orphan", passive_deletes=True)
+    pack_credits: Mapped["PackCreditsModel | None"] = relationship(back_populates="room", cascade="all, delete-orphan", passive_deletes=True, uselist=False)
     votes: Mapped[list["VoteModel"]] = relationship(back_populates="room", cascade="all, delete-orphan", passive_deletes=True)
     player_avatars: Mapped[list["PlayerAvatarModel"]] = relationship(back_populates="room", cascade="all, delete-orphan", passive_deletes=True)
 
@@ -226,3 +227,25 @@ class DemonBluffModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     room: Mapped[RoomModel] = relationship(back_populates="demon_bluffs")
+
+
+class PackCreditsModel(Base):
+    """Persist the attribution shipped inside a room's character pack.
+
+    One row per room: it is replaced together with the pack itself, and the
+    entry list is stored as JSON because it is only ever read as a whole.
+    """
+
+    __tablename__ = "pack_credits"
+
+    room_id: Mapped[str] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"), primary_key=True)
+    pack_name: Mapped[str] = mapped_column(String(120), default="")
+    author: Mapped[str] = mapped_column(String(120), default="")
+    url: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    license: Mapped[str] = mapped_column(String(120), default="")
+    license_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    notice: Mapped[str] = mapped_column(Text, default="")
+    entries: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    room: Mapped[RoomModel] = relationship(back_populates="pack_credits")

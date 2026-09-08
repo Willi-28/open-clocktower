@@ -1,6 +1,7 @@
 import asyncio
 import json
 import unittest
+from unittest.mock import patch
 
 from app.websocket.room_hub import RoomHub
 
@@ -67,6 +68,55 @@ class GatherEveryoneInVoiceRoomTest(unittest.TestCase):
         hub = RoomHub()
 
         self.assertEqual(asyncio.run(hub.gather_everyone_in_voice_room("room", "Town Square")), [])
+
+
+class NightVoiceVisibilityTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.hub = RoomHub()
+        self.hub._voice_rooms["room"] = {
+            "st": "alice:private:st",
+            "alice": "alice:private:st",
+            "bob": "Town Square",
+        }
+        self.participants = self.hub._voice_participants("room")
+
+    def test_storyteller_keeps_the_full_night_voice_overview(self) -> None:
+        visible = self.hub._night_visible_participants("room", self.participants, "st", "st")
+
+        self.assertEqual(visible, self.participants)
+
+    def test_unjoined_player_cannot_inspect_night_voice_presence(self) -> None:
+        visible = self.hub._night_visible_participants("room", self.participants, "observer", "st")
+
+        self.assertEqual(visible, [])
+
+    def test_player_only_receives_transport_peers_from_their_own_room(self) -> None:
+        visible = self.hub._night_visible_participants("room", self.participants, "bob", "st")
+
+        self.assertEqual(visible, [{"playerId": "bob", "voiceRoom": "Town Square"}])
+
+    def test_called_player_sees_both_participants_in_their_storyteller_call(self) -> None:
+        visible = self.hub._night_visible_participants("room", self.participants, "alice", "st")
+
+        self.assertEqual(
+            visible,
+            [
+                {"playerId": "st", "voiceRoom": "alice:private:st"},
+                {"playerId": "alice", "voiceRoom": "alice:private:st"},
+            ],
+        )
+
+    def test_mute_state_does_not_expose_other_night_calls(self) -> None:
+        hub, sockets = hub_with_connections(["st", "alice", "bob", "observer"])
+        hub._voice_rooms["room"] = self.hub._voice_rooms["room"]
+
+        with patch("app.websocket.room_hub.room_store.night_voice_info", return_value=(True, "st")):
+            asyncio.run(hub._broadcast_voice_flag_state("room", "mute.state", {"st", "alice", "bob"}))
+
+        self.assertEqual(sockets["st"].sent[0]["payload"]["playerIds"], ["alice", "bob", "st"])
+        self.assertEqual(sockets["alice"].sent[0]["payload"]["playerIds"], ["alice", "st"])
+        self.assertEqual(sockets["bob"].sent[0]["payload"]["playerIds"], ["bob"])
+        self.assertEqual(sockets["observer"].sent[0]["payload"]["playerIds"], [])
 
 
 if __name__ == "__main__":

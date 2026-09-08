@@ -33,7 +33,7 @@ class CharacterPackTest(unittest.TestCase):
             ],
         }
 
-        characters, reminder_tokens = parse_character_pack(pack_bytes({"manifest.json": json.dumps(manifest)}))
+        characters, reminder_tokens, _ = parse_character_pack(pack_bytes({"manifest.json": json.dumps(manifest)}))
 
         self.assertEqual(len(characters), 1)
         self.assertEqual(characters[0].id, "washerwoman")
@@ -49,7 +49,7 @@ class CharacterPackTest(unittest.TestCase):
             ],
         }
 
-        _, reminder_tokens = parse_character_pack(
+        _, reminder_tokens, _ = parse_character_pack(
             pack_bytes({"manifest.json": json.dumps(manifest), "reminder_tokens/juggler.png": PNG_BYTES})
         )
 
@@ -60,7 +60,7 @@ class CharacterPackTest(unittest.TestCase):
     def test_file_discovery_is_only_used_without_manifest_tokens(self) -> None:
         manifest = {"schemaVersion": 1, "characters": [{"id": "artist", "name": "Artist"}]}
 
-        _, reminder_tokens = parse_character_pack(
+        _, reminder_tokens, _ = parse_character_pack(
             pack_bytes({"manifest.json": json.dumps(manifest), "reminder_tokens/artist_correct.png": PNG_BYTES})
         )
 

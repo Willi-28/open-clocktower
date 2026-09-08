@@ -319,6 +319,11 @@ async def cast_vote(room_id: str, request: VoteRequest, x_player_secret: str | N
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
         raise HTTPException(status_code=404, detail="Room, player, or nomination not found")
+    if room.active_nomination is not None:
+        counted_index = room_hub.vote_count_index(room_id, room.active_nomination.id)
+        counted_room = room_store.consume_counted_dead_votes(room_id, counted_index)
+        if counted_room is not None:
+            room = counted_room
     await room_hub.broadcast_state(room)
     return room
 
@@ -386,8 +391,8 @@ async def upload_characters(
     """Parse and replace the room's character pack."""
     data = await _read_upload_capped(file, MAX_PACK_BYTES)
     try:
-        characters, reminder_tokens = parse_character_pack(data)
-        room = room_store.replace_pack(room_id, actor_player_id, x_player_secret, characters, reminder_tokens)
+        characters, reminder_tokens, credits = parse_character_pack(data)
+        room = room_store.replace_pack(room_id, actor_player_id, x_player_secret, characters, reminder_tokens, credits)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if room is None:
@@ -403,6 +408,15 @@ def list_characters(room_id: str, language: str | None = None):
     if characters is None:
         raise HTTPException(status_code=404, detail="Room not found")
     return characters
+
+
+@router.get("/{room_id}/credits")
+def get_pack_credits(room_id: str):
+    """Return the attribution shipped inside the room's character pack."""
+    credits = room_store.get_pack_credits(room_id)
+    if credits is None:
+        raise HTTPException(status_code=404, detail="Room not found")
+    return credits
 
 
 @router.get("/{room_id}/reminder-tokens")

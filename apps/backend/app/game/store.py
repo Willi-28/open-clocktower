@@ -22,6 +22,7 @@ from app.db.models import (
     DemonBluffModel,
     NominationModel,
     NominationRequestModel,
+    PackCreditsModel,
     PlayerAvatarModel,
     PlayerModel,
     ReminderTokenModel,
@@ -42,6 +43,8 @@ from .room_state import (
     JoinRoomRequest,
     Nomination,
     NominationRequestState,
+    PackCredits,
+    CreditEntry,
     PhaseRequest,
     Player,
     PlayerSession,
@@ -406,15 +409,58 @@ class RoomStore:
                 raise ValueError("storyteller cannot vote")
             if player.seat_index is None:
                 raise ValueError("spectators cannot vote")
-            if player.status == PlayerStatus.DEAD.value and request.value:
-                if not player.has_dead_vote:
-                    raise ValueError("dead player has no vote remaining")
-                player.has_dead_vote = False
-
-            session.execute(
-                delete(VoteModel).where(VoteModel.room_id == room_id, VoteModel.player_id == request.player_id)
+            vote = session.scalar(
+                select(VoteModel).where(VoteModel.room_id == room_id, VoteModel.player_id == request.player_id)
             )
-            session.add(VoteModel(room_id=room_id, player_id=request.player_id, value=request.value))
+            if (
+                player.status == PlayerStatus.DEAD.value
+                and request.value
+                and not player.has_dead_vote
+                and not (vote and vote.value)
+            ):
+                raise ValueError("dead player has no vote remaining")
+            if vote is None:
+                session.add(VoteModel(room_id=room_id, player_id=request.player_id, value=request.value))
+            else:
+                vote.value = request.value
+            self._touch(room)
+            session.commit()
+            return self._to_state(session, room)
+
+    def consume_counted_dead_votes(self, room_id: str, through_index: int) -> RoomState | None:
+        """Consume raised dead votes only after the server-side count reaches them."""
+        if through_index < 0:
+            return None
+        with SessionLocal() as session:
+            room = session.get(RoomModel, room_id)
+            nomination = self._active_nomination(session, room_id)
+            if room is None or nomination is None or not nomination.is_open:
+                return None
+            players = list(
+                session.scalars(
+                    select(PlayerModel)
+                    .where(
+                        PlayerModel.room_id == room_id,
+                        PlayerModel.is_storyteller.is_(False),
+                        PlayerModel.seat_index.is_not(None),
+                    )
+                    .order_by(PlayerModel.seat_index)
+                )
+            )
+            nominee_index = next((index for index, player in enumerate(players) if player.id == nomination.nominee_id), 0)
+            players = players[nominee_index:] + players[:nominee_index]
+            raised_player_ids = set(
+                session.scalars(
+                    select(VoteModel.player_id).where(VoteModel.room_id == room_id, VoteModel.value.is_(True))
+                )
+            )
+            changed = False
+            for player in players[: through_index + 1]:
+                if player.status == PlayerStatus.DEAD.value and player.has_dead_vote and player.id in raised_player_ids:
+                    player.has_dead_vote = False
+                    changed = True
+            if not changed:
+                return None
             self._touch(room)
             session.commit()
             return self._to_state(session, room)
@@ -538,8 +584,9 @@ class RoomStore:
         secret: str | None,
         characters: list[Character],
         reminder_tokens: list[ReminderTokenDefinition],
+        credits: PackCredits,
     ) -> RoomState | None:
-        """Replace a room's imported characters and reminder tokens."""
+        """Replace a room's imported characters, reminder tokens, and credits."""
         with SessionLocal() as session:
             room = session.get(RoomModel, room_id)
             if room is None:
@@ -553,6 +600,19 @@ class RoomStore:
             session.execute(delete(DemonBluffModel).where(DemonBluffModel.room_id == room_id))
             session.execute(delete(CharacterModel).where(CharacterModel.room_id == room_id))
             session.execute(delete(ReminderTokenModel).where(ReminderTokenModel.room_id == room_id))
+            session.execute(delete(PackCreditsModel).where(PackCreditsModel.room_id == room_id))
+            session.add(
+                PackCreditsModel(
+                    room_id=room_id,
+                    pack_name=credits.pack_name,
+                    author=credits.author,
+                    url=credits.url,
+                    license=credits.license,
+                    license_url=credits.license_url,
+                    notice=credits.notice,
+                    entries=json.dumps([entry.model_dump() for entry in credits.entries]),
+                )
+            )
             for sort_order, character in enumerate(characters):
                 session.add(
                     CharacterModel(
@@ -613,6 +673,28 @@ class RoomStore:
                 .order_by(ReminderTokenModel.character.asc(), ReminderTokenModel.label.asc())
             ).all()
             return [self._to_reminder_token(row, language) for row in rows]
+
+    def get_pack_credits(self, room_id: str) -> PackCredits | None:
+        """Return a room's character pack attribution, empty if the pack had none."""
+        with SessionLocal() as session:
+            if session.get(RoomModel, room_id) is None:
+                return None
+            row = session.get(PackCreditsModel, room_id)
+            if row is None:
+                return PackCredits()
+            try:
+                raw_entries = json.loads(row.entries)
+            except json.JSONDecodeError:
+                raw_entries = []
+            return PackCredits(
+                pack_name=row.pack_name,
+                author=row.author,
+                url=row.url,
+                license=row.license,
+                license_url=row.license_url,
+                notice=row.notice,
+                entries=[CreditEntry(**entry) for entry in raw_entries if isinstance(entry, dict)],
+            )
 
     def assign_character(
         self,

@@ -9,7 +9,7 @@ import json
 from io import BytesIO
 from zipfile import BadZipFile, ZipFile
 
-from .room_state import Character, ReminderTokenDefinition
+from .room_state import Character, CreditEntry, PackCredits, ReminderTokenDefinition
 
 ALLOWED_ICON_TYPES = {
     ".png": "image/png",
@@ -28,8 +28,8 @@ MAX_ARCHIVE_ENTRIES = 1000
 MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
 
 
-def parse_character_pack(data: bytes) -> tuple[list[Character], list[ReminderTokenDefinition]]:
-    """Parse uploaded ZIP bytes into character and reminder token definitions."""
+def parse_character_pack(data: bytes) -> tuple[list[Character], list[ReminderTokenDefinition], PackCredits]:
+    """Parse uploaded ZIP bytes into characters, reminder tokens, and credits."""
     try:
         archive = ZipFile(BytesIO(data))
     except BadZipFile as error:
@@ -130,7 +130,106 @@ def parse_character_pack(data: bytes) -> tuple[list[Character], list[ReminderTok
         if not raw_tokens:
             for discovered_token in _discover_reminder_tokens_from_files(archive, seen_token_ids):
                 reminder_tokens.append(discovered_token)
-        return characters, reminder_tokens
+        return characters, reminder_tokens, _read_credits(manifest, characters)
+
+
+MAX_CREDIT_ENTRIES = 200
+ALLOWED_CREDIT_URL_SCHEMES = ("http://", "https://")
+
+
+def _read_credits(manifest: dict[str, object], characters: list[Character]) -> PackCredits:
+    """Collect pack-level and per-character attribution into one credits record."""
+    raw_credits = manifest.get("credits", manifest.get("attribution", {}))
+    # A bare string is shown verbatim rather than guessed apart into fields.
+    if isinstance(raw_credits, str):
+        raw_credits = {"notice": raw_credits}
+    if not isinstance(raw_credits, dict):
+        raw_credits = {}
+
+    entries: list[CreditEntry] = []
+    raw_entries = raw_credits.get("entries", raw_credits.get("contributors", raw_credits.get("credits", [])))
+    if isinstance(raw_entries, list):
+        for raw_entry in raw_entries:
+            entry = _credit_entry(raw_entry)
+            if entry is not None:
+                _merge_credit_entry(entries, entry)
+
+    # Per-character credits collapse into the same list so the credits screen can
+    # group by person instead of repeating one artist for every character.
+    names_by_id = {character.id: character.name for character in characters}
+    raw_characters = manifest.get("characters", [])
+    if isinstance(raw_characters, list):
+        for raw_character in raw_characters:
+            if not isinstance(raw_character, dict):
+                continue
+            entry = _credit_entry(raw_character.get("credits", raw_character.get("artist")))
+            if entry is None:
+                continue
+            character_name = names_by_id.get(str(raw_character.get("id", "")).strip())
+            if character_name:
+                entry.works = [character_name]
+            _merge_credit_entry(entries, entry)
+
+    return PackCredits(
+        pack_name=_credit_text(manifest.get("name"), 120),
+        author=_credit_text(raw_credits.get("author", raw_credits.get("by", raw_credits.get("creator"))), 120),
+        url=_credit_url(raw_credits.get("url", raw_credits.get("link", raw_credits.get("homepage")))),
+        license=_credit_text(raw_credits.get("license", raw_credits.get("licence")), 120),
+        license_url=_credit_url(raw_credits.get("licenseUrl", raw_credits.get("license_url"))),
+        notice=_credit_text(raw_credits.get("notice", raw_credits.get("text")), 2000),
+        entries=entries[:MAX_CREDIT_ENTRIES],
+    )
+
+
+def _credit_entry(raw_entry: object) -> CreditEntry | None:
+    """Build one credit entry from a name string or a {name, role, url} object."""
+    if isinstance(raw_entry, str):
+        name = _credit_text(raw_entry, 120)
+        return CreditEntry(name=name) if name else None
+    if not isinstance(raw_entry, dict):
+        return None
+    name = _credit_text(raw_entry.get("name", raw_entry.get("author", raw_entry.get("artist"))), 120)
+    if not name:
+        return None
+    return CreditEntry(
+        name=name,
+        role=_credit_text(raw_entry.get("role", raw_entry.get("for", raw_entry.get("work"))), 80),
+        url=_credit_url(raw_entry.get("url", raw_entry.get("link"))),
+    )
+
+
+def _merge_credit_entry(entries: list[CreditEntry], entry: CreditEntry) -> None:
+    """Add an entry, folding it into a matching person instead of duplicating."""
+    if len(entries) >= MAX_CREDIT_ENTRIES:
+        return
+    for existing in entries:
+        if existing.name.casefold() != entry.name.casefold() or existing.role.casefold() != entry.role.casefold():
+            continue
+        existing.url = existing.url or entry.url
+        for work in entry.works:
+            if work not in existing.works and len(existing.works) < 200:
+                existing.works.append(work)
+        return
+    entries.append(entry)
+
+
+def _credit_text(value: object, limit: int) -> str:
+    """Return trimmed single-line credit text, truncated to the field limit."""
+    text = " ".join(str(value or "").split())
+    return text[:limit]
+
+
+def _credit_url(value: object) -> str | None:
+    """Return an http(s) credit URL, or None.
+
+    Credit URLs come from uploaded packs and are rendered as links, so anything
+    that is not plain http(s) - javascript:, data:, file: - is dropped rather
+    than passed to the browser.
+    """
+    url = str(value or "").strip()
+    if not url or len(url) > 300:
+        return None
+    return url if url.lower().startswith(ALLOWED_CREDIT_URL_SCHEMES) else None
 
 
 def _validate_archive_shape(archive: ZipFile) -> None:

@@ -7,7 +7,7 @@ as raised hands, voice rooms, synced timers, and vote counters.
 import json
 from datetime import datetime, timezone
 
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketDisconnect
 
 from app.game.chat_rules import find_player
 from app.game.room_state import RoomState
@@ -27,7 +27,7 @@ class RoomHub:
         self._deafened_players: dict[str, set[str]] = {}
         self._voice_rooms: dict[str, dict[str, str]] = {}
         self._timers: dict[str, dict[str, int | bool | str | None]] = {}
-        self._vote_counts: dict[str, dict[str, int | bool]] = {}
+        self._vote_counts: dict[str, dict[str, int | bool | str | None]] = {}
 
     async def connect(self, room_id: str, websocket: WebSocket, player_id: str | None) -> None:
         """Accept a WebSocket and send the current ephemeral room state."""
@@ -36,11 +36,15 @@ class RoomHub:
         self._rooms.setdefault(room_id, {})[websocket] = player_id
         is_night, storyteller_id = room_store.night_voice_info(room_id)
         participants = self._voice_participants(room_id)
+        muted_player_ids = sorted(self._muted_players.get(room_id, set()))
+        deafened_player_ids = sorted(self._deafened_players.get(room_id, set()))
         if is_night:
             participants = self._night_visible_participants(room_id, participants, player_id, storyteller_id)
+            muted_player_ids = self._night_visible_player_ids(room_id, set(muted_player_ids), player_id, storyteller_id)
+            deafened_player_ids = self._night_visible_player_ids(room_id, set(deafened_player_ids), player_id, storyteller_id)
         await websocket.send_json({"type": "hand.state", "payload": {"playerIds": sorted(self._raised_hands.get(room_id, set()))}})
-        await websocket.send_json({"type": "mute.state", "payload": {"playerIds": sorted(self._muted_players.get(room_id, set()))}})
-        await websocket.send_json({"type": "deafen.state", "payload": {"playerIds": sorted(self._deafened_players.get(room_id, set()))}})
+        await websocket.send_json({"type": "mute.state", "payload": {"playerIds": muted_player_ids}})
+        await websocket.send_json({"type": "deafen.state", "payload": {"playerIds": deafened_player_ids}})
         await websocket.send_json({"type": "voice.state", "payload": {"participants": participants}})
         await websocket.send_json({"type": "timer.state", "payload": self._timer_state(room_id)})
         await websocket.send_json({"type": "vote_count.state", "payload": self._vote_count_state(room_id)})
@@ -67,7 +71,7 @@ class RoomHub:
         for websocket in list(self._rooms.get(room_id, {})):
             try:
                 await websocket.send_text(message)
-            except RuntimeError:
+            except (RuntimeError, WebSocketDisconnect):
                 self.disconnect(room_id, websocket)
 
     async def broadcast_state(self, room: RoomState) -> None:
@@ -95,7 +99,7 @@ class RoomHub:
                 continue
             try:
                 await websocket.send_text(message)
-            except RuntimeError:
+            except (RuntimeError, WebSocketDisconnect):
                 self.disconnect(room_id, websocket)
 
     async def kick_player(self, room_id: str, player_id: str, reason: str) -> None:
@@ -138,7 +142,7 @@ class RoomHub:
             muted.add(player_id)
         else:
             muted.discard(player_id)
-        await self.broadcast_room_event(room_id, {"type": "mute.state", "payload": {"playerIds": sorted(muted)}})
+        await self._broadcast_voice_flag_state(room_id, "mute.state", muted)
 
     async def set_deafened(self, room_id: str, player_id: str, is_deafened: bool) -> None:
         """Track a player's deafen (headphone-mute) state and broadcast the list."""
@@ -150,7 +154,7 @@ class RoomHub:
             deafened.add(player_id)
         else:
             deafened.discard(player_id)
-        await self.broadcast_room_event(room_id, {"type": "deafen.state", "payload": {"playerIds": sorted(deafened)}})
+        await self._broadcast_voice_flag_state(room_id, "deafen.state", deafened)
 
     async def broadcast_room_event(self, room_id: str, payload: dict) -> None:
         """Send a lightweight realtime event to every connection in a room."""
@@ -171,11 +175,11 @@ class RoomHub:
             muted = self._muted_players.get(room_id)
             if muted and player_id in muted:
                 muted.discard(player_id)
-                await self.broadcast_room_event(room_id, {"type": "mute.state", "payload": {"playerIds": sorted(muted)}})
+                await self._broadcast_voice_flag_state(room_id, "mute.state", muted)
             deafened = self._deafened_players.get(room_id)
             if deafened and player_id in deafened:
                 deafened.discard(player_id)
-                await self.broadcast_room_event(room_id, {"type": "deafen.state", "payload": {"playerIds": sorted(deafened)}})
+                await self._broadcast_voice_flag_state(room_id, "deafen.state", deafened)
         await self.broadcast_voice_state(room_id)
 
     async def gather_everyone_in_voice_room(self, room_id: str, voice_room: str) -> list[str]:
@@ -237,7 +241,7 @@ class RoomHub:
             visible = self._night_visible_participants(room_id, participants, player_id, storyteller_id)
             try:
                 await websocket.send_text(json.dumps({"type": "voice.state", "payload": {"participants": visible}}))
-            except RuntimeError:
+            except (RuntimeError, WebSocketDisconnect):
                 self.disconnect(room_id, websocket)
 
     def _night_visible_participants(
@@ -255,6 +259,36 @@ class RoomHub:
             return []
         return [participant for participant in participants if participant["voiceRoom"] == own_room]
 
+    def _night_visible_player_ids(
+        self,
+        room_id: str,
+        player_ids: set[str],
+        viewer_id: str | None,
+        storyteller_id: str | None,
+    ) -> list[str]:
+        """Limit voice status ids to the viewer's own night call."""
+        visible_participants = self._night_visible_participants(
+            room_id,
+            self._voice_participants(room_id),
+            viewer_id,
+            storyteller_id,
+        )
+        visible_ids = {participant["playerId"] for participant in visible_participants}
+        return sorted(player_ids & visible_ids)
+
+    async def _broadcast_voice_flag_state(self, room_id: str, event_type: str, player_ids: set[str]) -> None:
+        """Broadcast mute/deafen state without exposing other night calls."""
+        is_night, storyteller_id = room_store.night_voice_info(room_id)
+        if not is_night:
+            await self.broadcast_room_event(room_id, {"type": event_type, "payload": {"playerIds": sorted(player_ids)}})
+            return
+        for websocket, viewer_id in list(self._rooms.get(room_id, {}).items()):
+            visible_ids = self._night_visible_player_ids(room_id, player_ids, viewer_id, storyteller_id)
+            try:
+                await websocket.send_text(json.dumps({"type": event_type, "payload": {"playerIds": visible_ids}}))
+            except (RuntimeError, WebSocketDisconnect):
+                self.disconnect(room_id, websocket)
+
     async def set_timer(self, room_id: str, duration_seconds: int, remaining_seconds: int, is_running: bool) -> None:
         """Store and broadcast the storyteller-controlled discussion timer."""
         duration = max(0, min(duration_seconds, 60 * 60))
@@ -271,8 +305,25 @@ class RoomHub:
         """Store and broadcast the public automatic vote counter state."""
         # Storyteller-controlled public vote counter. Clients use it to animate
         # the same clockwise clock hand and play the same tick.
-        self._vote_counts[room_id] = {"index": max(-1, index), "isRunning": is_running}
+        room = room_store.get_room(room_id)
+        nomination_id = room.active_nomination.id if room and room.active_nomination else None
+        counted_index = max(-1, index)
+        self._vote_counts[room_id] = {
+            "index": counted_index,
+            "isRunning": is_running,
+            "nominationId": nomination_id,
+        }
+        updated_room = room_store.consume_counted_dead_votes(room_id, counted_index)
+        if updated_room is not None:
+            await self.broadcast_state(updated_room)
         await self.broadcast_room_event(room_id, {"type": "vote_count.state", "payload": self._vote_count_state(room_id)})
+
+    def vote_count_index(self, room_id: str, nomination_id: str) -> int:
+        """Return the counted index only when it belongs to this nomination."""
+        state = self._vote_counts.get(room_id)
+        if state is None or state.get("nominationId") != nomination_id:
+            return -1
+        return int(state.get("index", -1))
 
     def _timer_state(self, room_id: str) -> dict[str, int | bool | str | None]:
         """Return a timer snapshot with elapsed running time applied."""
@@ -302,7 +353,8 @@ class RoomHub:
 
     def _vote_count_state(self, room_id: str) -> dict[str, int | bool]:
         """Return the current vote counter state for one room."""
-        return self._vote_counts.get(room_id, {"index": -1, "isRunning": False})
+        state = self._vote_counts.get(room_id, {})
+        return {"index": int(state.get("index", -1)), "isRunning": bool(state.get("isRunning", False))}
 
     def _voice_participants(self, room_id: str) -> list[dict[str, str]]:
         """Return all players currently present in voice rooms."""

@@ -94,6 +94,34 @@ class ReminderTokenDefinition(BaseModel):
     available_languages: list[str] = Field(default_factory=list)
 
 
+class CreditEntry(BaseModel):
+    """One credited person or group from a character pack.
+
+    Pack ZIPs are uploaded by storytellers and these fields are rendered as
+    text and links, so every field is bounded and the parser only ever puts a
+    validated http(s) URL here.
+    """
+
+    name: str = Field(max_length=120)
+    role: str = Field(default="", max_length=80)
+    url: str | None = Field(default=None, max_length=300)
+    # Character names this person is credited for, when the pack credits
+    # artwork per character instead of only at pack level.
+    works: list[str] = Field(default_factory=list, max_length=200)
+
+
+class PackCredits(BaseModel):
+    """Attribution for a room's character pack, shown on the credits screen."""
+
+    pack_name: str = Field(default="", max_length=120)
+    author: str = Field(default="", max_length=120)
+    url: str | None = Field(default=None, max_length=300)
+    license: str = Field(default="", max_length=120)
+    license_url: str | None = Field(default=None, max_length=300)
+    notice: str = Field(default="", max_length=2000)
+    entries: list[CreditEntry] = Field(default_factory=list, max_length=200)
+
+
 class CharacterAssignment(BaseModel):
     """Actual character assignment. Normal players should only receive their own."""
 
