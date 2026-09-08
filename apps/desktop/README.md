@@ -125,6 +125,8 @@ npm run dist   # rebuilds frontend -> release/OpenClocktower-<version>.exe
 
 The desktop client bundles only the frontend; there is no embedded server, so
 there is no Python build step.
+Release builds exclude ZIP character packs from `apps/frontend/src/packs`.
+`npm start` keeps those local packs available while developing.
 
 **Note:** the single-file `portable`/`nsis` target needs permission to create
 symlinks while electron-builder unpacks its code-sign cache. If it fails with

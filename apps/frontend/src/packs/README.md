@@ -1,13 +1,13 @@
-# Bundled character packs
+# Local character packs
 
-Every `.zip` in this folder is available to local frontend builds and is bundled
-into locally created desktop clients. It appears in the pack list on the
+Every `.zip` in this folder is available to local frontend builds. Release-mode
+builds, including published desktop clients, deliberately exclude it. It appears in the pack list on the
 room-creation screen without server support or a separate upload. Selecting one
 sends it to the room through the normal character-pack upload path.
 
-Public Docker images deliberately contain no packs from this folder. Both Git
-and the Docker build context ignore the ZIPs, and the Dockerfile aborts if one
-ever reaches the frontend build stage.
+Public Docker images and desktop releases contain no packs from this folder.
+Git and the Docker build context ignore the ZIPs, while local development and
+`npm start` desktop builds can still use them.
 
 ## Adding one
 
@@ -18,7 +18,7 @@ at build time, so nothing has to be registered anywhere.
 "The Menagerie v1.17", so rename the file if you want it to read differently.
 Keep names short: the list shows them on one line.
 
-The client is a frozen snapshot in the desktop build, so run the desktop build
+The client is a frozen snapshot in local desktop builds, so run the desktop app
 again after adding a pack (see `apps/desktop/README.md`).
 
 ## Requirements
@@ -29,16 +29,12 @@ An invalid pack is only rejected when a room is created with it, not at build
 time, so create one test room with anything you add.
 
 Packs should carry a `credits` block. It is optional, but the credits screen in
-client settings reads it, and a bundled pack is distributed to everyone who
-installs the app - so whoever made it should be named in it.
+client settings reads it, so whoever made it should be named in it.
 
 ## Licensing
 
-Only add packs you have the right to distribute. These ship inside the
-application to every user, which is a different thing from a storyteller
-uploading a pack into their own room on their own server: the project itself
-becomes the distributor. Content you did not create needs its author's
-permission.
+Only add packs you have the right to use. The ZIP files stay in the local
+workspace and are not part of public source, Docker, or desktop releases.
 
 The repository README states that the app is unofficial and ships no official
 game content, and that bundled packs are unofficial fan-made content credited to

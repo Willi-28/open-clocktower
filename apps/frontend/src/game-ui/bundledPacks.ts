@@ -1,5 +1,5 @@
 /**
- * Character packs that ship with the client.
+ * Character packs available in local development builds.
  *
  * The list is built from `src/packs/*.zip` at build time, so adding a pack is
  * only a matter of dropping the file in. A bundled pack is sent to the room
@@ -9,7 +9,7 @@
 
 // Vite resolves each match to an emitted asset URL; the ZIPs are far past the
 // inline limit, so they stay separate files instead of entering the JS bundle.
-const packUrls = import.meta.glob('../packs/*.zip', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
+const packUrls = import.meta.glob('@character-packs/*.zip', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
 
 export type BundledPack = {
   id: string;

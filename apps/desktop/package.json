@@ -1,7 +1,7 @@
 {
   "name": "open-clocktower-desktop",
   "private": true,
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Steam desktop shell for connecting to self-hosted Open Clocktower servers.",
   "author": "Open Clocktower",
   "license": "MIT",
@@ -9,12 +9,14 @@
   "main": "src/main.mjs",
   "scripts": {
     "build:frontend": "npm --prefix ../frontend run build",
+    "build:frontend:release": "npm --prefix ../frontend run build -- --mode release",
+    "verify:frontend:release": "node scripts/verify-release-frontend.mjs",
     "prestart": "npm run build:frontend",
     "start": "electron .",
     "test": "node test/gateway.test.mjs",
-    "predist": "npm run build:frontend",
+    "predist": "npm run build:frontend:release && npm run verify:frontend:release",
     "dist": "electron-builder",
-    "predist:dir": "npm run build:frontend",
+    "predist:dir": "npm run build:frontend:release && npm run verify:frontend:release",
     "dist:dir": "electron-builder --dir --config.win.signAndEditExecutable=false"
   },
   "dependencies": {

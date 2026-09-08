@@ -1,11 +1,17 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
 
 const backendOrigin = process.env.VITE_BACKEND_ORIGIN ?? 'http://127.0.0.1:8000';
 const backendWsOrigin = backendOrigin.replace(/^http/, 'ws');
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@character-packs': fileURLToPath(new URL(mode === 'release' ? './src/packs/release-empty' : './src/packs', import.meta.url)),
+    },
+  },
   // Bundled character packs. .zip is not one of Vite's built-in asset types, so
   // it has to be declared before src/packs/*.zip can be emitted as files.
   assetsInclude: ['**/*.zip'],
@@ -24,4 +30,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
