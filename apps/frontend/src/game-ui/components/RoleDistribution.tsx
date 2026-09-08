@@ -9,6 +9,7 @@
  */
 
 import type { CSSProperties } from 'react';
+import { useUiText } from '../../i18n';
 
 type RoleCounts = {
   townsfolk: number;
@@ -58,6 +59,7 @@ type RoleDistributionProps = {
 
 /** Show the role counts (and optional seat stepper) for a player count. */
 export function RoleDistribution({ count, seatControl }: RoleDistributionProps) {
+  const t = useUiText();
   const distribution = distributionByPlayerCount[count];
 
   return (
@@ -67,7 +69,7 @@ export function RoleDistribution({ count, seatControl }: RoleDistributionProps) 
           {/* Steps fire on pointer-down for instant feedback; the click handler
             * only covers keyboard activation (event.detail === 0). */}
           <button
-            aria-label="Remove one seat"
+            aria-label={t('Remove one seat')}
             className="secondary role-dist-step"
             disabled={seatControl.locked || count <= seatControl.min}
             onPointerDown={(event) => {
@@ -86,7 +88,7 @@ export function RoleDistribution({ count, seatControl }: RoleDistributionProps) 
           </button>
           <strong className="role-dist-count">{count}</strong>
           <button
-            aria-label="Add one seat"
+            aria-label={t('Add one seat')}
             className="secondary role-dist-step"
             disabled={seatControl.locked || count >= seatControl.max}
             onPointerDown={(event) => {
@@ -104,13 +106,11 @@ export function RoleDistribution({ count, seatControl }: RoleDistributionProps) 
             +
           </button>
           <span className="role-dist-caption">
-            players <small>({seatControl.min}–{seatControl.max})</small>
+            {t('players')} <small>({seatControl.min}–{seatControl.max})</small>
           </span>
         </div>
       ) : (
-        <span className="role-distribution-caption">
-          Role Distribution
-          <small>{count} players</small>
+        <span className="role-distribution-caption">{t('Role Distribution')}<small>{t('{count} players', { count })}</small>
         </span>
       )}
 
@@ -119,13 +119,15 @@ export function RoleDistribution({ count, seatControl }: RoleDistributionProps) 
           {categoryCards.map((card) => (
             <span className="role-card" key={card.key} style={{ '--role-accent': card.accent } as CSSProperties}>
               <strong>{distribution[card.key]}</strong>
-              <small>{card.label}</small>
+              <small>{t(card.label)}</small>
             </span>
           ))}
         </div>
       ) : (
         <p className="helper-text">
-          {count} seated player{count === 1 ? '' : 's'} — the chart covers 5 to 15.
+          {t(count === 1
+            ? '{count} seated player - the chart covers 5 to 15.'
+            : '{count} seated players - the chart covers 5 to 15.', { count })}
         </p>
       )}
     </div>

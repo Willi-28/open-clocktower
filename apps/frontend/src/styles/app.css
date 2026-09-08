@@ -66,6 +66,18 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
+/* Pixelify Sans (OFL 1.1) is the Retro RPG theme's display face. Before it the
+ * theme fell back to whatever monospace the system had, which is why its
+ * headings read as small and off-style next to the pixel art. Latin subset,
+ * variable weight - one 12 KB file covers regular and bold. */
+@font-face {
+  font-display: swap;
+  font-family: "Pixelify Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  src: url("../assets/fonts/pixelify-sans-latin.woff2") format("woff2");
+}
+
 :root {
   --desktop-left-panel: clamp(300px, 18.75vw, 360px);
   --desktop-right-panel: clamp(320px, 20vw, 380px);
@@ -74,6 +86,7 @@
   --display-font: "Cinzel", "Iowan Old Style", Georgia, "Times New Roman", serif;
   --body-font: "Alegreya", "Iowan Old Style", Georgia, "Times New Roman", serif;
   --mono-font: ui-monospace, "Cascadia Code", Consolas, monospace;
+  --dead-vote-image: url("../assets/themes/classic/dead-vote.png");
   --display-tracking: 0.05em;
   --radius-panel: 12px;
   --radius-card: 9px;
@@ -105,7 +118,7 @@
   --table-bg:
     radial-gradient(circle at 50% 50%, rgba(9, 6, 5, 0.1) 0 25%, transparent 26%),
     linear-gradient(180deg, rgba(35, 10, 16, 0.08), rgba(13, 4, 7, 0.18)),
-    url("../assets/Roundtable.png") center / cover no-repeat;
+    url("../assets/themes/classic/Roundtable.png") center / cover no-repeat;
   --table-border: #1b0f0a;
   --table-shadow:
     inset 0 0 96px rgba(0, 0, 0, 0.42),
@@ -154,6 +167,30 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+.app-shell.theme-classic {
+  --dead-vote-image: url("../assets/themes/classic/dead-vote.png");
+}
+
+.app-shell.theme-dark {
+  --dead-vote-image: url("../assets/themes/dark/dead-vote.png");
+}
+
+.app-shell.theme-island {
+  --dead-vote-image: url("../assets/themes/island/dead-vote.png");
+}
+
+.app-shell.theme-light {
+  --dead-vote-image: url("../assets/themes/light/dead-vote.png");
+}
+
+.app-shell.theme-universe {
+  --dead-vote-image: url("../assets/themes/universe/dead-vote.png");
+}
+
+.app-shell.theme-magic {
+  --dead-vote-image: url("../assets/themes/magic/dead-vote.png");
 }
 
 @supports (height: 100dvh) {
@@ -522,7 +559,7 @@ h2 {
 .app-shell.theme-classic.background-classic::before {
   background:
     linear-gradient(180deg, rgba(20, 5, 8, 0.06), rgba(8, 2, 4, 0.24)),
-    url("../assets/classic-background.png") center / cover no-repeat;
+    url("../assets/themes/classic/classic-background.png") center / cover no-repeat;
   content: "";
   filter: saturate(0.94) brightness(0.94) contrast(1.04);
   image-rendering: auto;
@@ -537,7 +574,7 @@ h2 {
   background:
     radial-gradient(ellipse at 52% 48%, rgba(42, 72, 118, 0.08), transparent 34rem),
     linear-gradient(180deg, rgba(1, 5, 18, 0.28), rgba(1, 4, 14, 0.58)),
-    url("../assets/universe_background2.jpg") center 48% / cover no-repeat;
+    url("../assets/themes/universe/universe_background2.jpg") center 48% / cover no-repeat;
   content: "";
   filter: saturate(0.9) brightness(0.68) contrast(1.04);
   image-rendering: auto;
@@ -553,7 +590,7 @@ h2 {
     radial-gradient(ellipse at 50% 45%, rgba(181, 220, 255, 0.2), transparent 30rem),
     radial-gradient(ellipse at 72% 24%, rgba(172, 117, 255, 0.18), transparent 26rem),
     linear-gradient(180deg, rgba(13, 9, 25, 0.3), rgba(8, 8, 15, 0.72)),
-    url("../assets/magic_background.jpg") center / cover no-repeat;
+    url("../assets/themes/magic/magic_background.jpg") center / cover no-repeat;
   content: "";
   filter: saturate(0.98) brightness(0.74) contrast(1.06);
   image-rendering: auto;
@@ -568,7 +605,7 @@ h2 {
   background:
     radial-gradient(ellipse at 28% 18%, rgba(255, 231, 153, 0.28), transparent 26rem),
     linear-gradient(180deg, rgba(255, 223, 128, 0.1), rgba(12, 88, 116, 0.28)),
-    url("../assets/sunny_island_background.jpg") center / cover no-repeat;
+    url("../assets/themes/island/sunny_island_background.jpg") center / cover no-repeat;
   content: "";
   filter: saturate(1.06) brightness(0.84) contrast(1.04);
   image-rendering: auto;
@@ -583,7 +620,7 @@ h2 {
   background:
     linear-gradient(90deg, rgba(8, 3, 2, 0.36), transparent 24%, transparent 76%, rgba(8, 3, 2, 0.36)),
     linear-gradient(180deg, rgba(17, 6, 3, 0.06), rgba(8, 3, 2, 0.24)),
-    url("../assets/retro-rpg/tavern-background.png") center / cover no-repeat;
+    url("../assets/themes/retro-rpg/tavern-background.png") center / cover no-repeat;
   content: "";
   filter: saturate(1.02) brightness(0.92) contrast(1.04);
   image-rendering: pixelated;
@@ -591,6 +628,7 @@ h2 {
   opacity: 1;
   pointer-events: none;
   position: fixed;
+  transition: filter 1400ms ease-in-out, opacity 1400ms ease-in-out;
   z-index: 0;
 }
 
@@ -877,6 +915,47 @@ h2 {
   width: 8px;
 }
 
+/* Native select, so pack choice needs no dropdown state, keyboard handling or
+ * outside-click of its own - it just wears the trigger's look. */
+.pack-select-input {
+  appearance: none;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--inner-bg) 78%, transparent), color-mix(in srgb, var(--panel-1) 76%, transparent)),
+    color-mix(in srgb, var(--theme-glow) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold) 42%, var(--panel-border));
+  border-radius: 10px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 184, 0.08),
+    0 12px 28px rgba(0, 0, 0, 0.32);
+  color: var(--cream);
+  cursor: pointer;
+  font-family: var(--body-font);
+  font-size: 0.94rem;
+  font-weight: 700;
+  min-height: 48px;
+  padding: 0 34px 0 12px;
+  width: 100%;
+}
+
+/* The chevron the trigger draws, kept for the select. */
+.pack-select::after {
+  border-bottom: 2px solid var(--gold-bright);
+  border-right: 2px solid var(--gold-bright);
+  content: "";
+  height: 8px;
+  pointer-events: none;
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-75%) rotate(45deg);
+  width: 8px;
+}
+
+.pack-select-input option {
+  background: var(--panel-1);
+  color: var(--cream);
+}
+
 .pack-select-trigger.static {
   cursor: default;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1104,7 +1183,7 @@ h2 {
   --chat-line: rgba(104, 80, 54, 0.18);
   --table-bg:
     linear-gradient(180deg, rgba(255, 247, 232, 0.2), rgba(126, 92, 55, 0.08)),
-    url("../assets/light_table.png") center / cover no-repeat,
+    url("../assets/themes/light/light_table.png") center / cover no-repeat,
     #eee1ce;
   --table-border: #cbb89c;
   --table-shadow:
@@ -1171,7 +1250,7 @@ h2 {
   --chat-line: rgba(214, 174, 102, 0.15);
   --table-bg:
     linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.3)),
-    url("../assets/dark_table.png") center / cover no-repeat,
+    url("../assets/themes/dark/dark_table.png") center / cover no-repeat,
     #111215;
   --table-border: #0b0c0e;
   --table-shadow:
@@ -1243,7 +1322,7 @@ h2 {
   --chat-line: rgba(116, 214, 230, 0.22);
   --table-bg:
     radial-gradient(circle at 50% 50%, rgba(6, 15, 32, 0.08), transparent 34%),
-    url("../assets/galaxy_table.png") center / cover no-repeat,
+    url("../assets/themes/universe/galaxy_table.png") center / cover no-repeat,
     #020817;
   --table-border: #050818;
   --table-shadow:
@@ -1310,7 +1389,7 @@ h2 {
   --chat-line: rgba(181, 220, 255, 0.18);
   --table-bg:
     radial-gradient(circle at 50% 50%, rgba(181, 220, 255, 0.08), transparent 35%),
-    url("../assets/magic_table.png") center / cover no-repeat,
+    url("../assets/themes/magic/magic_table.png") center / cover no-repeat,
     #181b29;
   --table-border: #20283b;
   --table-shadow:
@@ -1376,7 +1455,7 @@ h2 {
   --chat-input-bg: rgba(5, 38, 51, 0.96);
   --chat-line: rgba(255, 219, 146, 0.22);
   --table-bg:
-    url("../assets/water_art_table.png") center / cover no-repeat,
+    url("../assets/themes/island/water_art_table.png") center / cover no-repeat,
     #0a7282;
   --table-border: #0a5360;
   --table-shadow:
@@ -1410,7 +1489,8 @@ h2 {
 }
 
 .app-shell.theme-retro-rpg {
-  --display-font: ui-monospace, "Cascadia Mono", "Courier New", monospace;
+  --dead-vote-image: url("../assets/themes/retro-rpg/dead-vote.png");
+  --display-font: "Pixelify Sans", ui-monospace, "Cascadia Mono", "Courier New", monospace;
   --body-font: ui-monospace, "Cascadia Mono", "Courier New", monospace;
   --mono-font: ui-monospace, "Cascadia Mono", "Courier New", monospace;
   --display-tracking: 0;
@@ -1443,7 +1523,7 @@ h2 {
   --theme-glow: rgba(178, 67, 30, 0.3);
   --table-bg:
     linear-gradient(180deg, rgba(59, 17, 8, 0.05), rgba(10, 3, 2, 0.18)),
-    url("../assets/retro-rpg/table.png") center / 100% 100% no-repeat;
+    url("../assets/themes/retro-rpg/table.png") center / 100% 100% no-repeat;
   --table-border: transparent;
   --table-shadow:
     inset 0 0 68px rgba(16, 4, 2, 0.28),
@@ -2646,18 +2726,23 @@ h2 {
   text-transform: uppercase;
 }
 
-/* Accuser/Accused badges lean on theme variables so they stay readable on
- * every theme's seat background (the light theme flips gold to dark ink). */
 .nomination-role {
-  background: color-mix(in srgb, var(--gold) 30%, var(--panel-0));
-  border: 1px solid var(--gold);
-  border-radius: 999px;
-  color: var(--gold-bright);
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  padding: 3px 10px;
+  background: #f4ca68;
+  border: 2px solid #301707;
+  border-radius: 5px;
+  box-shadow: 0 0 0 2px #fff0b2, 0 5px 14px rgba(0, 0, 0, 0.52);
+  color: #211006;
+  font-size: calc(0.7rem * var(--seat-scale));
+  font-weight: 900;
+  left: 50%;
+  line-height: 1;
+  min-width: max-content;
+  padding: calc(4px * var(--seat-scale)) calc(9px * var(--seat-scale));
+  position: absolute;
+  top: 0;
   text-transform: uppercase;
+  transform: translate(-50%, -55%);
+  z-index: 9;
 }
 
 .vote-clock-hand {
@@ -2737,14 +2822,20 @@ h2 {
 }
 
 .nomination-role.accused {
-  background: color-mix(in srgb, #c03a4a 34%, var(--panel-0));
-  border-color: #ff9a9a;
-  color: #ffd0d0;
+  background: #b92339;
+  border-color: #3a0710;
+  box-shadow: 0 0 0 2px #ffc2c8, 0 5px 16px rgba(73, 0, 12, 0.58);
+  color: #fff8f8;
 }
 
 .app-shell.theme-light .nomination-role.accused {
-  border-color: #a8322f;
-  color: #7c1d1a;
+  border-color: #3a0710;
+  color: #fff8f8;
+}
+
+.app-shell.theme-retro-rpg .nomination-role {
+  border-radius: 0;
+  box-shadow: 0 0 0 2px #ffdf71, 3px 3px 0 rgba(12, 2, 1, 0.82);
 }
 
 .storyteller-seat {
@@ -3421,6 +3512,19 @@ h2 {
   opacity: 1;
 }
 
+.app-shell:is(.theme-classic, .theme-light, .theme-magic, .theme-universe, .theme-island, .theme-dark) .seat.speaking-seat,
+.app-shell:is(.theme-classic, .theme-light, .theme-magic, .theme-universe, .theme-island, .theme-dark) .table-stage.phase-night .seat.speaking-seat {
+  border-color: #75ed96;
+  box-shadow:
+    0 0 0 3px rgba(8, 24, 13, 0.9),
+    0 0 0 7px rgba(78, 225, 118, 0.72),
+    0 0 30px rgba(62, 220, 105, 0.62);
+  outline: 2px solid #c5ffd2;
+  outline-offset: 2px;
+  opacity: 1;
+  z-index: 8;
+}
+
 .seat.dead.speaking-seat,
 .table-stage.phase-night .seat.dead.speaking-seat {
   border-color: #92f8a5;
@@ -3464,23 +3568,18 @@ h2 {
 }
 
 .dead-vote-token {
-  border-radius: 999px;
-  font-size: calc(0.62rem * var(--seat-scale));
-  font-weight: 900;
-  padding: 2px 7px;
-  text-transform: uppercase;
+  background: var(--dead-vote-image) center / contain no-repeat;
+  height: 86%;
+  pointer-events: none;
+  position: absolute;
+  right: -20%;
+  top: 7%;
+  width: 32%;
+  z-index: 4;
 }
 
-.dead-vote-token.available {
-  background: rgba(216, 173, 98, 0.2);
-  border: 1px solid rgba(243, 211, 138, 0.58);
-  color: #ffe0a0;
-}
-
-.dead-vote-token.spent {
-  background: rgba(164, 164, 164, 0.1);
-  border: 1px solid rgba(164, 164, 164, 0.3);
-  color: #8f8a80;
+.seat-visual {
+  display: contents;
 }
 
 .seat-avatar {
@@ -3494,7 +3593,7 @@ h2 {
   z-index: -1;
 }
 
-.seat.occupied:has(.seat-avatar)::after {
+.seat.has-avatar::after {
   background: var(--seat-overlay);
   border-radius: 14px;
   content: "";
@@ -4626,7 +4725,8 @@ h2 {
 .settings-tabs {
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* Two rows of three: six tabs in one row leaves no room for the labels. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .settings-tabs button {
@@ -5604,9 +5704,25 @@ details.voice-panel[open] > summary::before {
   cursor: pointer;
   display: grid;
   gap: 3px 9px;
-  grid-template-columns: 30px minmax(0, 1fr);
+  /* The third track holds the check indicator. It is reserved even when
+   * unselected so picking a character never shifts the row. */
+  grid-template-columns: 30px minmax(0, 1fr) 17px;
   padding: 6px 9px;
-  transition: border-color 130ms ease, background-color 130ms ease;
+  transition: border-color 130ms ease, background-color 130ms ease, box-shadow 130ms ease;
+}
+
+/* The real checkbox is hidden, so selection needs its own affordance. A tint
+ * alone was too easy to miss - most of all in the retro theme, where the panel
+ * is already warm and the 1px border is covered by the frame sprite. */
+.character-pick::after {
+  align-self: center;
+  border: 1px solid color-mix(in srgb, var(--panel-border) 80%, transparent);
+  border-radius: var(--radius-pill);
+  content: "";
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  height: 17px;
+  width: 17px;
 }
 
 .character-pick:hover {
@@ -5614,8 +5730,22 @@ details.voice-panel[open] > summary::before {
 }
 
 .character-pick.selected {
-  background: color-mix(in srgb, var(--gold) 16%, var(--inner-bg));
+  background: color-mix(in srgb, var(--gold) 30%, var(--inner-bg));
   border-color: var(--gold);
+  box-shadow: inset 0 0 0 1px var(--gold);
+}
+
+/* A filled disc rather than a check glyph: the retro theme renders everything
+ * in a monospace fallback that has no U+2713, so the character came out as
+ * replacement junk. A ring that fills in needs no font at all. */
+.character-pick.selected::after {
+  background: var(--gold);
+  border-color: var(--gold);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--bg-0) 70%, transparent);
+}
+
+.character-pick.selected .character-pick-name {
+  color: var(--gold-bright);
 }
 
 .character-pick input {
@@ -5687,6 +5817,24 @@ details.voice-panel[open] > summary::before {
   max-height: var(--viewport-block);
   overflow: hidden;
   padding: 0;
+}
+
+@media (min-width: 981px) and (min-height: 541px) {
+  .right-edge {
+    align-self: stretch;
+    height: 100%;
+    min-height: 0;
+    overflow-y: hidden;
+  }
+
+  .right-dashboard {
+    height: 100%;
+    inset: 0;
+    max-height: 100%;
+    min-height: 0;
+    position: absolute;
+    width: 100%;
+  }
 }
 
 /* The tab rail is clearly darker than the panel content below it, so the
@@ -6381,15 +6529,29 @@ details.voice-panel[open] > summary::before {
   text-rendering: optimizeLegibility;
 }
 
+/* Setup banner: the wide plate with the product name set as text on it. */
 .app-shell.theme-retro-rpg :is(.setup-grid, .server-connect-content)::before {
+  align-content: center;
   aspect-ratio: 520 / 88;
-  background: url("../assets/retro-rpg/title-clocktower.png") center / contain no-repeat;
-  content: "";
-  display: block;
+  /* Painted whole rather than as a border image: the plate is used at its
+   * native 520x88 and its lantern ornaments are far wider than any sensible
+   * border width, so slicing them squeezed and blurred them. */
+  background: url("../assets/themes/retro-rpg/title-frame-wide.png") center / 100% 100% no-repeat;
+  color: var(--gold-bright);
+  content: "Open Clocktower";
+  display: grid;
+  font-family: var(--display-font);
+  font-size: clamp(0.95rem, 2.9vw, 1.55rem);
+  font-weight: 700;
   grid-column: 1 / -1;
   justify-self: center;
+  letter-spacing: 0.14em;
   max-width: 520px;
+  padding: 0 clamp(64px, 15%, 86px);
   pointer-events: none;
+  text-align: center;
+  text-shadow: 2px 2px 0 #2b0905, 0 0 10px rgba(236, 173, 57, 0.35);
+  text-transform: uppercase;
   width: min(520px, 88vw);
 }
 
@@ -6413,8 +6575,8 @@ details.voice-panel[open] > summary::before {
   border: 12px solid transparent;
   border-image-outset: 0;
   border-image-repeat: stretch;
-  border-image-slice: 28 fill;
-  border-image-source: url("../assets/retro-rpg/panel-frame.png");
+  border-image-slice: 28;
+  border-image-source: url("../assets/themes/retro-rpg/panel-frame.png");
   border-image-width: 12px;
   border-radius: 0;
   box-shadow: 0 18px 38px rgba(0, 0, 0, 0.58), 0 0 18px rgba(128, 40, 15, 0.2);
@@ -6434,8 +6596,8 @@ details.voice-panel[open] > summary::before {
   border-image-outset: 0;
   border-image-repeat: stretch;
   border-image-slice: 28 fill;
-  border-image-source: url("../assets/retro-rpg/panel-frame.png");
-  border-image-width: 8px;
+  border-image-source: url("../assets/themes/retro-rpg/panel-frame.png");
+  border-image-width: 8px 10px 8px 8px;
   border-radius: 0;
   box-shadow: none;
 }
@@ -6459,44 +6621,69 @@ details.voice-panel[open] > summary::before {
 .app-shell.theme-retro-rpg .pack-upload-button {
   background: #351016;
   background-clip: padding-box;
-  border: 7px solid transparent;
+  border-width: 7px 9px 7px 7px;
+  border-style: solid;
+  border-color: transparent;
   border-image-outset: 0;
   border-image-repeat: stretch;
-  border-image-slice: 22 fill;
-  border-image-source: url("../assets/retro-rpg/button.png");
-  border-image-width: 7px;
+  border-image-slice: 22 27 22 22 fill;
+  border-image-source: url("../assets/themes/retro-rpg/button.png");
+  border-image-width: 7px 9px 7px 7px;
   border-radius: 0;
   box-shadow: none;
   color: var(--cream);
   text-shadow: 1px 1px 0 #210605;
 }
 
-.app-shell.theme-retro-rpg .dashboard-tab:not(.dashboard-tab-characters) {
+.app-shell.theme-retro-rpg .dashboard-tab:not(:is(.dashboard-tab-characters, .dashboard-tab-night, .dashboard-tab-tools)) {
   background: #1d1107;
   border-image-slice: 22;
 }
 
-.app-shell.theme-retro-rpg button:where(:not(.seat):not(.dashboard-tab-characters):not(.reminder-token):not(.reminder-symbol)):hover:not(:disabled),
+/* Hover and active swap to the theme's brighter button sprite.
+ *
+ * Two things were wrong before. The slice was missing "fill", so the sprite
+ * painted only the frame and the flat background colour showed through the
+ * middle as a hard rectangle inset by the 7px border - the misaligned, overly
+ * square highlight. And that colour was brown, which dragged every red button
+ * off-hue on hover. button-active.png is the same red, only brighter, and it
+ * lines up with the frame by construction. */
+.app-shell.theme-retro-rpg button:where(:not(.seat):not(:is(.dashboard-tab-characters, .dashboard-tab-night, .dashboard-tab-tools)):not(.reminder-token):not(.reminder-symbol)):hover:not(:disabled),
 .app-shell.theme-retro-rpg .pack-upload-button:hover {
-  background: #2b1709;
   border-color: transparent;
-  border-image-slice: 22;
-  border-image-source: url("../assets/retro-rpg/button.png");
+  border-image-slice: 22 27 22 22 fill;
+  border-image-source: url("../assets/themes/retro-rpg/button-hover.png");
   color: #fff2bd;
-  filter: brightness(1.13) saturate(0.92) drop-shadow(0 0 4px rgba(231, 166, 50, 0.38));
+}
+
+/* Pressed and disabled use their own sprites, so a button reads as pushed in
+ * and an unavailable one stops looking clickable. Neither state had artwork
+ * before; both were only a colour change. */
+.app-shell.theme-retro-rpg button:where(:not(.seat):not(.reminder-token):not(.reminder-symbol)):active:not(:disabled),
+.app-shell.theme-retro-rpg .pack-upload-button:active {
+  border-image-slice: 22 27 22 22 fill;
+  border-image-source: url("../assets/themes/retro-rpg/button-pressed.png");
+  color: #ffe9b0;
+}
+
+.app-shell.theme-retro-rpg button:where(:not(.seat):not(.reminder-token):not(.reminder-symbol)):disabled {
+  border-image-slice: 22 27 22 22 fill;
+  border-image-source: url("../assets/themes/retro-rpg/button-disabled.png");
+  color: rgba(248, 234, 209, 0.42);
+  filter: none;
+  text-shadow: none;
 }
 
 .app-shell.theme-retro-rpg :is(
-  .dashboard-tab.active:not(.dashboard-tab-characters),
+  .dashboard-tab.active:not(:is(.dashboard-tab-characters, .dashboard-tab-night, .dashboard-tab-tools)),
   .settings-tabs button.active,
   .hand-button.raised
 ) {
-  background: #2b1709;
   border-color: transparent;
-  border-image-slice: 22;
-  border-image-source: url("../assets/retro-rpg/button.png");
+  border-image-slice: 22 27 22 22 fill;
+  border-image-source: url("../assets/themes/retro-rpg/button-active.png");
   color: #fff4c2;
-  filter: brightness(1.18) saturate(0.9) drop-shadow(0 0 5px rgba(236, 173, 57, 0.56));
+  filter: brightness(1.2);
   text-shadow: 1px 1px 0 #210605, 0 0 5px rgba(255, 224, 138, 0.38);
 }
 
@@ -6547,20 +6734,29 @@ details.voice-panel[open] > summary::before {
 }
 
 .app-shell.theme-retro-rpg .settings-tabs {
-  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   width: 100%;
 }
 
+/* This theme sets every font to monospace, whose small x-height reads a size
+ * smaller than the serif faces the other themes use. Short labels therefore
+ * need a bump here to stay as legible as they are elsewhere. */
 .app-shell.theme-retro-rpg .settings-tabs button {
   border-width: 5px;
   border-image-width: 5px;
-  font-size: 0.68rem;
+  font-size: 0.82rem;
   min-width: 0;
   overflow: hidden;
-  padding: 0 2px;
+  padding: 0 4px;
   text-overflow: clip;
   white-space: nowrap;
   width: 100%;
+}
+
+/* Sprite-labelled tabs are excluded: their text is transparent, so a size
+ * change there would only alter the button width. */
+.app-shell.theme-retro-rpg .dashboard-tab:not(:is(.dashboard-tab-characters, .dashboard-tab-night, .dashboard-tab-tools)) {
+  font-size: 0.92rem;
 }
 
 .app-shell.theme-retro-rpg .phase-button-row {
@@ -6726,13 +6922,12 @@ details.voice-panel[open] > summary::before {
   box-shadow: inset 0 0 0 1px rgba(255, 224, 138, 0.16), 0 0 12px rgba(216, 156, 54, 0.34);
 }
 
-.app-shell.theme-retro-rpg :is(
-  .token-context-grid button img,
-  .reminder-symbol img,
-  .reminder-token img,
-  .character-card img,
-  .seat-avatar
-) {
+/* The theme pixelates its own pixel-art surfaces - background, table, frames -
+ * and those are all CSS backgrounds. Every <img> is content instead: character
+ * pack icons, seat roles, demon bluffs, avatars, emoji. Those are ordinary
+ * artwork and must never be pixelated, so images opt out as a group rather than
+ * through an allowlist that kept missing new icon locations. */
+.app-shell.theme-retro-rpg img {
   image-rendering: auto;
 }
 
@@ -6749,27 +6944,40 @@ details.voice-panel[open] > summary::before {
   object-fit: contain;
 }
 
+/* The chat composer is excluded by name rather than by a later reset rule: the
+ * :is() list above scores 0,5,1 (the :not() chain on input counts), so a plain
+ * ".chat-input-row textarea" override silently lost and the composer carried a
+ * second input frame inside the one the row already draws - and, being 8px
+ * bordered under border-box sizing, it scrolled on a single line. */
 .app-shell.theme-retro-rpg :is(
   input:not([type="checkbox"]):not([type="range"]):not([type="file"]),
   select,
-  textarea,
+  textarea:not(.chat-composer),
   .pack-select-trigger,
   .pack-upload-file
 ) {
   background: #160909;
   background-clip: padding-box;
-  border: 8px solid transparent;
+  border-width: 8px 10px 8px 8px;
+  border-style: solid;
+  border-color: transparent;
   border-image-outset: 0;
   border-image-repeat: stretch;
-  border-image-slice: 20 fill;
-  border-image-source: url("../assets/retro-rpg/input.png");
-  border-image-width: 8px;
+  border-image-slice: 20 25 20 20 fill;
+  border-image-source: url("../assets/themes/retro-rpg/input.png");
+  border-image-width: 8px 10px 8px 8px;
   border-radius: 0;
   color: var(--cream);
   outline: none;
 }
 
-.app-shell.theme-retro-rpg :is(input, select, textarea):focus {
+.app-shell.theme-retro-rpg :is(input:not([type="checkbox"]):not([type="range"]):not([type="file"]), select, textarea:not(.chat-composer)):focus {
+  border-image-source: url("../assets/themes/retro-rpg/input-focus.png");
+  filter: none;
+}
+
+/* The chat composer draws no frame of its own, so it keeps a plain lift. */
+.app-shell.theme-retro-rpg .chat-composer:focus {
   filter: brightness(1.16);
 }
 
@@ -6778,9 +6986,9 @@ details.voice-panel[open] > summary::before {
   border: 7px solid transparent;
   border-image-outset: 0;
   border-image-repeat: stretch;
-  border-image-slice: 20 fill;
-  border-image-source: url("../assets/retro-rpg/input.png");
-  border-image-width: 7px;
+  border-image-slice: 20 25 20 20 fill;
+  border-image-source: url("../assets/themes/retro-rpg/input.png");
+  border-image-width: 7px 9px 7px 7px;
   border-radius: 0;
 }
 
@@ -6789,67 +6997,109 @@ details.voice-panel[open] > summary::before {
   border: 0;
   border-image: none;
   filter: none;
+  /* Centre one line exactly, at any root font size.
+   *
+   * Dropping min-height lets the auto-grow set the height to the content, so
+   * there is nothing to scroll, and the grid cell then centres that box against
+   * the 38px buttons. A fixed padding could not do this: the root font size is
+   * fluid, so the line box height moves with the viewport while the padding
+   * would not. */
+  align-self: center;
+  min-height: 0;
 }
 
-.app-shell.theme-retro-rpg .voice-panel-heading strong {
-  aspect-ratio: 390 / 88;
-  background: url("../assets/retro-rpg/title-voice-rooms.png") center / contain no-repeat;
-  color: transparent;
+/* Title plates.
+ *
+ * The plate is a stretchable 9-slice frame and the heading is real text drawn
+ * on it, so every label translates. One frame serves them all: the per-heading
+ * sprites were the same plate at different sizes, and dropping them saves the
+ * ~1.6 MB the large ones cost.
+ */
+.app-shell.theme-retro-rpg :is(
+  .voice-panel-heading strong,
+  .chat-heading-text.public strong,
+  .floating-sheet-titlebar strong
+) {
+  background: transparent;
+  border: 10px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 24 fill;
+  border-image-source: url("../assets/themes/retro-rpg/title-frame-medium.png");
+  border-image-width: 10px;
+  color: var(--gold-bright);
   display: block;
-  font-size: 0;
+  font-family: var(--display-font);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   max-width: 100%;
-  text-shadow: none;
-  width: 230px;
-}
-
-.app-shell.theme-retro-rpg .chat-heading-text.public strong {
-  aspect-ratio: 390 / 88;
-  background: url("../assets/retro-rpg/title-town-chat.png") center / contain no-repeat;
-  color: transparent;
-  display: block;
-  font-size: 0;
-  max-width: 100%;
-  text-shadow: none;
-  width: 190px;
+  overflow: hidden;
+  padding: 3px 6px;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-shadow: 1px 1px 0 #2b0905;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .app-shell.theme-retro-rpg .floating-sheet-titlebar strong {
-  aspect-ratio: 390 / 92;
-  background: url("../assets/retro-rpg/title-characters.png") center / contain no-repeat;
-  color: transparent;
-  display: block;
-  font-size: 0;
   max-width: calc(100% - 42px);
-  width: 190px;
 }
 
-.app-shell.theme-retro-rpg .dashboard-tab-characters {
+/* Dashboard tabs use the theme's own tab sprites, with the label as real text
+ * so Characters / Order / Tools follow the interface language. */
+.app-shell.theme-retro-rpg :is(.dashboard-tab-characters, .dashboard-tab-night, .dashboard-tab-tools) {
+  align-items: center;
   background: transparent;
-  border: 0;
-  border-image: none;
+  border-color: transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 58 92 fill;
+  border-image-source: url("../assets/themes/retro-rpg/tab-normal-ui.png");
+  border-image-width: 11px 17px;
+  border-style: solid;
+  border-width: 11px 17px;
   box-shadow: none;
-  color: transparent;
-  min-width: 153px;
-  padding: 0;
-  position: relative;
-  text-shadow: none;
+  color: var(--gold);
+  display: flex;
+  /* Shrink rather than wrap in the narrowest dashboard: flexbox picks the wrap
+   * from the basis, so the basis is the narrow case and no max-width parks them
+   * on the left of a widened panel. */
+  flex: 1 1 auto;
+  font-size: 0.82rem;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 2px;
+  text-overflow: clip;
+  text-shadow: 1px 1px 0 #210605;
+  /* Only the selected tab changes size, and it grows - nothing shrinks. */
+  transform-origin: center bottom;
+  transition: transform 140ms ease, filter 140ms ease, color 140ms ease;
+  white-space: nowrap;
+  width: 88px;
+  /* Never crop the label. A tab that cannot fit its word makes the row wrap
+   * instead, which stays readable - clipping produced things like "RAOTER". */
+  min-width: max-content;
 }
 
-.app-shell.theme-retro-rpg .dashboard-tab-characters::before {
-  background: url("../assets/retro-rpg/title-characters.png") center / contain no-repeat;
-  content: "";
-  height: 36px;
-  left: 50%;
-  pointer-events: none;
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 153px;
+.app-shell.theme-retro-rpg :is(.dashboard-tab-characters, .dashboard-tab-night, .dashboard-tab-tools):hover:not(:disabled) {
+  border-image-source: url("../assets/themes/retro-rpg/tab-hover-ui.png");
+  color: var(--gold-bright);
 }
 
-.app-shell.theme-retro-rpg .dashboard-tab-characters:hover:not(:disabled)::before,
-.app-shell.theme-retro-rpg .dashboard-tab-characters.active::before {
-  filter: brightness(1.14);
+.app-shell.theme-retro-rpg :is(.dashboard-tab-characters, .dashboard-tab-night, .dashboard-tab-tools).active {
+  border-image-source: url("../assets/themes/retro-rpg/tab-active-ui.png");
+  color: var(--gold-bright);
+  filter: drop-shadow(0 0 5px rgba(236, 173, 57, 0.5));
+  transform: scale(1.18);
+  z-index: 1;
+}
+
+.app-shell.theme-retro-rpg .dashboard-tab:only-child.active {
+  transform: none;
 }
 
 .app-shell.theme-retro-rpg .dashboard-tab-characters .dashboard-tab-detach-hint {
@@ -6864,6 +7114,7 @@ details.voice-panel[open] > summary::before {
   border-radius: 50%;
   box-shadow: var(--table-shadow);
   image-rendering: pixelated;
+  transition: filter 1400ms ease-in-out;
 }
 
 .app-shell.theme-retro-rpg .table-surface::before {
@@ -6886,7 +7137,7 @@ details.voice-panel[open] > summary::before {
   border-image-outset: 0;
   border-image-repeat: stretch;
   border-image-slice: 28 fill;
-  border-image-source: url("../assets/retro-rpg/panel-frame.png");
+  border-image-source: url("../assets/themes/retro-rpg/panel-frame.png");
   border-image-width: 9px;
   border-radius: 0;
   box-shadow: 0 7px 0 rgba(8, 2, 1, 0.42);
@@ -6905,24 +7156,38 @@ details.voice-panel[open] > summary::before {
   display: none;
 }
 
+/* Phase indicator: the compact sun/moon symbol above a readable label. The
+ * large phase art carried the word itself and is now textless, so the label is
+ * rendered as text and follows the interface language. */
 .app-shell.theme-retro-rpg .table-phase-label {
+  align-items: center;
+  color: var(--gold-bright);
+  display: grid;
+  font-family: var(--display-font);
+  font-size: 0.86rem;
+  font-weight: 700;
+  gap: 2px;
+  justify-items: center;
+  letter-spacing: 0.06em;
+  text-shadow: 2px 2px 0 #2b0905;
+  text-transform: uppercase;
+}
+
+.app-shell.theme-retro-rpg .table-phase-label::before {
   aspect-ratio: 1;
   background-position: center;
   background-repeat: no-repeat;
-  color: transparent;
-  display: block;
-  font-size: 0;
-  width: clamp(88px, 12cqi, 124px);
+  background-size: contain;
+  content: "";
+  width: clamp(72px, 10cqi, 104px);
 }
 
-.app-shell.theme-retro-rpg .table-phase[data-phase="day"] .table-phase-label {
-  background-image: url("../assets/retro-rpg/phase-day.png");
-  background-size: auto 108%;
+.app-shell.theme-retro-rpg .table-phase[data-phase="day"] .table-phase-label::before {
+  background-image: url("../assets/themes/retro-rpg/phase-day-icon.png");
 }
 
-.app-shell.theme-retro-rpg .table-phase[data-phase="night"] .table-phase-label {
-  background-image: url("../assets/retro-rpg/phase-night.png");
-  background-size: auto 124%;
+.app-shell.theme-retro-rpg .table-phase[data-phase="night"] .table-phase-label::before {
+  background-image: url("../assets/themes/retro-rpg/phase-night-icon.png");
 }
 
 .app-shell.theme-retro-rpg .table-stage.phase-night .table-surface {
@@ -6942,138 +7207,139 @@ details.voice-panel[open] > summary::before {
 }
 
 .app-shell.theme-retro-rpg .seat {
-  background: #190809;
-  background-clip: padding-box;
-  border: 14px solid transparent;
-  border-image-outset: 0;
-  border-image-repeat: stretch;
-  border-image-slice: 34 fill;
-  border-image-source: url("../assets/retro-rpg/seat-frame.png");
-  border-image-width: 14px;
+  --retro-seat-content: url("../assets/themes/retro-rpg/seat-content-empty.png");
+  aspect-ratio: 1254 / 863;
+  background: transparent;
+  border: 0;
   border-radius: 0;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.42);
-  isolation: isolate;
-}
-
-.app-shell.theme-retro-rpg .seat.has-character {
-  background-color: #4b0c20;
-  border-image-slice: 30 fill;
-  border-image-source: url("../assets/retro-rpg/role-card-frame.png");
-}
-
-.app-shell.theme-retro-rpg .seat:has(.seat-avatar) {
-  background-color: #100607;
-  border-image: none;
   box-shadow: none;
-}
-
-.app-shell.theme-retro-rpg .seat.has-character:has(.seat-avatar) {
-  border-image: none;
-}
-
-.app-shell.theme-retro-rpg .seat:has(.seat-avatar)::before {
-  border: 14px solid transparent;
-  border-image-outset: 0;
-  border-image-repeat: stretch;
-  border-image-slice: 30;
-  border-image-source: url("../assets/retro-rpg/role-card-frame.png");
-  border-image-width: 14px;
   box-sizing: border-box;
-  content: "";
-  inset: -14px;
+  height: auto;
+  isolation: isolate;
+  min-height: 0;
+  outline: 0;
+  padding: 0;
+  width: calc(min(246px, 24cqi) * var(--seat-scale));
+}
+
+.app-shell.theme-retro-rpg .seat.occupied {
+  --retro-seat-content: url("../assets/themes/retro-rpg/seat-content-occupied.png");
+}
+
+.app-shell.theme-retro-rpg .seat-visual {
+  background: none;
+  border-radius: calc(5px * var(--seat-scale));
+  display: block;
+  inset: 0;
+  overflow: hidden;
   pointer-events: none;
   position: absolute;
+  z-index: 0;
+}
+
+.app-shell.theme-retro-rpg .seat-visual::before,
+.app-shell.theme-retro-rpg .seat-visual::after {
+  aspect-ratio: 1;
+  content: "";
+  left: 0;
+  position: absolute;
+  top: -18.2%;
+  width: 100%;
+}
+
+.app-shell.theme-retro-rpg .seat-visual::before {
+  background: var(--retro-seat-content) center / 100% 100% no-repeat;
+  z-index: 0;
+}
+
+.app-shell.theme-retro-rpg .seat.has-avatar .seat-visual::before {
+  background-image: none;
+}
+
+.app-shell.theme-retro-rpg .seat-visual::after {
+  background: url("../assets/themes/retro-rpg/seat-frame-overlay.png") center / 100% 100% no-repeat;
   z-index: 2;
 }
 
-.app-shell.theme-retro-rpg .seat:hover,
-.app-shell.theme-retro-rpg .seat.occupied {
-  border-color: transparent;
-  filter: none;
+.app-shell.theme-retro-rpg .seat .seat-avatar {
+  border-radius: 0;
+  filter: saturate(0.78) contrast(1.08) brightness(0.86) sepia(0.08);
+  height: 88.3%;
+  inset: 5.7% auto auto 3.75%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 1;
+  pointer-events: none;
+  width: 92.5%;
+  z-index: 1;
+}
+
+.app-shell.theme-retro-rpg .seat.has-avatar::after {
+  content: none;
 }
 
 .app-shell.theme-retro-rpg .seat:hover {
-  box-shadow: 0 0 16px rgba(223, 157, 50, 0.42), 0 12px 24px rgba(0, 0, 0, 0.42);
-}
-
-.app-shell.theme-retro-rpg .seat:has(.seat-avatar):hover {
+  border: 0;
   box-shadow: none;
-}
-
-.app-shell.theme-retro-rpg .seat:has(.seat-avatar):hover::before {
-  filter: brightness(1.1) saturate(0.94) drop-shadow(0 0 3px rgba(231, 166, 50, 0.34));
-}
-
-.app-shell.theme-retro-rpg .seat.speaking-seat,
-.app-shell.theme-retro-rpg .table-stage.phase-night .seat.speaking-seat {
-  border-color: transparent;
-  box-shadow: 0 0 24px rgba(73, 226, 108, 0.66), 0 8px 0 rgba(8, 2, 1, 0.56);
   filter: none;
-  outline: 3px solid #79f28d;
-  outline-offset: -9px;
 }
 
-.app-shell.theme-retro-rpg .seat.speaking-seat:has(.seat-avatar),
-.app-shell.theme-retro-rpg .table-stage.phase-night .seat.speaking-seat:has(.seat-avatar) {
+.app-shell.theme-retro-rpg .seat:hover .seat-visual {
+  filter: brightness(1.08);
+}
+
+.app-shell.theme-retro-rpg .seat:is(.hand-raised, .nominator-seat, .voice-focused-seat) .seat-visual {
+  box-shadow: 0 0 0 calc(2px * var(--seat-scale)) #f3c85f, 0 0 calc(16px * var(--seat-scale)) rgba(216, 173, 98, 0.46);
+}
+
+.app-shell.theme-retro-rpg .seat.nominee-seat .seat-visual {
+  box-shadow: 0 0 0 calc(2px * var(--seat-scale)) #ff8f8f, 0 0 calc(18px * var(--seat-scale)) rgba(220, 55, 68, 0.5);
+}
+
+.app-shell.theme-retro-rpg .seat.speaking-seat {
+  border: 0;
   box-shadow: none;
+  filter: none;
   outline: none;
 }
 
-.app-shell.theme-retro-rpg .seat.speaking-seat:has(.seat-avatar)::before,
-.app-shell.theme-retro-rpg .table-stage.phase-night .seat.speaking-seat:has(.seat-avatar)::before {
-  filter:
-    drop-shadow(0 0 1px #b8ffc5)
-    drop-shadow(0 0 3px #61e77f)
-    drop-shadow(0 0 9px rgba(73, 226, 108, 0.74));
-}
-
-.app-shell.theme-retro-rpg .seat-avatar,
-.app-shell.theme-retro-rpg .seat.occupied:has(.seat-avatar)::after {
-  border-radius: 0;
-}
-
-.app-shell.theme-retro-rpg .seat-avatar {
-  display: block;
-  height: calc(100% + 4px);
-  inset: -2px auto auto -2px;
-  max-height: none;
-  max-width: none;
-  object-fit: cover;
-  opacity: 1;
-  pointer-events: none;
-  width: calc(100% + 4px);
-  z-index: 3;
-}
-
-.app-shell.theme-retro-rpg .seat.occupied:has(.seat-avatar)::after {
-  inset: -2px;
-  z-index: 4;
+.app-shell.theme-retro-rpg .seat.speaking-seat .seat-visual {
+  box-shadow: 0 0 0 calc(2px * var(--seat-scale)) #74dc8a, 0 0 calc(14px * var(--seat-scale)) rgba(76, 214, 108, 0.34);
 }
 
 .app-shell.theme-retro-rpg .seat :is(
-  .nomination-role,
   .raised-hand-indicator,
-  .dead-vote-token,
   .seat-initials,
   .seat-empty-icon,
   .seat-character-token,
   .seat-suspicion-token
 ) {
   position: relative;
-  z-index: 5;
+  z-index: 1;
 }
 
+.app-shell.theme-retro-rpg .seat-empty-icon {
+  display: none;
+}
+
+/* Drawn as a border image rather than a stretched background: stretching
+ * squashed the decorated ends on a short label, and the text then sat on top of
+ * them - which is what pushed "Frei" past the plate edge. Now only the middle
+ * stretches and the ends keep their size, so the padding always clears them. */
 .app-shell.theme-retro-rpg .seat-nameplate {
-  background: url("../assets/retro-rpg/nameplate.png") center / 100% 100% no-repeat;
-  border: 0;
+  background: transparent;
+  border-color: transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 26 34 fill;
+  border-image-source: url("../assets/themes/retro-rpg/nameplate.png");
+  border-image-width: calc(9px * var(--seat-scale)) calc(13px * var(--seat-scale));
   border-radius: 0;
+  border-style: solid;
+  border-width: calc(9px * var(--seat-scale)) calc(13px * var(--seat-scale));
   min-height: calc(29px * var(--seat-scale));
-  padding: calc(5px * var(--seat-scale)) calc(17px * var(--seat-scale));
-  z-index: 5;
-}
-
-.app-shell.theme-retro-rpg .storyteller-seat-tag {
-  z-index: 5;
+  padding: 0 calc(4px * var(--seat-scale));
+  z-index: 3;
 }
 
 .app-shell.theme-retro-rpg :is(.voice-room-block.active, .chat-bubble) {
@@ -7085,8 +7351,8 @@ details.voice-panel[open] > summary::before {
   border: 5px solid transparent;
   border-image-outset: 0;
   border-image-repeat: stretch;
-  border-image-slice: 20 fill;
-  border-image-source: url("../assets/retro-rpg/input.png");
+  border-image-slice: 20 25 20 20 fill;
+  border-image-source: url("../assets/themes/retro-rpg/input.png");
   border-image-width: 5px;
   box-shadow: none;
 }
@@ -7118,13 +7384,13 @@ details.voice-panel[open] > summary::before {
 }
 
 .app-shell.theme-retro-rpg ::-webkit-scrollbar-track {
-  background: #160707;
-  border: 2px solid #6f4218;
+  background: url("../assets/themes/retro-rpg/scrollbar-track.png") center / 100% 100% no-repeat;
+  border: 0;
   border-radius: 0;
 }
 
 .app-shell.theme-retro-rpg ::-webkit-scrollbar-thumb {
-  background: url("../assets/retro-rpg/scrollbar-thumb.png") center / 100% 100% no-repeat;
+  background: url("../assets/themes/retro-rpg/scrollbar-thumb.png") center / 100% 100% no-repeat;
   border: 0;
   border-radius: 0;
   min-height: 34px;
@@ -7756,5 +8022,1545 @@ details.voice-panel[open] > summary::before {
 
   .workspace::before {
     mix-blend-mode: normal;
+  }
+}
+
+/*
+ * Credits.
+ *
+ * Reachable from the setup screen footer and the client settings dialog. The
+ * pack attribution and the bundled third-party notices share one layout so a
+ * character pack's credits read the same as the app's own.
+ */
+
+.credits-view {
+  display: grid;
+  gap: 14px;
+}
+
+.credits-section {
+  background: var(--inner-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-card);
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.credits-section h3 {
+  color: var(--gold);
+  font-family: var(--display-font);
+  font-size: 0.92rem;
+  letter-spacing: var(--display-tracking);
+  margin: 0;
+}
+
+.credits-lead {
+  color: var(--cream);
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.credits-facts {
+  display: grid;
+  gap: 2px 10px;
+  grid-template-columns: auto 1fr;
+  margin: 0;
+}
+
+.credits-facts dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.credits-facts dd {
+  color: var(--cream);
+  font-size: 0.84rem;
+  margin: 0;
+}
+
+.credits-notice {
+  color: var(--message-text);
+  font-size: 0.84rem;
+  margin: 0;
+}
+
+.credit-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.credit-row {
+  display: grid;
+  gap: 1px;
+}
+
+.credit-name {
+  color: var(--cream);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.credit-role {
+  color: var(--gold-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: var(--display-tracking);
+  text-transform: uppercase;
+}
+
+.credit-works {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.credits-view a {
+  color: var(--gold);
+}
+
+.credits-view a:hover {
+  color: var(--gold-bright);
+}
+
+/* Flog in: moonlit storybook skin built from the supplied lunar PNG set. */
+.app-shell.theme-flog-in {
+  --dead-vote-image: url("../assets/themes/flog-in/dead-vote.png");
+  --display-font: "Cinzel", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --body-font: "Alegreya", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --display-tracking: 0.04em;
+  --radius-panel: 8px;
+  --radius-card: 7px;
+  --radius-inner: 6px;
+  --bg-0: #040610;
+  --bg-1: #090d1d;
+  --bg-2: #15142a;
+  --panel-0: #0b0e1c;
+  --panel-1: #050711;
+  --burgundy: #332351;
+  --burgundy-soft: #4a3670;
+  --burgundy-dark: #151027;
+  --wine-shadow: rgba(13, 10, 31, 0.64);
+  --gold: #b8b7c9;
+  --gold-bright: #f1edf8;
+  --gold-muted: #8e91ad;
+  --cream: #eeeaf5;
+  --muted: #adb2c8;
+  --button-bg: linear-gradient(180deg, #242846, #101426);
+  --button-bg-hover: linear-gradient(180deg, #3e3b68, #191a35);
+  --input-bg: #070a17;
+  --panel-bg:
+    linear-gradient(180deg, rgba(13, 16, 34, 0.97), rgba(5, 7, 17, 0.98)),
+    #080b18;
+  --panel-border: rgba(184, 183, 201, 0.54);
+  --inner-bg: linear-gradient(180deg, rgba(29, 29, 55, 0.9), rgba(8, 10, 23, 0.94));
+  --tab-active-bg: linear-gradient(180deg, rgba(71, 55, 105, 0.96), rgba(27, 24, 52, 0.98));
+  --message-text: #e6e4ef;
+  --theme-glow: rgba(117, 106, 181, 0.3);
+  --table-bg:
+    url("../assets/themes/flog-in/table-runes-overlay.png") center / 100% 100% no-repeat,
+    url("../assets/themes/flog-in/table.png") center / 61% 61% no-repeat;
+  --table-border: transparent;
+  --table-shadow:
+    0 34px 82px rgba(0, 0, 0, 0.68),
+    0 0 54px rgba(155, 165, 232, 0.18);
+  --table-line: rgba(203, 209, 237, 0.26);
+  --table-shine: rgba(229, 232, 255, 0.1);
+  --vote-hand-core: #080a14;
+  --vote-hand-dark: #11172a;
+  --vote-hand-mid: #2a3151;
+  --vote-hand-ridge: #8f91aa;
+  --vote-hand-accent: rgba(218, 218, 235, 0.48);
+  --vote-hand-accent-soft: rgba(149, 151, 181, 0.34);
+  --vote-hand-highlight: rgba(248, 246, 255, 0.38);
+  --vote-hand-center: #343b63;
+  --vote-hand-center-light: #f1edf8;
+  --vote-hand-border: rgba(196, 196, 217, 0.68);
+  --seat-bg: transparent;
+  --seat-bg-character: transparent;
+  --seat-border: transparent;
+  --seat-overlay: linear-gradient(180deg, rgba(8, 10, 22, 0.02), rgba(4, 6, 16, 0.68));
+  --seat-text: #f4f0fb;
+  --demon-bar-bg: linear-gradient(180deg, #17182e, #080a16);
+  --demon-bar-border: rgba(184, 183, 201, 0.62);
+  --demon-slot-bg: linear-gradient(180deg, #30284d, #111326);
+  --demon-slot-border: rgba(211, 208, 228, 0.7);
+  --chat-bg: #080b18;
+  --chat-border: rgba(184, 183, 201, 0.58);
+  --chat-tab-bg: #19172e;
+  --chat-tab-active: linear-gradient(180deg, #43345f, #18162d);
+  --chat-input-bg: #050711;
+  --chat-line: rgba(174, 178, 207, 0.4);
+  background: #040610;
+  color: var(--cream);
+}
+
+.app-shell.background-flog-in::before {
+  background:
+    linear-gradient(90deg, rgba(2, 4, 12, 0.32), transparent 25%, transparent 75%, rgba(2, 4, 12, 0.36)),
+    linear-gradient(180deg, rgba(5, 8, 22, 0.02), rgba(2, 4, 12, 0.2)),
+    url("../assets/themes/flog-in/background-day.png") center / cover no-repeat;
+  content: "";
+  filter: saturate(0.94) brightness(0.9) contrast(1.03);
+  image-rendering: auto;
+  inset: 0;
+  opacity: 1;
+  pointer-events: none;
+  position: fixed;
+  transition: filter 360ms ease, opacity 360ms ease;
+  z-index: 0;
+}
+
+.app-shell.theme-flog-in .workspace {
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(117, 126, 194, 0.1), transparent 42rem),
+    linear-gradient(90deg, rgba(2, 4, 14, 0.34), transparent 25%, transparent 75%, rgba(2, 4, 14, 0.4));
+}
+
+.app-shell.theme-flog-in :is(h1, h2, h3, .tool-section-heading, .voice-room-name, .character-team-heading) {
+  color: var(--gold-bright);
+  text-shadow: 0 0 14px rgba(160, 154, 217, 0.3);
+}
+
+.app-shell.theme-flog-in :is(.setup-grid, .server-connect-content)::before {
+  aspect-ratio: 680 / 284;
+  background: url("../assets/themes/flog-in/logo-ui.png") center / contain no-repeat;
+  content: "";
+  display: block;
+  grid-column: 1 / -1;
+  justify-self: center;
+  max-width: 430px;
+  pointer-events: none;
+  width: min(430px, 82vw);
+}
+
+.app-shell.theme-flog-in :is(
+  .panel,
+  .left-edge > details,
+  .left-edge > .voice-panel,
+  .chat-panel,
+  .floating-sheet,
+  .chat-popout,
+  .settings-panel,
+  .confirm-dialog,
+  .seat-action-menu,
+  .token-context-menu,
+  .server-connect-help,
+  .server-address-bar,
+  .lobby-info
+) {
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  background:
+    linear-gradient(180deg, rgba(12, 15, 31, 0.94), rgba(5, 7, 16, 0.97)),
+    url("../assets/themes/flog-in/panel-fill.png") center / 180px repeat;
+  background-clip: padding-box;
+  border: 11px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 28;
+  border-image-source: url("../assets/themes/flog-in/panel-fill.png");
+  border-image-width: 9px;
+  border-radius: 0;
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.54), 0 0 26px rgba(92, 89, 152, 0.2);
+}
+
+.app-shell.theme-flog-in :is(.settings-panel, .confirm-dialog, .nomination-request-popup) {
+  border-image-slice: 28;
+  border-image-source: url("../assets/themes/flog-in/panel-fill.png");
+}
+
+.app-shell.theme-flog-in .chat-popout .chat-panel {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: transparent;
+  border: 0;
+  border-image: none;
+  box-shadow: none;
+}
+
+.app-shell.theme-flog-in :is(
+  .panel details,
+  .character-card,
+  .role-card,
+  .sheet-detached-note,
+  .credits-section,
+  .nomination-request-card
+) {
+  background: linear-gradient(180deg, rgba(25, 25, 48, 0.93), rgba(7, 9, 20, 0.96));
+  background-clip: padding-box;
+  border: 8px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 28;
+  border-image-source: url("../assets/themes/flog-in/panel-fill.png");
+  border-image-width: 8px 10px 8px 8px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.app-shell.theme-flog-in .game-top-bar {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  background: linear-gradient(180deg, rgba(13, 16, 34, 0.97), rgba(5, 7, 17, 0.98));
+  border-bottom: 1px solid rgba(198, 198, 219, 0.54);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.46), inset 0 -1px 0 rgba(125, 119, 187, 0.28);
+}
+
+.app-shell.theme-flog-in :is(.dashboard-tabs, .chat-heading, .chat-popout-titlebar, .floating-sheet-titlebar) {
+  background:
+    linear-gradient(180deg, rgba(24, 25, 50, 0.96), rgba(8, 10, 23, 0.98)),
+    url("../assets/themes/flog-in/panel-fill.png") center / 160px repeat;
+  border-bottom-color: rgba(190, 190, 211, 0.46);
+  box-shadow: inset 0 -1px 0 rgba(119, 110, 181, 0.32);
+}
+
+.app-shell.theme-flog-in .voice-panel-heading {
+  aspect-ratio: auto;
+  background: transparent;
+  border: 8px 14px solid transparent;
+  border-image-repeat: stretch;
+  border-image-slice: 24 44 fill;
+  border-image-source: url("../assets/themes/flog-in/button-normal-ui.png");
+  border-image-width: 8px 14px;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 34px;
+  position: relative;
+}
+
+.app-shell.theme-flog-in .voice-panel-heading::before {
+  background: url("../assets/themes/flog-in/tab-crescent-ui.png") center / contain no-repeat;
+  content: "";
+  height: 18px;
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: -8px;
+  transform: translateX(-50%);
+  width: 24px;
+}
+
+.app-shell.theme-flog-in .voice-panel-heading strong {
+  color: #f3effb;
+  line-height: 1;
+  text-shadow: 0 0 10px rgba(200, 194, 244, 0.42);
+  transform: translateY(2px);
+}
+
+.app-shell.theme-flog-in button:where(:not(.seat):not(.dashboard-tab):not(.voice-room):not(.voice-user-button):not(.top-bar-icon):not(.icon-button):not(.chat-minimize):not(.chat-emoji-button):not(.chat-send-button):not(.chat-panel-open-button):not(.top-bar-reopen):not(.dashboard-edge-handle):not(.floating-sheet-reattach):not(.role-dist-step):not(.reminder-token):not(.reminder-symbol):not(.character-card)),
+.app-shell.theme-flog-in .pack-upload-button {
+  align-items: center;
+  background: transparent;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 9px 15px;
+  border-image-repeat: stretch;
+  border-image-slice: 24 44 fill;
+  border-image-source: url("../assets/themes/flog-in/button-normal-ui.png");
+  border-image-width: 9px 15px;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--cream);
+  justify-content: center;
+  line-height: 1;
+  min-height: 44px;
+  min-width: 82px;
+  padding: 0 4px;
+  text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+
+.app-shell.theme-flog-in button:where(:not(.seat):not(.dashboard-tab):not(.voice-room):not(.voice-user-button):not(.top-bar-icon):not(.icon-button):not(.chat-minimize):not(.chat-emoji-button):not(.chat-send-button):not(.chat-panel-open-button):not(.top-bar-reopen):not(.dashboard-edge-handle):not(.floating-sheet-reattach):not(.role-dist-step):not(.reminder-token):not(.reminder-symbol):not(.character-card)):hover:not(:disabled),
+.app-shell.theme-flog-in .pack-upload-button:hover {
+  background: transparent;
+  border-image-source: url("../assets/themes/flog-in/button-hover-ui.png");
+  color: #fff;
+  filter: brightness(1.1) drop-shadow(0 0 7px rgba(163, 153, 225, 0.4));
+}
+
+.app-shell.theme-flog-in button:where(:not(.seat):not(.dashboard-tab):not(.voice-room):not(.voice-user-button):not(.top-bar-icon):not(.icon-button):not(.chat-minimize):not(.chat-emoji-button):not(.chat-send-button):not(.chat-panel-open-button):not(.top-bar-reopen):not(.dashboard-edge-handle):not(.floating-sheet-reattach):not(.role-dist-step):not(.reminder-token):not(.reminder-symbol):not(.character-card)):active:not(:disabled) {
+  border-image-source: url("../assets/themes/flog-in/button-pressed-ui.png");
+  filter: brightness(1.04);
+}
+
+.app-shell.theme-flog-in button:where(:not(.seat):not(.dashboard-tab):not(.voice-room):not(.voice-user-button):not(.top-bar-icon):not(.icon-button):not(.chat-minimize):not(.chat-emoji-button):not(.chat-send-button):not(.chat-panel-open-button):not(.top-bar-reopen):not(.dashboard-edge-handle):not(.floating-sheet-reattach):not(.role-dist-step):not(.reminder-token):not(.reminder-symbol):not(.character-card)):disabled,
+.app-shell.theme-flog-in .pack-upload-button:has(input:disabled) {
+  border-image-source: url("../assets/themes/flog-in/button-disabled-ui.png");
+  color: color-mix(in srgb, var(--muted) 68%, transparent);
+  opacity: 0.72;
+}
+
+.app-shell.theme-flog-in :is(.dashboard-tab, .settings-tabs button, .segmented-control button) {
+  align-items: center;
+  background: transparent;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 9px 15px;
+  border-image-repeat: stretch;
+  border-image-slice: 24 44 fill;
+  border-image-source: url("../assets/themes/flog-in/button-normal-ui.png");
+  border-image-width: 9px 15px;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--muted);
+  display: inline-flex;
+  justify-content: center;
+  line-height: 1;
+  min-height: 42px;
+  min-width: 0;
+  padding: 0 2px;
+  position: relative;
+}
+
+.app-shell.theme-flog-in :is(.dashboard-tab, .settings-tabs button)::before {
+  background: url("../assets/themes/flog-in/tab-crescent-ui.png") center / contain no-repeat;
+  content: "";
+  height: 15px;
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: -9px;
+  transform: translateX(-50%);
+  width: 20px;
+}
+
+.app-shell.theme-flog-in :is(.dashboard-tab, .settings-tabs button, .segmented-control button):hover:not(:disabled) {
+  border-image-source: url("../assets/themes/flog-in/button-hover-ui.png");
+  color: var(--gold-bright);
+  filter: brightness(1.08) drop-shadow(0 0 5px rgba(155, 146, 216, 0.34));
+}
+
+.app-shell.theme-flog-in :is(.dashboard-tab.active, .settings-tabs button.active, .segmented-control button.active) {
+  background: transparent;
+  border-image-source: url("../assets/themes/flog-in/button-pressed-ui.png");
+  box-shadow: none;
+  color: #fff;
+  filter: drop-shadow(0 0 6px rgba(170, 160, 231, 0.38));
+}
+
+.app-shell.theme-flog-in .settings-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-shell.theme-flog-in .settings-tabs button {
+  font-size: 0.8rem;
+  overflow: visible;
+  padding: 0 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell.theme-flog-in .dashboard-tab-detach-hint {
+  position: absolute;
+  right: 13px;
+}
+
+.app-shell.theme-flog-in :is(
+  input:not([type="checkbox"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea:not(.chat-composer),
+  .pack-select-trigger,
+  .pack-upload-file
+) {
+  background: rgba(7, 10, 24, 0.82);
+  background-clip: padding-box;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 9px 16px;
+  border-image-repeat: stretch;
+  border-image-slice: 24 44 fill;
+  border-image-source: url("../assets/themes/flog-in/input-normal-ui.png");
+  border-image-width: 9px 16px;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--cream);
+  min-height: 46px;
+  outline: none;
+  padding: 0 8px;
+}
+
+.app-shell.theme-flog-in :is(input, select, textarea):focus {
+  border-image-source: url("../assets/themes/flog-in/input-focus-ui.png");
+  filter: drop-shadow(0 0 7px rgba(158, 149, 220, 0.38));
+}
+
+.app-shell.theme-flog-in .chat-input-row::before {
+  background: transparent;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 8px 14px;
+  border-image-repeat: stretch;
+  border-image-slice: 24 44 fill;
+  border-image-source: url("../assets/themes/flog-in/input-normal-ui.png");
+  border-image-width: 8px 14px;
+  border-radius: 0;
+  inset: 8px 43px;
+}
+
+.app-shell.theme-flog-in .chat-input-row:focus-within::before {
+  border-image-source: url("../assets/themes/flog-in/input-normal-ui.png");
+  box-shadow: none;
+  filter: brightness(1.14) drop-shadow(0 0 7px rgba(158, 149, 220, 0.5));
+}
+
+.app-shell.theme-flog-in .chat-input-row textarea {
+  background: transparent;
+  border: 0;
+  filter: none;
+  min-height: 38px;
+  padding: 9px 14px;
+}
+
+.app-shell.theme-flog-in :is(.top-bar-icon, .voice-user-button, .chat-minimize, .chat-emoji-button, .chat-send-button, .floating-sheet-reattach) {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.app-shell.theme-flog-in :is(.top-bar-icon, .voice-user-button, .chat-minimize, .chat-emoji-button, .chat-send-button, .floating-sheet-reattach):hover:not(:disabled) {
+  background: transparent;
+  filter: brightness(1.16) drop-shadow(0 0 7px rgba(167, 157, 229, 0.58));
+}
+
+.app-shell.theme-flog-in :is(.voice-user-button.active, .chat-emoji-button.active) {
+  background: transparent;
+  filter: brightness(1.2) drop-shadow(0 0 8px rgba(184, 172, 247, 0.7));
+}
+
+.app-shell.theme-flog-in .fullscreen-icon {
+  display: none;
+}
+
+.app-shell.theme-flog-in .top-bar-actions .fullscreen-button {
+  background: url("../assets/themes/flog-in/icons/icon-fullscreen.png") center / contain no-repeat;
+}
+
+.app-shell.theme-flog-in .top-bar-actions .fullscreen-button:hover:not(:disabled) {
+  background: url("../assets/themes/flog-in/icons/icon-fullscreen.png") center / contain no-repeat;
+}
+
+.app-shell.theme-flog-in .top-bar-actions .top-bar-icon:last-child {
+  background: url("../assets/themes/flog-in/icons/icon-settings.png") center / contain no-repeat;
+  color: transparent;
+  font-size: 0;
+}
+
+.app-shell.theme-flog-in .top-bar-actions .top-bar-icon:last-child:hover:not(:disabled) {
+  background: url("../assets/themes/flog-in/icons/icon-settings.png") center / contain no-repeat;
+}
+
+.app-shell.theme-flog-in .voice-user-button svg,
+.app-shell.theme-flog-in .chat-minimize svg {
+  display: none;
+}
+
+.app-shell.theme-flog-in .voice-user-button::before,
+.app-shell.theme-flog-in .chat-minimize::before {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  content: "";
+  inset: 2px;
+  position: absolute;
+}
+
+.app-shell.theme-flog-in .voice-user-button {
+  border-radius: 50%;
+  display: grid;
+  height: 2.3rem;
+  min-height: 2.3rem;
+  min-width: 2.3rem;
+  overflow: visible;
+  position: relative;
+  width: 2.3rem;
+}
+
+.app-shell.theme-flog-in .voice-user-button:disabled {
+  opacity: 0.58;
+}
+
+.app-shell.theme-flog-in .voice-user-button:disabled::before {
+  filter: grayscale(0.25) brightness(0.96);
+}
+
+.app-shell.theme-flog-in :is(.voice-user-button.active, .voice-user-button.chat-toggle.open) {
+  background: radial-gradient(circle, rgba(94, 75, 177, 0.62), rgba(16, 18, 42, 0.9));
+  border: 1px solid rgba(220, 216, 252, 0.88);
+  box-shadow:
+    0 0 0 2px rgba(91, 76, 175, 0.28),
+    0 0 13px rgba(126, 105, 226, 0.72);
+  filter: none;
+}
+
+.app-shell.theme-flog-in :is(.voice-user-button.active, .voice-user-button.chat-toggle.open)::before {
+  filter: brightness(1.22) drop-shadow(0 0 5px rgba(224, 220, 255, 0.72));
+}
+
+.app-shell.theme-flog-in :is(.chat-emoji-button, .chat-send-button, .floating-sheet-reattach) {
+  background: radial-gradient(circle, rgba(33, 37, 70, 0.94), rgba(7, 9, 21, 0.96));
+  border: 1px solid rgba(199, 198, 222, 0.58);
+  border-radius: 50%;
+}
+
+.app-shell.theme-flog-in .chat-input-row :is(.chat-emoji-button, .chat-send-button) {
+  height: 2rem;
+  min-height: 2rem;
+  min-width: 2rem;
+  width: 2rem;
+}
+
+.app-shell.theme-flog-in :is(.icon-button, .role-dist-step) {
+  background: radial-gradient(circle, rgba(36, 40, 73, 0.96), rgba(6, 8, 20, 0.98));
+  border: 1px solid rgba(202, 201, 224, 0.64);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px rgba(103, 103, 151, 0.18);
+  color: var(--gold-bright);
+}
+
+.app-shell.theme-flog-in :is(.icon-button, .role-dist-step):hover:not(:disabled) {
+  background: radial-gradient(circle, rgba(60, 58, 103, 0.98), rgba(12, 14, 31, 0.98));
+  border-color: rgba(238, 234, 249, 0.88);
+  filter: drop-shadow(0 0 7px rgba(157, 147, 220, 0.46));
+}
+
+.app-shell.theme-flog-in .voice-user-controls .voice-user-button:nth-child(1)::before {
+  background-image: url("../assets/themes/flog-in/icons/icon-chat.png");
+}
+
+.app-shell.theme-flog-in .voice-user-controls .voice-user-button:nth-child(2)::before {
+  background-image: url("../assets/themes/flog-in/icons/icon-microphone.png");
+}
+
+.app-shell.theme-flog-in .voice-user-controls .voice-user-button:nth-child(2).active::before {
+  background-image: url("../assets/themes/flog-in/icons/icon-mute.png");
+}
+
+.app-shell.theme-flog-in .voice-user-controls .voice-user-button:nth-child(3)::before {
+  background-image: url("../assets/themes/flog-in/icons/icon-headphones.png");
+}
+
+.app-shell.theme-flog-in .voice-user-controls .voice-user-button:nth-child(4)::before {
+  background-image: url("../assets/themes/flog-in/icons/icon-leave.png");
+}
+
+.app-shell.theme-flog-in .chat-minimize::before {
+  background-image: url("../assets/themes/flog-in/icons/icon-collapse.png");
+}
+
+.app-shell.theme-flog-in .chat-panel-open-button {
+  background: rgba(8, 10, 23, 0.78);
+  grid-template-columns: 28px minmax(0, 1fr);
+}
+
+.app-shell.theme-flog-in .chat-panel-open-button::before {
+  background: url("../assets/themes/flog-in/icons/icon-chat.png") center / contain no-repeat;
+  content: "";
+  height: 24px;
+  width: 24px;
+}
+
+.app-shell.theme-flog-in .chat-panel-open-button:hover:not(:disabled) {
+  background: rgba(39, 35, 70, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(192, 188, 224, 0.3);
+}
+
+.app-shell.theme-flog-in .voice-room-block {
+  background: rgba(7, 9, 20, 0.82);
+  background-clip: padding-box;
+  border: 6px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 28;
+  border-image-source: url("../assets/themes/flog-in/panel-fill.png");
+  border-image-width: 6px 9px;
+  border-radius: 0;
+  box-shadow: inset 0 0 18px rgba(43, 47, 88, 0.22);
+  opacity: 0.72;
+}
+
+.app-shell.theme-flog-in .voice-room-block.active {
+  background: rgba(19, 20, 42, 0.9);
+  border-image-source: url("../assets/themes/flog-in/panel-fill.png");
+  box-shadow: inset 0 0 20px rgba(80, 76, 138, 0.28), 0 0 14px rgba(139, 130, 202, 0.34);
+  opacity: 1;
+}
+
+.app-shell.theme-flog-in .voice-room,
+.app-shell.theme-flog-in .voice-room:hover:not(:disabled) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  filter: none;
+}
+
+.app-shell.theme-flog-in .voice-room-block:not(.active):hover {
+  filter: brightness(1.16) drop-shadow(0 0 6px rgba(153, 145, 216, 0.34));
+  opacity: 0.96;
+}
+
+.app-shell.theme-flog-in .chat-bubble {
+  background: transparent;
+  border: 8px 12px solid transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 24 32 fill;
+  border-image-source: url("../assets/themes/flog-in/chat-bubble-other-ui.png");
+  border-image-width: 8px 12px;
+  border-radius: 0;
+  padding: 3px 6px;
+}
+
+.app-shell.theme-flog-in .chat-group.own .chat-bubble {
+  background: transparent;
+  border-image-source: url("../assets/themes/flog-in/chat-bubble-own-ui.png");
+}
+
+.app-shell.theme-flog-in .chat-bubble:has(> .emoji-only-message) {
+  background: transparent;
+  border: 0;
+  border-image: none;
+}
+
+.app-shell.theme-flog-in .chat-simple-targets button,
+.app-shell.theme-flog-in :is(.emoji-picker-grid button, .demon-bluff-picker button) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  filter: none;
+}
+
+.app-shell.theme-flog-in .chat-simple-targets button:hover:not(:disabled),
+.app-shell.theme-flog-in :is(.emoji-picker-grid button, .demon-bluff-picker button):hover:not(:disabled) {
+  background: rgba(126, 116, 188, 0.14);
+  color: var(--gold-bright);
+}
+
+.app-shell.theme-flog-in .chat-simple-targets button.active {
+  background: rgba(107, 91, 165, 0.24);
+  box-shadow: inset 0 -2px 0 #cbc7e5;
+}
+
+.app-shell.theme-flog-in .demon-bluff-bar {
+  background: rgba(7, 9, 21, 0.9);
+  background-clip: padding-box;
+  border: 7px solid transparent;
+  border-image-repeat: stretch;
+  border-image-slice: 28;
+  border-image-source: url("../assets/themes/flog-in/panel-fill.png");
+  border-image-width: 7px 10px;
+  border-radius: 0;
+  padding: 5px;
+}
+
+.app-shell.theme-flog-in .demon-bluff-slot button {
+  background:
+    url("../assets/themes/flog-in/role-token-frame.png") center / contain no-repeat,
+    radial-gradient(circle, rgba(33, 37, 69, 0.96), rgba(5, 7, 18, 0.98));
+  border: 0;
+  border-image: none;
+  border-radius: 50%;
+  filter: none;
+  min-height: 54px;
+  width: 54px;
+}
+
+.app-shell.theme-flog-in .demon-bluff-slot button:hover:not(:disabled) {
+  background:
+    url("../assets/themes/flog-in/role-token-frame.png") center / contain no-repeat,
+    radial-gradient(circle, rgba(54, 52, 94, 0.98), rgba(10, 12, 28, 0.98));
+  filter: brightness(1.12) drop-shadow(0 0 7px rgba(163, 153, 225, 0.5));
+}
+
+.app-shell.theme-flog-in .table-surface {
+  background: var(--table-bg);
+  border: 0;
+  box-shadow: var(--table-shadow);
+}
+
+.app-shell.theme-flog-in .table-stage.phase-night .table-surface {
+  background:
+    url("../assets/themes/flog-in/table-runes-overlay.png") center / 100% 100% no-repeat,
+    url("../assets/themes/flog-in/table.png") center / 61% 61% no-repeat;
+}
+
+.app-shell.theme-flog-in .table-surface::before {
+  background: radial-gradient(circle, rgba(191, 199, 244, 0.08), transparent 58%);
+  mix-blend-mode: screen;
+  opacity: 0.72;
+}
+
+.app-shell.theme-flog-in .table-surface::after {
+  box-shadow: inset 0 0 86px rgba(3, 5, 16, 0.24), 0 0 30px rgba(158, 165, 226, 0.16);
+}
+
+.app-shell.theme-flog-in .table-inlay {
+  display: none;
+}
+
+.app-shell.theme-flog-in .table-surface.table-surface-hidden {
+  background: none;
+  box-shadow: none;
+}
+
+/* The night-state selector above is more specific than the generic hidden
+ * state. Repeat the full state here so both moon and rune ring disappear. */
+.app-shell.theme-flog-in .table-stage.phase-night .table-surface.table-surface-hidden {
+  background: none;
+  box-shadow: none;
+}
+
+.app-shell.theme-flog-in .table-surface.table-surface-hidden::before,
+.app-shell.theme-flog-in .table-surface.table-surface-hidden::after,
+.app-shell.theme-flog-in .table-surface.table-surface-hidden .table-center {
+  display: none;
+}
+
+.app-shell.theme-flog-in .table-center:has(> .table-phase):not(:has(.table-vote-counter)) {
+  aspect-ratio: 1;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  min-width: 0;
+  padding: 0;
+  width: clamp(118px, 15cqi, 168px);
+}
+
+.app-shell.theme-flog-in .table-phase {
+  gap: 1px;
+}
+
+.app-shell.theme-flog-in .table-phase-icon {
+  display: none;
+}
+
+.app-shell.theme-flog-in .table-phase::before {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  content: "";
+  height: clamp(82px, 11cqi, 126px);
+  width: clamp(82px, 11cqi, 126px);
+}
+
+.app-shell.theme-flog-in .table-phase[data-phase="day"]::before {
+  background-image: url("../assets/themes/flog-in/phase-day-icon.png");
+}
+
+.app-shell.theme-flog-in .table-phase[data-phase="night"]::before {
+  background-image: url("../assets/themes/flog-in/phase-night-icon.png");
+}
+
+.app-shell.theme-flog-in .table-phase-label {
+  color: #f4f0fa;
+  font-size: clamp(0.68rem, 1.25cqi, 0.9rem);
+  margin-top: -12px;
+  text-shadow: 0 1px 4px #03040b, 0 0 8px rgba(191, 185, 235, 0.38);
+}
+
+.app-shell.theme-flog-in .seat {
+  aspect-ratio: 403 / 344;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  height: auto;
+  isolation: isolate;
+  min-height: 0;
+  padding:
+    min(calc(70px * var(--seat-scale)), calc(6.72cqi * var(--seat-scale)))
+    min(calc(31px * var(--seat-scale)), calc(3cqi * var(--seat-scale)))
+    min(calc(35px * var(--seat-scale)), calc(3.36cqi * var(--seat-scale)));
+  transform: translate(
+    calc(-50% + var(--seat-x) * 1cqw),
+    calc(-50% + var(--seat-y) * 0.94cqw)
+  );
+  width: calc(min(250px, 24cqi) * var(--seat-scale));
+}
+
+.app-shell.theme-flog-in .storyteller-table-seat:not(.storyteller-voice-center) {
+  --seat-y: 42 !important;
+}
+
+.app-shell.theme-flog-in .seat::before {
+  background: url("../assets/themes/flog-in/seat-frame-empty-ui.png") center / contain no-repeat;
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 3;
+}
+
+.app-shell.theme-flog-in .seat.occupied::before {
+  background-image: url("../assets/themes/flog-in/seat-frame-occupied-ui.png");
+  background-size: contain;
+}
+
+.app-shell.theme-flog-in .seat.has-character::before {
+  background-image: url("../assets/themes/flog-in/seat-frame-character-ui.png");
+  background-size: contain;
+}
+
+.app-shell.theme-flog-in .seat-avatar {
+  border-radius: 0;
+  filter: saturate(0.88) brightness(0.82);
+  height: 51.744%;
+  inset: 32.558% auto auto 12.655%;
+  mask: url("../assets/themes/flog-in/seat-avatar-window-mask-ui.png") center / 100% 100% no-repeat;
+  -webkit-mask: url("../assets/themes/flog-in/seat-avatar-window-mask-ui.png") center / 100% 100% no-repeat;
+  object-fit: cover;
+  object-position: center top;
+  opacity: 0.94;
+  width: 74.69%;
+  z-index: 0;
+}
+
+.app-shell.theme-flog-in .seat.has-avatar::after {
+  background: var(--seat-overlay);
+  border-radius: 0;
+  height: 51.744%;
+  inset: 32.558% auto auto 12.655%;
+  mask: url("../assets/themes/flog-in/seat-avatar-window-mask-ui.png") center / 100% 100% no-repeat;
+  -webkit-mask: url("../assets/themes/flog-in/seat-avatar-window-mask-ui.png") center / 100% 100% no-repeat;
+  width: 74.69%;
+  z-index: 1;
+}
+
+.app-shell.theme-flog-in .seat.occupied:not(.has-avatar) {
+  background: url("../assets/themes/flog-in/seat-placeholder.png") center 56% / auto 42% no-repeat;
+}
+
+.app-shell.theme-flog-in .seat-empty-icon {
+  background: url("../assets/themes/flog-in/seat-placeholder.png") center / contain no-repeat;
+  filter: brightness(0.86) saturate(0.65);
+  height: min(calc(72px * var(--seat-scale)), calc(7.8cqi * var(--seat-scale)));
+  opacity: 0.72;
+  position: relative;
+  width: min(calc(72px * var(--seat-scale)), calc(7.8cqi * var(--seat-scale)));
+  z-index: 2;
+}
+
+.app-shell.theme-flog-in .seat-empty-icon svg {
+  display: none;
+}
+
+.app-shell.theme-flog-in :is(.seat-initials, .seat-character-token, .seat-suspicion-token, .storyteller-seat-tag) {
+  position: relative;
+  z-index: 4;
+}
+
+.app-shell.theme-flog-in .seat-nameplate {
+  background: rgba(7, 10, 23, 0.88);
+  background-clip: padding-box;
+  border-color: transparent;
+  border-style: solid;
+  border-width:
+    min(calc(9px * var(--seat-scale)), calc(1cqi * var(--seat-scale)))
+    min(calc(22px * var(--seat-scale)), calc(2.5cqi * var(--seat-scale)));
+  border-image-repeat: stretch;
+  border-image-slice: 54 120 fill;
+  border-image-source: url("../assets/themes/flog-in/seat-nameplate-ui.png");
+  border-image-width:
+    min(calc(9px * var(--seat-scale)), calc(1cqi * var(--seat-scale)))
+    min(calc(22px * var(--seat-scale)), calc(2.5cqi * var(--seat-scale)));
+  border-radius: 0;
+  gap: calc(4px * var(--seat-scale));
+  height: min(calc(46px * var(--seat-scale)), calc(5.2cqi * var(--seat-scale)));
+  justify-content: center;
+  max-width: none;
+  padding: 0 calc(4px * var(--seat-scale));
+  text-align: center;
+  top: calc(100% - min(calc(25px * var(--seat-scale)), calc(2.8cqi * var(--seat-scale))));
+  width: min(calc(202px * var(--seat-scale)), calc(20.5cqi * var(--seat-scale)));
+  z-index: 5;
+}
+
+.app-shell.theme-flog-in .seat-nameplate strong {
+  flex: 0 1 auto;
+  color: #f4f0fb;
+  font-size: calc(clamp(0.78rem, 1.7cqi, 1.02rem) * var(--seat-scale));
+  font-weight: 700;
+  line-height: 1;
+  min-width: 0;
+  text-shadow: 0 1px 4px #02030a;
+}
+
+.app-shell.theme-flog-in .storyteller-seat-tag {
+  bottom: min(calc(47px * var(--seat-scale)), calc(5.1cqi * var(--seat-scale)));
+  color: #f0ecf8;
+  font-size: calc(0.55rem * var(--seat-scale));
+  left: 50%;
+  position: absolute;
+  text-shadow: 0 1px 4px #03040b, 0 0 7px rgba(191, 184, 237, 0.42);
+  transform: translateX(-50%);
+}
+
+.app-shell.theme-flog-in .timer-display input:not([type="checkbox"]):not([type="range"]):not([type="file"]) {
+  border-width: 6px 10px;
+  border-image-width: 6px 10px;
+  flex: 0 0 108px;
+  min-width: 108px;
+  padding-inline: 4px;
+  width: 108px;
+}
+
+.app-shell.theme-flog-in .timer-display span {
+  flex: 0 0 auto;
+  margin-left: 8px;
+}
+
+.app-shell.theme-flog-in .seat:hover {
+  border: 0;
+  box-shadow: none;
+  filter: brightness(1.12) drop-shadow(0 0 6px rgba(193, 187, 232, 0.54));
+}
+
+.app-shell.theme-flog-in :is(.seat.hand-raised, .seat.vote-highlight, .seat.voice-focused-seat, .seat.nominator-seat) {
+  border: 0;
+  box-shadow: none;
+  filter:
+    brightness(1.12)
+    drop-shadow(0 0 4px rgba(220, 216, 245, 0.9))
+    drop-shadow(0 0 13px rgba(139, 128, 205, 0.72));
+  outline: 0;
+}
+
+.app-shell.theme-flog-in .seat.nominee-seat {
+  border: 0;
+  box-shadow: none;
+  filter: brightness(1.08) drop-shadow(0 0 5px rgba(232, 118, 156, 0.88));
+  outline: 0;
+}
+
+.app-shell.theme-flog-in .seat.speaking-seat,
+.app-shell.theme-flog-in .table-stage.phase-night .seat.speaking-seat {
+  border: 0;
+  box-shadow: none;
+  filter:
+    brightness(1.1)
+    drop-shadow(0 0 3px rgba(106, 245, 155, 0.96))
+    drop-shadow(0 0 11px rgba(63, 218, 119, 0.74));
+  opacity: 1;
+}
+
+.app-shell.theme-flog-in .character-card img,
+.app-shell.theme-flog-in .character-card .character-fallback,
+.app-shell.theme-flog-in .seat-character-token img,
+.app-shell.theme-flog-in .seat-suspicion-token img {
+  background: transparent url("../assets/themes/flog-in/role-token-frame.png") center / 100% 100% no-repeat;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  object-fit: contain;
+  padding: 7px;
+}
+
+.app-shell.theme-flog-in .character-card {
+  grid-template-columns: 50px minmax(0, 1fr);
+}
+
+.app-shell.theme-flog-in .character-card img,
+.app-shell.theme-flog-in .character-card .character-fallback {
+  width: 50px;
+}
+
+.app-shell.theme-flog-in .reminder-symbol img,
+.app-shell.theme-flog-in .token-context-grid button img {
+  background: transparent url("../assets/themes/flog-in/reminder-token-frame.png") center / 100% 100% no-repeat;
+  object-fit: contain;
+  padding: 5px;
+}
+
+.app-shell.theme-flog-in .reminder-token.image-token img {
+  background: transparent url("../assets/themes/flog-in/reminder-token-frame.png") center / 100% 100% no-repeat;
+  padding: 9px;
+}
+
+.app-shell.theme-flog-in :is(.token-context-grid button, .reminder-symbol) {
+  background: linear-gradient(180deg, rgba(24, 25, 49, 0.94), rgba(7, 9, 20, 0.97));
+  border: 1px solid rgba(159, 158, 185, 0.32);
+  border-image: none;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(226, 224, 239, 0.04);
+  filter: none;
+}
+
+.app-shell.theme-flog-in :is(.token-context-grid button, .reminder-symbol):hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(48, 42, 78, 0.96), rgba(13, 15, 31, 0.98));
+  border-color: rgba(219, 215, 237, 0.72);
+  box-shadow: 0 0 12px rgba(137, 126, 201, 0.34);
+  filter: brightness(1.08);
+}
+
+.app-shell.theme-flog-in .reminder-symbol.selected {
+  background: linear-gradient(180deg, rgba(66, 53, 102, 0.98), rgba(19, 19, 42, 0.98));
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 14px rgba(156, 145, 221, 0.46);
+}
+
+.app-shell.theme-flog-in .token-context-menu {
+  border-image-slice: 28;
+  border-image-source: url("../assets/themes/flog-in/panel-fill.png");
+  max-height: min(430px, calc(100vh - 24px));
+  width: min(330px, calc(100vw - 24px));
+}
+
+.app-shell.theme-flog-in .token-context-grid {
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  max-height: min(350px, calc(100vh - 96px));
+}
+
+.app-shell.theme-flog-in .night-order-list li.night-step-in-play {
+  background: rgba(100, 88, 157, 0.2);
+  border-color: rgba(186, 181, 221, 0.42);
+}
+
+.app-shell.theme-flog-in :is(.night-order-list li span, .character-card p, .storyteller-tools .helper-text) {
+  color: #c8cada;
+  font-family: var(--body-font);
+  font-size: 0.96rem;
+  line-height: 1.42;
+}
+
+.app-shell.theme-flog-in * {
+  scrollbar-color: #8f8ba9 rgba(5, 7, 17, 0.54);
+}
+
+.app-shell.theme-flog-in *::-webkit-scrollbar {
+  width: 12px;
+}
+
+.app-shell.theme-flog-in *::-webkit-scrollbar-track {
+  background: rgba(5, 7, 17, 0.62) url("../assets/themes/flog-in/scrollbar-track.png") center / 12px 100% no-repeat;
+}
+
+.app-shell.theme-flog-in *::-webkit-scrollbar-thumb {
+  background: transparent url("../assets/themes/flog-in/scrollbar-thumb.png") center / 12px 100% no-repeat;
+  border-radius: 0;
+}
+
+@media (max-width: 820px) {
+  .app-shell.theme-flog-in :is(.setup-grid, .server-connect-content)::before {
+    max-width: 340px;
+  }
+
+  .app-shell.theme-flog-in .settings-tabs button {
+    font-size: 0.72rem;
+    padding-inline: 4px;
+  }
+
+  .app-shell.theme-flog-in .storyteller-table-seat:not(.storyteller-voice-center) {
+    --seat-x: -35 !important;
+    --seat-y: 72 !important;
+  }
+
+  .app-shell.theme-flog-in .storyteller-table-seat .seat-nameplate {
+    width: calc(27cqi * var(--seat-scale));
+  }
+}
+
+/* ------------------------------------------------------------------
+ * Retro RPG: surfaces that previously ran on base styling.
+ * ------------------------------------------------------------------ */
+
+/* Dialogs and popups share the modal frame. */
+.app-shell.theme-retro-rpg :is(.settings-panel, .confirm-dialog, .nomination-request-card, .incoming-call-toast, .timer-done-toast, .voice-audio-unlock) {
+  background: transparent;
+  border-color: transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 120 150 fill;
+  border-image-source: url("../assets/themes/retro-rpg/modal-frame-ui.png");
+  border-image-width: 28px 32px;
+  border-radius: 0;
+  border-style: solid;
+  border-width: 28px 32px;
+  box-shadow: 0 14px 0 rgba(8, 2, 1, 0.5);
+}
+
+/* Menus and pickers get the smaller menu frame. */
+.app-shell.theme-retro-rpg :is(.seat-action-menu, .token-context-menu, .emoji-picker-panel, .demon-bluff-picker) {
+  background: transparent;
+  border-color: transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 110 130 fill;
+  border-image-source: url("../assets/themes/retro-rpg/context-menu-frame-ui.png");
+  border-image-width: 22px 26px;
+  border-radius: 0;
+  border-style: solid;
+  border-width: 22px 26px;
+}
+
+/* Panel headings sit on the dedicated header plate. */
+.app-shell.theme-retro-rpg :is(.voice-panel-heading strong, .chat-heading-text.public strong, .floating-sheet-titlebar strong) {
+  border-image-slice: 90 170 fill;
+  border-image-source: url("../assets/themes/retro-rpg/panel-header-frame-ui.png");
+  border-image-width: 9px 18px;
+  border-width: 9px 18px;
+}
+
+/* Cards inside panels get the inner frame. */
+.app-shell.theme-retro-rpg :is(.character-card, .credits-section, .nomination-display) {
+  background: transparent;
+  border-color: transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 100 100 fill;
+  border-image-source: url("../assets/themes/retro-rpg/inner-card-frame-ui.png");
+  border-image-width: 16px;
+  border-radius: 0;
+  border-style: solid;
+  border-width: 16px;
+}
+
+/* Voice room portraits. */
+.app-shell.theme-retro-rpg :is(.voice-occupant-avatar, .voice-user-avatar) {
+  background: transparent;
+  border-color: transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 150 fill;
+  border-image-source: url("../assets/themes/retro-rpg/voice-avatar-frame-ui.png");
+  border-image-width: 7px;
+  border-radius: 0;
+  border-style: solid;
+  border-width: 7px;
+}
+
+/* Keep the decorative corners and tails at a stable size while the center of
+ * each bubble grows with its message. The `-slice` assets are lossless crops of
+ * the supplied sprites; their original transparent canvas cannot be 9-sliced. */
+.app-shell.theme-retro-rpg .chat-bubble {
+  background: transparent;
+  border-color: transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 54 66 112 fill;
+  border-image-source: url("../assets/themes/retro-rpg/chat-bubble-other-slice.png");
+  border-image-width: 6px 8px 11px;
+  border-radius: 0;
+  border-style: solid;
+  border-width: 6px 8px 11px;
+  box-sizing: border-box;
+  box-shadow: none;
+  display: block;
+  max-width: 100%;
+  min-width: 54px;
+  overflow-wrap: anywhere;
+  padding: 2px 5px 3px;
+  white-space: pre-wrap;
+  width: fit-content;
+  word-break: break-word;
+}
+
+.app-shell.theme-retro-rpg .chat-group.own .chat-bubble {
+  background: transparent;
+  border-image-source: url("../assets/themes/retro-rpg/chat-bubble-own-slice.png");
+}
+
+.app-shell.theme-retro-rpg .chat-group.system .chat-bubble {
+  border-image-source: url("../assets/themes/retro-rpg/chat-bubble-system-slice.png");
+}
+
+.app-shell.theme-retro-rpg .chat-message-text {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: inherit;
+  word-break: break-word;
+}
+
+/* Square sprite for the icon-only buttons, which the wide button art stretched
+ * out of shape. */
+.app-shell.theme-retro-rpg :is(.top-bar-icon, .voice-user-controls button, .chat-emoji-button, .chat-send-button) {
+  border-image-slice: 60 fill;
+  border-image-source: url("../assets/themes/retro-rpg/button-square.png");
+  border-image-width: 10px;
+  border-width: 10px;
+}
+
+.app-shell.theme-retro-rpg :is(.top-bar-icon, .voice-user-controls button, .chat-emoji-button, .chat-send-button):hover:not(:disabled) {
+  border-image-source: url("../assets/themes/retro-rpg/button-square-hover.png");
+}
+
+.app-shell.theme-retro-rpg :is(.top-bar-icon, .voice-user-controls button, .chat-emoji-button, .chat-send-button):active:not(:disabled) {
+  border-image-source: url("../assets/themes/retro-rpg/button-square-pressed.png");
+}
+
+.app-shell.theme-retro-rpg button.top-bar-icon {
+  border-image-width: 3px;
+  border-width: 3px;
+}
+
+.app-shell.theme-retro-rpg button.top-bar-icon:hover:not(:disabled) {
+  border-image-source: url("../assets/themes/retro-rpg/button-square.png");
+  filter: brightness(1.15) drop-shadow(0 0 3px rgba(231, 166, 50, 0.32));
+}
+
+/* Pixel icons replace the vector/glyph versions. */
+.app-shell.theme-retro-rpg .fullscreen-icon {
+  --fullscreen-icon-url: url("../assets/themes/retro-rpg/icon-fullscreen.png") !important;
+  background: var(--fullscreen-icon-url) center / contain no-repeat;
+  mask: none;
+  -webkit-mask: none;
+}
+
+.app-shell.theme-retro-rpg .top-bar-icon:not(.fullscreen-button) {
+  color: transparent;
+  position: relative;
+}
+
+.app-shell.theme-retro-rpg .top-bar-icon:not(.fullscreen-button)::after {
+  background: url("../assets/themes/retro-rpg/icon-settings.png") center / contain no-repeat;
+  content: "";
+  height: 22px;
+  image-rendering: pixelated;
+  inset: 50% auto auto 50%;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+}
+
+.app-shell.theme-retro-rpg .seat-mic svg {
+  display: none;
+}
+
+.app-shell.theme-retro-rpg .seat-mic {
+  background: url("../assets/themes/retro-rpg/icon-mic.png") center / contain no-repeat;
+}
+
+.app-shell.theme-retro-rpg .seat-mic.muted {
+  background-image: url("../assets/themes/retro-rpg/icon-mic-muted.png");
+}
+
+.app-shell.theme-retro-rpg .voice-speaking-bars {
+  background: none;
+  gap: 3px;
+  justify-content: center;
+  width: 22px;
+}
+
+.app-shell.theme-retro-rpg .voice-speaking-bars > * {
+  background: linear-gradient(90deg, #e48a19, #ffe46f);
+  border-radius: 0;
+  box-shadow: 1px 0 0 #5f1a09;
+  visibility: visible;
+  width: 3px;
+}
+
+.app-shell.theme-retro-rpg .emoji-picker-search {
+  background-image: url("../assets/themes/retro-rpg/icon-search.png");
+  background-position: left 8px center;
+  background-repeat: no-repeat;
+  background-size: 16px 16px;
+  padding-left: 30px;
+}
+
+/* Voice controls carry the theme's pixel icons instead of their vector ones.
+ * The svg stays in the markup so the button keeps its accessible name. */
+.app-shell.theme-retro-rpg :is(.voice-user-mic, .voice-user-deafen, .voice-user-leave) svg {
+  visibility: hidden;
+}
+
+.app-shell.theme-retro-rpg :is(.voice-user-mic, .voice-user-deafen, .voice-user-leave) {
+  background-image: none;
+  position: relative;
+}
+
+.app-shell.theme-retro-rpg .voice-user-controls .voice-user-button {
+  border-image-width: 4px;
+  border-width: 4px;
+  height: 40px;
+  min-height: 40px;
+  min-width: 40px;
+  width: 40px;
+}
+
+.app-shell.theme-retro-rpg .voice-user-controls .voice-user-button > svg,
+.app-shell.theme-retro-rpg .voice-user-controls .voice-user-button .voice-toggle-icon {
+  height: 24px;
+  width: 24px;
+}
+
+.app-shell.theme-retro-rpg :is(.voice-user-mic, .voice-user-deafen, .voice-user-leave)::before {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  content: "";
+  height: 23px;
+  image-rendering: pixelated;
+  inset: 50% auto auto 50%;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 23px;
+  z-index: 1;
+}
+
+.app-shell.theme-retro-rpg .voice-user-mic::before {
+  background-image: url("../assets/themes/retro-rpg/icon-mic.png");
+  height: 24px;
+  width: 18px;
+}
+
+.app-shell.theme-retro-rpg .voice-user-mic.active::before {
+  background-image: url("../assets/themes/retro-rpg/icon-mic-muted.png");
+  height: 24px;
+  width: 18px;
+}
+
+.app-shell.theme-retro-rpg .voice-user-deafen::before {
+  background-image: url("../assets/themes/retro-rpg/icon-headphones.png");
+}
+
+.app-shell.theme-retro-rpg .voice-user-deafen.active::before {
+  background-image: url("../assets/themes/retro-rpg/icon-deafened.png");
+}
+
+.app-shell.theme-retro-rpg .voice-user-leave::before {
+  background-image: url("../assets/themes/retro-rpg/icon-leave.png");
+}
+
+/* The joined-room marker uses the theme's gold bead. */
+.app-shell.theme-retro-rpg .voice-room-marker {
+  background: url("../assets/themes/retro-rpg/icon-dot.png") center / contain no-repeat;
+  border: 0;
+  box-shadow: none;
+}
+
+/* The three bluff slots use the same framed surfaces as the rest of the retro
+ * UI. Stable square dimensions keep the bar from moving when an icon replaces
+ * a slot number. */
+.app-shell.theme-retro-rpg .demon-bluff-bar {
+  background: transparent;
+  border-color: transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 28 fill;
+  border-image-source: url("../assets/themes/retro-rpg/panel-frame.png");
+  border-image-width: 9px;
+  border-radius: 0;
+  border-style: solid;
+  border-width: 9px;
+  box-shadow: 0 12px 24px rgba(8, 2, 1, 0.46);
+  gap: 6px;
+  padding: 6px;
+}
+
+.app-shell.theme-retro-rpg .demon-bluff-slot button {
+  background: transparent;
+  border-color: transparent;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  border-image-slice: 60 fill;
+  border-image-source: url("../assets/themes/retro-rpg/button-square.png");
+  border-image-width: 7px;
+  border-radius: 0;
+  border-style: solid;
+  border-width: 7px;
+  box-shadow: none;
+  box-sizing: border-box;
+  height: 52px;
+  min-height: 52px;
+  min-width: 52px;
+  width: 52px;
+}
+
+.app-shell.theme-retro-rpg .demon-bluff-slot button:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+  border-image-slice: 60 fill;
+  border-image-source: url("../assets/themes/retro-rpg/button-square-hover.png");
+  filter: brightness(1.06) drop-shadow(0 0 4px rgba(231, 166, 50, 0.34));
+}
+
+.app-shell.theme-retro-rpg .demon-bluff-slot button:active:not(:disabled) {
+  border-image-slice: 60 fill;
+  border-image-source: url("../assets/themes/retro-rpg/button-square-pressed.png");
+  filter: brightness(0.98);
+}
+
+.app-shell.theme-retro-rpg .demon-bluff-slot img {
+  height: 36px;
+  width: 36px;
+}
+
+.app-shell.theme-retro-rpg .demon-bluff-slot span {
+  font-size: 0.96rem;
+}
+
+/* The portaled picker uses the useful centre of its frame instead of reserving
+ * a quarter of the menu for decorative side borders. */
+.app-shell.theme-retro-rpg .demon-bluff-picker {
+  border-image-width: 14px 16px;
+  border-width: 14px 16px;
+  overflow-x: hidden;
+  padding: 2px;
+  width: 214px;
+}
+
+.app-shell.theme-retro-rpg .demon-bluff-picker button {
+  gap: 6px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  min-height: 34px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 2px 4px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.app-shell.theme-retro-rpg :is(.demon-bluff-picker button img, .demon-bluff-picker-fallback) {
+  height: 24px;
+  width: 24px;
+}
+
+/* Cross-fade a dedicated night layer instead of swapping the day background in
+ * one frame. This layer stays below the workspace and therefore never dims the
+ * dashboards themselves. */
+.app-shell.theme-retro-rpg::after,
+.app-shell.theme-flog-in::after {
+  content: "";
+  display: block !important;
+  inset: 0;
+  opacity: 0 !important;
+  pointer-events: none;
+  position: fixed;
+  transition: opacity 1400ms ease-in-out;
+  z-index: 0;
+}
+
+.app-shell.theme-retro-rpg::after {
+  background: rgba(5, 1, 2, 0.32);
+}
+
+.app-shell.theme-flog-in::after {
+  background:
+    linear-gradient(90deg, rgba(2, 4, 14, 0.34), transparent 25%, transparent 75%, rgba(2, 4, 14, 0.38)),
+    linear-gradient(180deg, rgba(2, 5, 18, 0.04), rgba(1, 3, 12, 0.22)),
+    url("../assets/themes/flog-in/background-night.png") center / cover no-repeat;
+  filter: saturate(0.98) brightness(0.9) contrast(1.05);
+  image-rendering: auto;
+}
+
+.app-shell.theme-retro-rpg.room-night::after,
+.app-shell.theme-flog-in.room-night::after {
+  opacity: 1 !important;
+}
+
+@media (max-width: 820px) {
+  .app-shell.theme-flog-in::after {
+    background:
+      linear-gradient(180deg, rgba(2, 5, 18, 0.06), rgba(1, 3, 12, 0.34)),
+      url("../assets/themes/flog-in/background-mobile.png") center / cover no-repeat;
   }
 }

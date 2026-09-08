@@ -10,6 +10,7 @@
 import { useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useUiText } from '../../i18n';
 
 type ChatPopoutProps = {
   children: ReactNode;
@@ -43,6 +44,7 @@ export function ChatPopout({
   position,
   size,
 }: ChatPopoutProps) {
+  const t = useUiText();
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const resizeRef = useRef<{
     pointerId: number;
@@ -134,11 +136,11 @@ export function ChatPopout({
           dragRef.current = null;
         }}
       >
-        <strong>Text Chat</strong>
+        <strong>{t('Text Chat')}</strong>
         <span className="chat-popout-buttons">
           <button
-            aria-label={isMinimized ? 'Restore chat window' : 'Minimize chat window'}
-            title={isMinimized ? 'Restore' : 'Minimize'}
+            aria-label={t(isMinimized ? 'Restore chat window' : 'Minimize chat window')}
+            title={t(isMinimized ? 'Restore' : 'Minimize')}
             onClick={onToggleMinimized}
             type="button"
           >
@@ -146,7 +148,7 @@ export function ChatPopout({
               {isMinimized ? <path d="M12 5v14M5 12h14" /> : <path d="M5 12h14" />}
             </svg>
           </button>
-          <button aria-label="Close chat window" title="Close" onClick={onClose} type="button">
+          <button aria-label={t('Close chat window')} title={t('Close')} onClick={onClose} type="button">
             <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
               <path d="m6 6 12 12M18 6 6 18" />
             </svg>

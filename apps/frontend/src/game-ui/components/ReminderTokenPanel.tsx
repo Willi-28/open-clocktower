@@ -6,6 +6,7 @@
  */
 
 import type { ReminderTokenOption } from '../reminderTokens';
+import { useUiText } from '../../i18n';
 
 type ReminderTokenPanelProps = {
   reminderTokenOptions: ReminderTokenOption[];
@@ -19,9 +20,10 @@ export function ReminderTokenPanel({
   selectedReminderLabel,
   onToggleReminderToken,
 }: ReminderTokenPanelProps) {
+  const t = useUiText();
   return (
     <div className="reminder-symbol-grid">
-      {reminderTokenOptions.length === 0 ? <p className="helper-text">No reminder token PNGs loaded.</p> : null}
+      {reminderTokenOptions.length === 0 ? <p className="helper-text">{t('No reminder token PNGs loaded.')}</p> : null}
       {reminderTokenOptions.map((token) => (
         <button
           className={selectedReminderLabel === token.id ? 'reminder-symbol selected' : 'reminder-symbol'}

@@ -5,12 +5,14 @@
  * avatar uploads, saved client settings, and the composed voice controller.
  */
 
+import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
-import { uploadProfileImage, type RoomState } from '../../api/client';
+import { getPackCredits, uploadProfileImage, type PackCredits, type RoomState } from '../../api/client';
 import { MediaDevicesWithOutputPicker } from '../../audio/browserAudio';
 import type { ClientSettings } from '../clientSettings';
 import type { useVoiceController } from '../hooks/useVoiceController';
+import type { CreditsStatus } from './CreditsView';
 import { SettingsPanel } from './SettingsPanel';
 
 type SettingsPanelContainerProps = {
@@ -18,6 +20,7 @@ type SettingsPanelContainerProps = {
   clientSettings: ClientSettings;
   currentPlayerId: string;
   defaultCharacterLanguage: string;
+  hideVoicePresence: boolean;
   isMuted: boolean;
   onClose: () => void;
   onMicTestActiveChange: (isActive: boolean) => void;
@@ -37,6 +40,7 @@ export function SettingsPanelContainer({
   clientSettings,
   currentPlayerId,
   defaultCharacterLanguage,
+  hideVoicePresence,
   isMuted,
   onClose,
   onMicTestActiveChange,
@@ -48,6 +52,36 @@ export function SettingsPanelContainer({
   voice,
 }: SettingsPanelContainerProps) {
   const { devices, peers, session } = voice;
+  const [packCredits, setPackCredits] = useState<PackCredits | null>(null);
+  const [packCreditsStatus, setPackCreditsStatus] = useState<CreditsStatus>('loading');
+  const roomId = room?.id ?? null;
+
+  // The container only exists while the dialog is open, so the credits are
+  // fetched on open rather than kept in the room snapshot broadcast to everyone.
+  useEffect(() => {
+    if (!roomId) {
+      setPackCredits(null);
+      setPackCreditsStatus('error');
+      return;
+    }
+    let isCurrent = true;
+    setPackCreditsStatus('loading');
+    void getPackCredits(roomId)
+      .then((credits) => {
+        if (isCurrent) {
+          setPackCredits(credits);
+          setPackCreditsStatus('ready');
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setPackCreditsStatus('error');
+        }
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [roomId]);
 
   /**
    * Uploads the current player's avatar through the room API.
@@ -78,6 +112,7 @@ export function SettingsPanelContainer({
       currentPlayerId={currentPlayerId}
       defaultCharacterLanguage={defaultCharacterLanguage}
       hasOutputDevicePicker={Boolean((navigator.mediaDevices as MediaDevicesWithOutputPicker | undefined)?.selectAudioOutput)}
+      hideVoicePresence={hideVoicePresence}
       isMuted={isMuted}
       joinedVoiceRoom={session.joinedVoiceRoom}
       onChooseOutputDevice={() => void devices.chooseOutputDevice()}
@@ -89,6 +124,8 @@ export function SettingsPanelContainer({
       onSwitchMicrophone={(deviceId) => void session.switchMicrophone(deviceId)}
       onToggleMuted={onToggleMuted}
       onUploadProfileImage={uploadCurrentPlayerImage}
+      packCredits={packCredits}
+      packCreditsStatus={packCreditsStatus}
       clientSettings={clientSettings}
       onUpdateClientSettings={updateClientSettings}
       playerName={playerName}
@@ -98,7 +135,6 @@ export function SettingsPanelContainer({
       selectedAudioOutputId={devices.selectedAudioOutputId}
       setRemoteVolumes={peers.setRemoteVolumes}
       voiceDiagnostics={peers.voiceDiagnostics}
-      voiceParticipants={session.voiceParticipants}
     />
   );
 }

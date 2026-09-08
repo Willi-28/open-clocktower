@@ -9,6 +9,7 @@ import type { CSSProperties } from 'react';
 
 import type { Character, Nomination, Player, RoomState } from '../../api/client';
 import { characterRole } from '../gameText';
+import { useUiText } from '../../i18n';
 
 type SeatActionMenuProps = {
   activeNomination: Nomination | null | undefined;
@@ -62,6 +63,7 @@ export function SeatActionMenu({
   onSuspectedCharacterChange,
   onToggleDeadVote,
 }: SeatActionMenuProps) {
+  const t = useUiText();
   const canChatWithPlayer = chatTargets.some((target) => target.id === player.id);
   const canNominatePlayer = roomPhase === 'day' && currentPlayer.status === 'alive' && player.status === 'alive';
 
@@ -69,22 +71,16 @@ export function SeatActionMenu({
     <div className="seat-action-menu" style={anchorStyle}>
       <div className="seat-action-header">
         <strong>{player.display_name}</strong>
-        <button className="secondary" onClick={onClose} type="button">
-          Close
-        </button>
+        <button className="secondary" onClick={onClose} type="button">{t('Close')}</button>
       </div>
       {isStoryteller ? (
         <>
           <div className="seat-action-comm-row">
-            <button className="secondary" onClick={() => onOpenChat(player.id)} type="button">
-              Chat
-            </button>
-            <button className="secondary" onClick={() => onStartPrivateCall(player.id)} type="button">
-              Call
-            </button>
+            <button className="secondary" onClick={() => onOpenChat(player.id)} type="button">{t('Chat')}</button>
+            <button className="secondary" onClick={() => onStartPrivateCall(player.id)} type="button">{t('Call')}</button>
           </div>
           <label className="seat-action-volume">
-            <span>Volume</span>
+            <span>{t('Volume')}</span>
             <input
               type="range"
               min="0"
@@ -100,16 +96,12 @@ export function SeatActionMenu({
               className={player.status === 'alive' ? 'active' : ''}
               onClick={() => onMarkAlive(player.id)}
               type="button"
-            >
-              Alive
-            </button>
+            >{t('Alive')}</button>
             <button
               className={player.status === 'dead' ? 'active' : ''}
               onClick={() => onMarkDead(player.id)}
               type="button"
-            >
-              Dead
-            </button>
+            >{t('Dead')}</button>
           </div>
           <label className={player.status === 'dead' ? 'checkbox-row seat-dead-vote' : 'checkbox-row seat-dead-vote disabled'}>
             <input
@@ -117,34 +109,24 @@ export function SeatActionMenu({
               disabled={player.status !== 'dead'}
               type="checkbox"
               onChange={() => onToggleDeadVote(player)}
-            />
-            Dead Vote
-          </label>
+            />{t('Dead Vote')}</label>
           {activeNomination?.nominee_id === player.id ? (
-            <button disabled={!hasExecutionVotes} onClick={() => onExecute(player.id)} type="button">
-              Execute
-            </button>
+            <button disabled={!hasExecutionVotes} onClick={() => onExecute(player.id)} type="button">{t('Execute')}</button>
           ) : null}
           {!player.is_storyteller ? (
-            <button className="secondary danger-button seat-action-kick" onClick={() => onRequestKick(player)} type="button">
-              Kick
-            </button>
+            <button className="secondary danger-button seat-action-kick" onClick={() => onRequestKick(player)} type="button">{t('Kick')}</button>
           ) : null}
         </>
       ) : (
         <>
           <div className="seat-action-comm-row">
             {canChatWithPlayer ? (
-              <button className="secondary" onClick={() => onOpenChat(player.id)} type="button">
-                Chat
-              </button>
+              <button className="secondary" onClick={() => onOpenChat(player.id)} type="button">{t('Chat')}</button>
             ) : null}
-            <button className="secondary" disabled={roomPhase === 'night'} onClick={() => onStartPrivateCall(player.id)} type="button">
-              Call
-            </button>
+            <button className="secondary" disabled={roomPhase === 'night'} onClick={() => onStartPrivateCall(player.id)} type="button">{t('Call')}</button>
           </div>
           <label className="seat-action-volume">
-            <span>Volume</span>
+            <span>{t('Volume')}</span>
             <input
               type="range"
               min="0"
@@ -157,13 +139,9 @@ export function SeatActionMenu({
           </label>
           {!player.is_storyteller ? (
             <>
-              <button disabled={!canNominatePlayer} onClick={() => onNominate(player.id)} type="button">
-                Nominate
-              </button>
-              <label>
-                Private Suspicion
-                <select value={suspectedCharacterId} onChange={(event) => onSuspectedCharacterChange(event.target.value)}>
-                  <option value="">Choose character</option>
+              <button disabled={!canNominatePlayer} onClick={() => onNominate(player.id)} type="button">{t('Nominate')}</button>
+              <label>{t('Private Suspicion')}<select value={suspectedCharacterId} onChange={(event) => onSuspectedCharacterChange(event.target.value)}>
+                  <option value="">{t('Choose character')}</option>
                   {characters.map((character) => (
                     <option key={character.id} value={character.id}>
                       {characterRole(character)}
@@ -176,9 +154,7 @@ export function SeatActionMenu({
                 disabled={!suspectedCharacterId}
                 onClick={() => onPlaceSuspicion(player.id)}
                 type="button"
-              >
-                Place Suspicion
-              </button>
+              >{t('Place Suspicion')}</button>
             </>
           ) : null}
         </>

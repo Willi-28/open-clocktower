@@ -18,6 +18,7 @@ import { NightOrderPanel } from './NightOrderPanel';
 import { ReminderTokenPanel } from './ReminderTokenPanel';
 import { StorytellerToolsPanel } from './StorytellerToolsPanel';
 import type { StorytellerToolsPanelProps } from './StorytellerToolsPanel';
+import { useUiText } from '../../i18n';
 
 type RightControlStackProps = StorytellerToolsPanelProps & {
   activeNightOrderTab: 'first' | 'other';
@@ -54,6 +55,7 @@ function PopOutIcon() {
 
 /** Render the right-edge dashboard as one tabbed, minimizable panel beside the table. */
 export function RightControlStack(props: RightControlStackProps) {
+  const t = useUiText();
   const { isStoryteller } = props;
   // On desktop (mouse) tokens are placed/removed by right-clicking the table, so
   // the Tokens tab only appears on touch devices that cannot right-click.
@@ -148,8 +150,8 @@ export function RightControlStack(props: RightControlStackProps) {
     <aside ref={asideRef} className={`edge-panel right-edge control-stack${isMinimized ? ' minimized' : ''}`}>
       <button
         className="dashboard-edge-handle"
-        aria-label={isMinimized ? 'Show dashboard' : 'Hide dashboard'}
-        title={isMinimized ? 'Show dashboard – drag to resize' : 'Hide dashboard – drag to resize'}
+        aria-label={t(isMinimized ? 'Show dashboard' : 'Hide dashboard')}
+        title={t(isMinimized ? 'Show dashboard - drag to resize' : 'Hide dashboard - drag to resize')}
         onPointerDown={(event) => {
           if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) {
             return;
@@ -198,9 +200,9 @@ export function RightControlStack(props: RightControlStackProps) {
       >
         <span className="dashboard-edge-grip" aria-hidden="true">{isMinimized ? '‹' : '›'}</span>
       </button>
-      <section className="right-dashboard panel" aria-label="Table dashboard">
+      <section className="right-dashboard panel" aria-label={t('Table dashboard')}>
         <div className="dashboard-tabs">
-            <div className="dashboard-tab-list" role="tablist" aria-label="Table dashboards">
+            <div className="dashboard-tab-list" role="tablist" aria-label={t('Table dashboards')}>
               {tabs.map((tab) => {
                 if (tab.id === 'characters') {
                   // Draggable: drag out to detach the sheet, click to select/reattach.
@@ -257,24 +259,24 @@ export function RightControlStack(props: RightControlStackProps) {
                         tabDragRef.current = null;
                       }}
                       role="tab"
-                      title={props.characterSheetFloating ? 'Click to reattach the character sheet' : 'Drag out to detach the character sheet'}
+                      title={t(props.characterSheetFloating ? 'Click to reattach the character sheet' : 'Drag out to detach the character sheet')}
                       type="button"
                     >
-                      {tab.label}
-                      <span className="dashboard-tab-detach-hint" aria-hidden="true"><PopOutIcon /></span>
+                      {t(tab.label)}
                     </button>
                   );
                 }
                 return (
                   <button
                     aria-selected={activeTab === tab.id}
-                    className={activeTab === tab.id ? 'dashboard-tab active' : 'dashboard-tab'}
+                    // The per-tab class lets a theme replace a label with a sprite.
+                    className={[activeTab === tab.id ? 'dashboard-tab active' : 'dashboard-tab', `dashboard-tab-${tab.id}`].join(' ')}
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     role="tab"
                     type="button"
                   >
-                    {tab.label}
+                    {t(tab.label)}
                   </button>
                 );
               })}
@@ -289,7 +291,7 @@ export function RightControlStack(props: RightControlStackProps) {
             {props.characterSheetFloating ? (
               <button className="sheet-detached-note" onClick={props.onReattachCharacterSheet} type="button">
                 <span className="sheet-detached-icon" aria-hidden="true"><PopOutIcon /></span>
-                <span>Character sheet is floating on the table.<br />Click here (or drag it back) to reattach.</span>
+                <span>{t('Character sheet is floating on the table.')}<br />{t('Click here (or drag it back) to reattach.')}</span>
               </button>
             ) : (
               <CharacterSheetPanel

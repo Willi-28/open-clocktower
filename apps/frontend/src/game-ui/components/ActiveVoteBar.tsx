@@ -6,6 +6,7 @@
  */
 
 import type { Nomination } from '../../api/client';
+import { useUiText } from '../../i18n';
 
 type ActiveVoteBarProps = {
   activeNomination: Nomination;
@@ -23,19 +24,23 @@ export function ActiveVoteBar({
   onToggleVote,
   playerName,
 }: ActiveVoteBarProps) {
+  const t = useUiText();
   return (
     <div className="table-vote-bar">
-      <strong>{playerName(activeNomination.nominator_id)} vs {playerName(activeNomination.nominee_id)}</strong>
+      <strong>{t('{nominator} versus {nominee}', {
+        nominator: playerName(activeNomination.nominator_id),
+        nominee: playerName(activeNomination.nominee_id),
+      })}</strong>
       {activeNomination.is_open ? (
         <button
           className={isVoteRaised ? 'hand-button raised' : 'hand-button'}
           onClick={onToggleVote}
           type="button"
         >
-          {isVoteRaised ? 'Lower Hand' : 'Raise Hand'}
+          {t(isVoteRaised ? 'Lower Hand' : 'Raise Hand')}
         </button>
       ) : (
-        <span>Vote closed</span>
+        <span>{t('Vote closed')}</span>
       )}
     </div>
   );

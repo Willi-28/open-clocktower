@@ -7,8 +7,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import type { VoiceParticipant } from '../voiceRooms';
+import type { PackCredits } from '../../api/client';
+import { uiLanguages, useUiText, type UiLanguage } from '../../i18n';
 import type { VoiceStreamRequest } from '../hooks/useVoiceDevices';
+import { CreditsView, type CreditsStatus } from './CreditsView';
 import { VoiceMuteIcon } from './VoiceMuteIcon';
 
 type SettingsPanelProps = {
@@ -19,6 +21,7 @@ type SettingsPanelProps = {
   currentPlayerId: string;
   defaultCharacterLanguage: string;
   hasOutputDevicePicker: boolean;
+  hideVoicePresence: boolean;
   isMuted: boolean;
   joinedVoiceRoom: string | null;
   onChooseOutputDevice: () => void;
@@ -30,6 +33,8 @@ type SettingsPanelProps = {
   onSwitchMicrophone: (deviceId: string) => void;
   onToggleMuted: () => void;
   onUploadProfileImage: (file: File) => Promise<void>;
+  packCredits: PackCredits | null;
+  packCreditsStatus: CreditsStatus;
   playerName: (playerId: string | undefined) => string;
   volumePlayerIds: string[];
   remoteVolumes: Record<string, number>;
@@ -37,7 +42,6 @@ type SettingsPanelProps = {
   selectedAudioOutputId: string;
   setRemoteVolumes: (updater: (current: Record<string, number>) => Record<string, number>) => void;
   voiceDiagnostics: Record<string, string>;
-  voiceParticipants: VoiceParticipant[];
   clientSettings: {
     showTable: boolean;
     appTheme: string;
@@ -45,6 +49,7 @@ type SettingsPanelProps = {
     soundVolume: number;
     soundFiltersEnabled: boolean;
     characterLanguage: string;
+    uiLanguage: UiLanguage;
   };
   onUpdateClientSettings: (settings: Partial<SettingsPanelProps['clientSettings']>) => void;
 };
@@ -58,6 +63,7 @@ export function SettingsPanel({
   currentPlayerId,
   defaultCharacterLanguage,
   hasOutputDevicePicker,
+  hideVoicePresence,
   isMuted,
   joinedVoiceRoom,
   onChooseOutputDevice,
@@ -69,6 +75,8 @@ export function SettingsPanel({
   onSwitchMicrophone,
   onToggleMuted,
   onUploadProfileImage,
+  packCredits,
+  packCreditsStatus,
   playerName,
   volumePlayerIds,
   remoteVolumes,
@@ -76,16 +84,10 @@ export function SettingsPanel({
   selectedAudioOutputId,
   setRemoteVolumes,
   voiceDiagnostics,
-  voiceParticipants,
   clientSettings,
   onUpdateClientSettings,
 }: SettingsPanelProps) {
-  const remoteParticipantIds = Array.from(
-    new Set([
-      ...volumePlayerIds.filter((playerId) => playerId !== currentPlayerId),
-      ...voiceParticipants.filter((participant) => participant.playerId !== currentPlayerId).map((participant) => participant.playerId),
-    ]),
-  );
+  const remoteParticipantIds = volumePlayerIds.filter((playerId) => playerId !== currentPlayerId);
   const audioTestRef = useRef<HTMLAudioElement | null>(null);
   const monitorAudioRef = useRef<HTMLAudioElement | null>(null);
   const micCleanupRef = useRef<(() => void) | null>(null);
@@ -99,7 +101,8 @@ export function SettingsPanel({
   const [isTestingMic, setIsTestingMic] = useState(false);
   const [testStatus, setTestStatus] = useState('');
   const [profileStatus, setProfileStatus] = useState('');
-  const [activeTab, setActiveTab] = useState<'general' | 'sound' | 'board' | 'characters' | 'voice'>('general');
+  const t = useUiText();
+  const [activeTab, setActiveTab] = useState<'general' | 'sound' | 'board' | 'characters' | 'voice' | 'credits'>('general');
 
   useEffect(() => {
     return () => {
@@ -293,15 +296,13 @@ export function SettingsPanel({
 
   return (
     <div className="settings-backdrop" role="presentation" onClick={onClose}>
-      <section className="settings-panel" role="dialog" aria-modal="true" aria-label="Client settings" onClick={(event) => event.stopPropagation()}>
+      <section className="settings-panel" role="dialog" aria-modal="true" aria-label={t('Client settings')} onClick={(event) => event.stopPropagation()}>
         <div className="settings-header">
           <div>
-            <h2>Client Settings</h2>
-            <p className="helper-text">Voice and local playback preferences.</p>
+            <h2>{t('Client Settings')}</h2>
+            <p className="helper-text">{t('Voice and local playback preferences.')}</p>
           </div>
-          <button className="secondary" onClick={onClose} type="button">
-            Close
-          </button>
+          <button className="secondary" onClick={onClose} type="button">{t('Close')}</button>
         </div>
 
         <div className="settings-tabs">
@@ -311,18 +312,17 @@ export function SettingsPanel({
             ['board', 'Board'],
             ['characters', 'Language'],
             ['voice', 'Voicechat'],
+            ['credits', 'Credits'],
           ].map(([tabId, label]) => (
             <button className={activeTab === tabId ? 'active' : 'secondary'} key={tabId} onClick={() => setActiveTab(tabId as typeof activeTab)} type="button">
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
 
         {activeTab === 'general' ? (
           <div className="settings-tab-panel">
-            <label>
-              Profile Image
-              <input
+            <label>{t('Profile Image')}<input
                 accept="image/png,image/jpeg,image/gif"
                 type="file"
                 onChange={(event) => {
@@ -338,16 +338,16 @@ export function SettingsPanel({
                 }}
               />
             </label>
-            {profileStatus ? <p className="helper-text">{profileStatus}</p> : null}
+            {profileStatus ? <p className="helper-text">{t(profileStatus)}</p> : null}
           </div>
         ) : null}
 
         {activeTab === 'sound' ? (
           <div className="settings-tab-panel">
             <label className="volume-row">
-              <span>Sound Volume</span>
+              <span>{t('Sound Volume')}</span>
               <input
-                aria-label="Sound volume"
+                aria-label={t('Sound volume')}
                 max="2"
                 min="0"
                 step="0.05"
@@ -357,65 +357,68 @@ export function SettingsPanel({
               />
               <strong>{Math.round(clientSettings.soundVolume * 100)}%</strong>
             </label>
-            <label>
-              Output Device
-              <select value={selectedAudioOutputId} onChange={(event) => onSelectOutputDevice(event.target.value)}>
-                <option value="">System default</option>
+            <label>{t('Output Device')}<select value={selectedAudioOutputId} onChange={(event) => onSelectOutputDevice(event.target.value)}>
+                <option value="">{t('System default')}</option>
                 {audioOutputDevices.map((device, index) => (
                   <option key={device.deviceId || index} value={device.deviceId}>
-                    {device.label || `Output ${index + 1}`}
+                    {device.label || t('Output {index}', { index: index + 1 })}
                   </option>
                 ))}
               </select>
             </label>
-            {audioDeviceStatus ? <p className="helper-text">{audioDeviceStatus}</p> : null}
+            {audioDeviceStatus ? <p className="helper-text">{t(audioDeviceStatus)}</p> : null}
             {hasOutputDevicePicker ? (
-              <button className="secondary" onClick={onChooseOutputDevice} type="button">
-                Choose Output Device
-              </button>
+              <button className="secondary" onClick={onChooseOutputDevice} type="button">{t('Choose Output Device')}</button>
             ) : audioOutputDevices.length === 0 ? (
-              <p className="helper-text">This browser only exposes the system default output.</p>
+              <p className="helper-text">{t('This browser only exposes the system default output.')}</p>
             ) : null}
-            <button className="secondary" onClick={() => void testOutputDevice()} type="button">
-              Test Output
-            </button>
-            {testStatus ? <p className="helper-text">{testStatus}</p> : null}
+            <button className="secondary" onClick={() => void testOutputDevice()} type="button">{t('Test Output')}</button>
+            {testStatus ? <p className="helper-text">{t(testStatus)}</p> : null}
           </div>
         ) : null}
 
         {activeTab === 'board' ? (
           <div className="settings-tab-panel">
-            <label>
-              Theme
-              <select value={clientSettings.appTheme} onChange={(event) => onUpdateClientSettings({ appTheme: event.target.value })}>
-                <option value="classic">Classic</option>
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
-                <option value="universe">Universe</option>
-                <option value="magic">Magic</option>
-                <option value="island">Island</option>
-                <option value="retro-rpg">Retro RPG</option>
+            <label>{t('Theme')}<select value={clientSettings.appTheme} onChange={(event) => onUpdateClientSettings({ appTheme: event.target.value })}>
+                <option value="classic">{t('Classic')}</option>
+                <option value="dark">{t('Dark')}</option>
+                <option value="light">{t('Light')}</option>
+                <option value="universe">{t('Universe')}</option>
+                <option value="magic">{t('Magic')}</option>
+                <option value="island">{t('Island')}</option>
+                <option value="retro-rpg">{t('Retro RPG')}</option>
+                <option value="flog-in">{t('Moon')}</option>
               </select>
             </label>
-            <label>
-              Night Vision
-              <select value={clientSettings.nightEffect} onChange={(event) => onUpdateClientSettings({ nightEffect: event.target.value })}>
-                <option value="subtle">Subtle moonlight</option>
-                <option value="fog">Soft fog</option>
-                <option value="none">No effect</option>
+            <label>{t('Night Vision')}<select value={clientSettings.nightEffect} onChange={(event) => onUpdateClientSettings({ nightEffect: event.target.value })}>
+                <option value="subtle">{t('Subtle moonlight')}</option>
+                <option value="fog">{t('Soft fog')}</option>
+                <option value="none">{t('No effect')}</option>
               </select>
             </label>
             <label className="checkbox-row">
-              <input checked={clientSettings.showTable} type="checkbox" onChange={(event) => onUpdateClientSettings({ showTable: event.target.checked })} />
-              Show table
-            </label>
+              <input checked={clientSettings.showTable} type="checkbox" onChange={(event) => onUpdateClientSettings({ showTable: event.target.checked })} />{t('Show table')}</label>
           </div>
         ) : null}
 
         {activeTab === 'characters' ? (
           <div className="settings-tab-panel">
             <label>
-              Character Sheet Language
+              {t('Interface Language')}
+              <select
+                value={clientSettings.uiLanguage}
+                onChange={(event) => onUpdateClientSettings({ uiLanguage: event.target.value as UiLanguage })}
+              >
+                {uiLanguages.map((language) => (
+                  <option key={language.code} value={language.code}>
+                    {language.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="helper-text">{t('Changes the app text on this device. Character packs are translated separately below.')}</p>
+            <label>
+              {t('Character Sheet Language')}
               <select
                 value={clientSettings.characterLanguage}
                 onChange={(event) => onUpdateClientSettings({ characterLanguage: event.target.value })}
@@ -429,55 +432,49 @@ export function SettingsPanel({
               </select>
             </label>
             {availableCharacterLanguages.length === 0 ? (
-              <p className="helper-text">The loaded character pack does not provide additional languages.</p>
+              <p className="helper-text">{t('The loaded character pack does not provide additional languages.')}</p>
             ) : (
-              <p className="helper-text">This only changes role, reminder token, and night-order text on this device.</p>
+              <p className="helper-text">{t('This only changes role, reminder token, and night-order text on this device.')}</p>
             )}
           </div>
         ) : null}
 
         {activeTab === 'voice' ? (
           <div className="settings-tab-panel">
-            <label>
-              Microphone
-              <select value={selectedAudioInputId} onChange={(event) => onSwitchMicrophone(event.target.value)}>
-                <option value="">Default microphone</option>
+            <label>{t('Microphone')}<select value={selectedAudioInputId} onChange={(event) => onSwitchMicrophone(event.target.value)}>
+                <option value="">{t('Default microphone')}</option>
                 {audioInputDevices.map((device, index) => (
                   <option key={device.deviceId || index} value={device.deviceId}>
-                    {device.label || `Microphone ${index + 1}`}
+                    {device.label || t('Microphone {index}', { index: index + 1 })}
                   </option>
                 ))}
               </select>
             </label>
-            {audioDeviceStatus ? <p className="helper-text">{audioDeviceStatus}</p> : null}
+            {audioDeviceStatus ? <p className="helper-text">{t(audioDeviceStatus)}</p> : null}
             <label className="checkbox-row">
-              <input checked={clientSettings.soundFiltersEnabled} type="checkbox" onChange={(event) => onUpdateClientSettings({ soundFiltersEnabled: event.target.checked })} />
-              Use RNNoise suppression
-            </label>
+              <input checked={clientSettings.soundFiltersEnabled} type="checkbox" onChange={(event) => onUpdateClientSettings({ soundFiltersEnabled: event.target.checked })} />{t('Use RNNoise suppression')}</label>
             <div className="device-test">
-              <div className="mic-meter" aria-label="Microphone level">
+              <div className="mic-meter" aria-label={t('Microphone level')}>
                 <span ref={micMeterRef} />
               </div>
               <button className="secondary" onClick={() => void (isTestingMic ? stopMicTest() : startMicTest())} type="button">
-                {isTestingMic ? 'Stop Input Test' : 'Test Input'}
+                {t(isTestingMic ? 'Stop Input Test' : 'Test Input')}
               </button>
             </div>
             <div className="voice-controls">
               <button className={isMuted ? 'voice-toggle-button hand-button raised' : 'voice-toggle-button secondary'} disabled={!joinedVoiceRoom} onClick={onToggleMuted} type="button">
                 <VoiceMuteIcon isMuted={isMuted} />
-                <span>{isMuted ? 'Muted Microphone' : 'Unmuted Microphone'}</span>
+                <span>{t(isMuted ? 'Muted Microphone' : 'Unmuted Microphone')}</span>
               </button>
-              <button className="secondary" onClick={onRefreshDevices} type="button">
-                Refresh Devices
-              </button>
+              <button className="secondary" onClick={onRefreshDevices} type="button">{t('Refresh Devices')}</button>
             </div>
             <div className="voice-participants">
-              <strong>Player Volume</strong>
-              {remoteParticipantIds.length === 0 ? <p className="helper-text">No remote players available.</p> : null}
+              <strong>{t('Player Volume')}</strong>
+              {remoteParticipantIds.length === 0 ? <p className="helper-text">{t('No remote players available.')}</p> : null}
               {remoteParticipantIds.map((playerId) => (
                 <label className="volume-row" key={playerId}>
                   <span>{playerName(playerId)}</span>
-                  <small>{voiceDiagnostics[playerId] ?? 'not connected'}</small>
+                  {!hideVoicePresence ? <small>{t(voiceDiagnostics[playerId] ?? 'not connected')}</small> : null}
                   <input
                     max="2"
                     min="0"
@@ -495,6 +492,12 @@ export function SettingsPanel({
                 </label>
               ))}
             </div>
+          </div>
+        ) : null}
+
+        {activeTab === 'credits' ? (
+          <div className="settings-tab-panel">
+            <CreditsView packCredits={packCredits} status={packCreditsStatus} />
           </div>
         ) : null}
       </section>

@@ -6,6 +6,7 @@
  */
 
 import type { NominationRequestState } from '../../api/client';
+import { useUiText } from '../../i18n';
 
 type NominationRequestPopupProps = {
   nominationRequests: NominationRequestState[];
@@ -23,25 +24,25 @@ export function NominationRequestPopup({
   onStartNomination,
   playerName,
 }: NominationRequestPopupProps) {
+  const t = useUiText();
   if (nominationRequests.length === 0) {
     return null;
   }
 
   return (
     <div className="nomination-request-popup">
-      <h2>Nomination Request</h2>
+      <h2>{t('Nomination Request')}</h2>
       {nominationRequests.map((request) => (
         <div className="nomination-request-card" key={request.id}>
           <strong>
-            {playerName(request.nominator_id)} nominates {playerName(request.nominee_id)}
+            {t('{nominator} nominates {nominee}', {
+              nominator: playerName(request.nominator_id),
+              nominee: playerName(request.nominee_id),
+            })}
           </strong>
           <div className="button-row">
-            <button onClick={() => onStartNomination(request.nominator_id, request.nominee_id)} type="button">
-              Start Nomination
-            </button>
-            <button className="secondary" onClick={() => onReject(request.id)} type="button">
-              Reject
-            </button>
+            <button onClick={() => onStartNomination(request.nominator_id, request.nominee_id)} type="button">{t('Start Nomination')}</button>
+            <button className="secondary" onClick={() => onReject(request.id)} type="button">{t('Reject')}</button>
           </div>
         </div>
       ))}

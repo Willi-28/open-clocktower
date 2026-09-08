@@ -20,6 +20,7 @@ import {
 import type { EmojiDefinition } from '../emojis';
 import { twemojiUrl } from '../twemoji';
 import type { ChatMessage } from '../types';
+import { useUiText } from '../../i18n';
 
 type ChatPanelProps = {
   activeChatTab: string;
@@ -113,6 +114,7 @@ type EmojiPickerProps = {
 
 /** Emoji-only picker popover with search and category sections. */
 function EmojiPicker({ onClose, onSelect }: EmojiPickerProps) {
+  const t = useUiText();
   const [search, setSearch] = useState('');
   const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -160,10 +162,10 @@ function EmojiPicker({ onClose, onSelect }: EmojiPickerProps) {
   return (
     <div className="emoji-picker-panel" ref={panelRef}>
       <input
-        aria-label="Search emoji"
+        aria-label={t('Search emoji')}
         autoFocus
         className="emoji-picker-search"
-        placeholder="Search emoji…"
+        placeholder={t('Search emoji...')}
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         onKeyDown={(event) => {
@@ -176,12 +178,12 @@ function EmojiPicker({ onClose, onSelect }: EmojiPickerProps) {
         {query ? (
           <div className="emoji-picker-grid">
             {results.map(renderEmojiButton)}
-            {results.length === 0 ? <p>No emoji found.</p> : null}
+            {results.length === 0 ? <p>{t('No emoji found.')}</p> : null}
           </div>
         ) : (
           categories.map((section) => (
             <div key={section.name}>
-              <h4 className="emoji-picker-category">{section.name}</h4>
+              <h4 className="emoji-picker-category">{t(section.name)}</h4>
               <div className="emoji-picker-grid">{section.emojis.map(renderEmojiButton)}</div>
             </div>
           ))
@@ -206,6 +208,7 @@ export function ChatPanel({
   setActiveChatTab,
   setChatDraft,
 }: ChatPanelProps) {
+  const t = useUiText();
   const chatLogRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const isPinnedToBottomRef = useRef(true);
@@ -229,12 +232,16 @@ export function ChatPanel({
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 108)}px`;
+      // scrollHeight covers content plus padding but not borders, while
+      // box-sizing is border-box everywhere - so a bordered composer would be
+      // set exactly its border height too short and scroll on a single line.
+      const borders = textarea.offsetHeight - textarea.clientHeight;
+      textarea.style.height = `${Math.min(textarea.scrollHeight + borders, 108)}px`;
     }
   }, [chatDraft, isOpen]);
 
   const privateTabs = openChatTabs.filter((tabId) => tabId !== 'public');
-  const activeChatLabel = activeChatTab === 'public' ? 'Public' : playerName(activeChatTab);
+  const activeChatLabel = activeChatTab === 'public' ? t('Public') : playerName(activeChatTab);
   const messageGroups = useMemo(() => groupMessages(messages), [messages]);
 
   /** Insert one emoji character where the user is currently typing. */
@@ -256,7 +263,7 @@ export function ChatPanel({
     return (
       <section className="chat-panel chat-panel-closed">
         <button className="chat-panel-open-button" onClick={() => setIsOpen(true)} type="button">
-          <span>Text Chat</span>
+          <span>{t('Text Chat')}</span>
         </button>
       </section>
     );
@@ -266,10 +273,10 @@ export function ChatPanel({
     <section className="chat-panel">
       <div className="chat-heading">
         <span className={activeChatTab === 'public' ? 'chat-heading-text public' : 'chat-heading-text'}>
-          <strong>{activeChatTab === 'public' ? 'Town Chat' : playerName(activeChatTab)}</strong>
-          <small>{activeChatTab === 'public' ? '#public' : 'private whisper'}</small>
+          <strong>{activeChatTab === 'public' ? t('Town Chat') : playerName(activeChatTab)}</strong>
+          <small>{activeChatTab === 'public' ? '#public' : t('private whisper')}</small>
         </span>
-        <button className="chat-minimize" aria-label="Minimize chat" title="Minimize chat" onClick={() => setIsOpen(false)} type="button">
+        <button className="chat-minimize" aria-label={t('Minimize chat')} title={t('Minimize chat')} onClick={() => setIsOpen(false)} type="button">
           <svg
             aria-hidden="true"
             fill="none"
@@ -291,7 +298,7 @@ export function ChatPanel({
       {privateTabs.length > 0 ? (
         <div className="chat-simple-targets">
           <button className={activeChatTab === 'public' ? 'active' : ''} onClick={() => setActiveChatTab('public')} type="button">
-            <span>Public</span>
+            <span>{t('Public')}</span>
           </button>
           {privateTabs.map((tabId) => {
             const isActive = activeChatTab === tabId;
@@ -305,7 +312,7 @@ export function ChatPanel({
               >
                 <span>{playerName(tabId)}</span>
                 <small
-                  aria-label={`Close chat with ${playerName(tabId)}`}
+                  aria-label={t('Close chat with {player}', { player: playerName(tabId) })}
                   onClick={(event) => {
                     event.stopPropagation();
                     closeChatTab(tabId);
@@ -330,14 +337,12 @@ export function ChatPanel({
       >
         {messages.length === 0 ? (
           <p className="chat-empty-state">
-            No messages in {activeChatLabel} yet.
-            <br />
-            Say hello!
-          </p>
+            {t('No messages in {chat} yet.', { chat: activeChatLabel })}
+            <br />{t('Say hello!')}</p>
         ) : null}
         {messageGroups.map((group) => {
           const isOwn = group.fromPlayerId === currentPlayerId;
-          const senderName = isOwn ? 'You' : playerName(group.fromPlayerId);
+          const senderName = isOwn ? t('You') : playerName(group.fromPlayerId);
           const avatarUrl = playerAvatarUrl(group.fromPlayerId);
           return (
             <div className={isOwn ? 'chat-group own' : 'chat-group'} key={group.id}>
@@ -370,7 +375,7 @@ export function ChatPanel({
           />
         ) : null}
         <button
-          aria-label="Emoji picker"
+          aria-label={t('Emoji picker')}
           className={isEmojiPickerOpen ? 'chat-emoji-button active' : 'chat-emoji-button'}
           onPointerDown={(event) => {
             // Handled on pointerdown so the picker's outside-click close does
@@ -384,8 +389,11 @@ export function ChatPanel({
           <span aria-hidden="true">☺</span>
         </button>
         <textarea
-          aria-label={`Message ${activeChatLabel}`}
-          placeholder={activeChatTab === 'public' ? 'Speak your mind…' : `Whisper to ${playerName(activeChatTab)}…`}
+          aria-label={t('Message {chat}', { chat: activeChatLabel })}
+          className="chat-composer"
+          placeholder={activeChatTab === 'public'
+            ? t('Speak your mind...')
+            : t('Whisper to {player}...', { player: playerName(activeChatTab) })}
           ref={textareaRef}
           rows={1}
           value={chatDraft}
@@ -400,7 +408,7 @@ export function ChatPanel({
             }
           }}
         />
-        <button className="chat-send-button" aria-label="Send message" disabled={!chatDraft.trim()} onClick={onSendMessage} type="button">
+        <button className="chat-send-button" aria-label={t('Send message')} disabled={!chatDraft.trim()} onClick={onSendMessage} type="button">
           <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
             <path d="M3.2 4.4 21 12 3.2 19.6l1.5-6.2L14 12l-9.3-1.4-1.5-6.2Z" />
           </svg>

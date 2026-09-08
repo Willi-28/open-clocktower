@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Character } from '../../api/client';
 import { RoleDistribution } from './RoleDistribution';
+import { useUiText } from '../../i18n';
 
 type CharacterSheetPanelProps = {
   characters: Character[];
@@ -44,6 +45,7 @@ function groupByCategory(characters: Character[]) {
 
 /** Render the imported character sheet as a dashboard tab section. */
 export function CharacterSheetPanel({ characters, seatedPlayerCount, highlight }: CharacterSheetPanelProps) {
+  const t = useUiText();
   const categoryGroups = useMemo(() => groupByCategory(characters), [characters]);
   // Packs without category info render as one flat list instead of an "Unknown" group.
   const showCategoryHeadings = categoryGroups.some((group) => group.category.toLowerCase() !== 'unknown');
@@ -67,7 +69,7 @@ export function CharacterSheetPanel({ characters, seatedPlayerCount, highlight }
 
   return (
     <div className="character-sheet">
-      {characters.length === 0 ? <p className="helper-text">No characters loaded.</p> : null}
+      {characters.length === 0 ? <p className="helper-text">{t('No characters loaded.')}</p> : null}
       {categoryGroups.map((group) => (
         <section className="character-team" key={group.category}>
           {showCategoryHeadings ? <h3 className="tool-section-heading character-team-heading">{group.category}</h3> : null}
@@ -92,7 +94,7 @@ export function CharacterSheetPanel({ characters, seatedPlayerCount, highlight }
                 {character.icon ? <img alt="" src={character.icon} /> : <span className="character-fallback" />}
                 <div>
                   <strong>{character.name}</strong>
-                  <p>{character.ability || 'No ability text.'}</p>
+                  <p>{character.ability || t('No ability text.')}</p>
                 </div>
               </article>
             );

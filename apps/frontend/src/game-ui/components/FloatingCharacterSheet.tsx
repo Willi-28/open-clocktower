@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom';
 
 import type { Character } from '../../api/client';
 import { CharacterSheetPanel } from './CharacterSheetPanel';
+import { useUiText } from '../../i18n';
 
 type FloatingCharacterSheetProps = {
   characters: Character[];
@@ -49,6 +50,7 @@ export function FloatingCharacterSheet({
   onResize,
   onReattach,
 }: FloatingCharacterSheetProps) {
+  const t = useUiText();
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const size = sizeProp ?? { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
   const resizeRef = useRef<{
@@ -143,8 +145,8 @@ export function FloatingCharacterSheet({
           dragRef.current = null;
         }}
       >
-        <strong>Characters</strong>
-        <button className="floating-sheet-reattach" onClick={onReattach} aria-label="Reattach to dashboard" title="Reattach to dashboard" type="button">
+        <strong>{t('Characters')}</strong>
+        <button className="floating-sheet-reattach" onClick={onReattach} aria-label={t('Reattach to dashboard')} title={t('Reattach to dashboard')} type="button">
           ⤡
         </button>
       </div>

@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { Character } from '../../api/client';
+import { useUiText } from '../../i18n';
 
 type DemonBluffBarProps = {
   characters: Character[];
@@ -22,6 +23,7 @@ type DemonBluffBarProps = {
  * Lets the storyteller view and edit the three demon bluff slots.
  */
 export function DemonBluffBar({ characters, demonBluffIds, portalTarget, onSetDemonBluffSlot }: DemonBluffBarProps) {
+  const t = useUiText();
   const [picker, setPicker] = useState<{ slotIndex: number; left: number; bottom: number } | null>(null);
 
   // Close the picker on any outside click or Escape.
@@ -84,9 +86,7 @@ export function DemonBluffBar({ characters, demonBluffIds, portalTarget, onSetDe
                 }}
                 type="button"
               >
-                <span className="demon-bluff-picker-fallback" aria-hidden="true">✕</span>
-                Empty
-              </button>
+                <span className="demon-bluff-picker-fallback" aria-hidden="true">✕</span>{t('Empty')}</button>
               {characters.map((option) => (
                 <button
                   key={option.id}

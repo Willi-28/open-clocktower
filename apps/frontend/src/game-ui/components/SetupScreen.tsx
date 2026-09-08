@@ -5,17 +5,12 @@
  * enter an existing room code or upload content for a new room.
  */
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-type PresetPackOption = {
-  id: string;
-  label: string;
-  meta: string;
-};
+import { bundledPacks, loadBundledPack } from '../bundledPacks';
+import { useUiText } from '../../i18n';
 
-const presetPackOptions: PresetPackOption[] = [
-  { id: 'custom', label: 'Custom ZIP upload', meta: 'Ready' },
-];
+const customPackId = 'custom';
 
 type SetupScreenProps = {
   characterPackFile: File | null;
@@ -43,8 +38,52 @@ export function SetupScreen({
   roomId,
   roomName,
 }: SetupScreenProps) {
+  const t = useUiText();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const selectedPack = presetPackOptions[0];
+  // A bundled pack is the default when one ships, so creating a room needs no
+  // file at all; picking "custom" falls back to the manual ZIP upload.
+  const [selectedPackId, setSelectedPackId] = useState(bundledPacks[0]?.id ?? customPackId);
+  const [isPreparingPack, setIsPreparingPack] = useState(false);
+  const [packError, setPackError] = useState('');
+  const selectedBundledPack = bundledPacks.find((pack) => pack.id === selectedPackId);
+
+  // Hand the chosen bundled pack to the room as a File, so it travels the same
+  // upload path as a pack the storyteller picks by hand and needs no server
+  // support of its own.
+  useEffect(() => {
+    if (!selectedBundledPack) {
+      return;
+    }
+    let isCurrent = true;
+    setIsPreparingPack(true);
+    setPackError('');
+    void loadBundledPack(selectedBundledPack)
+      .then((file) => {
+        if (isCurrent) {
+          onCharacterPackFileChange(file);
+        }
+      })
+      .catch((error: Error) => {
+        if (isCurrent) {
+          setPackError(error.message);
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsPreparingPack(false);
+        }
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedBundledPack, onCharacterPackFileChange]);
+
+  /** Switch pack source, dropping any file the previous choice had set. */
+  function selectPackSource(packId: string) {
+    setSelectedPackId(packId);
+    setPackError('');
+    clearCharacterPackFile();
+  }
 
   function clearCharacterPackFile() {
     onCharacterPackFileChange(null);
@@ -56,10 +95,8 @@ export function SetupScreen({
   return (
     <section className="setup-grid">
       <section className="panel setup-identity">
-        <h2>Your Name</h2>
-        <label>
-          Display Name
-          <input required value={displayName} onChange={(event) => onDisplayNameChange(event.target.value)} />
+        <h2>{t('Your Name')}</h2>
+        <label>{t('Display Name')}<input required value={displayName} onChange={(event) => onDisplayNameChange(event.target.value)} />
         </label>
       </section>
 
@@ -71,12 +108,10 @@ export function SetupScreen({
             onJoinRoom();
           }}
         >
-          <h2>Join Room</h2>
-          <label>
-            Room Code
-            <input required value={roomId} onChange={(event) => onRoomIdChange(event.target.value)} />
+          <h2>{t('Join Room')}</h2>
+          <label>{t('Room Code')}<input required value={roomId} onChange={(event) => onRoomIdChange(event.target.value)} />
           </label>
-          <button disabled={!displayName.trim()} type="submit">Join</button>
+          <button disabled={!displayName.trim()} type="submit">{t('Join')}</button>
         </form>
 
         <form
@@ -86,48 +121,53 @@ export function SetupScreen({
             onCreateRoom();
           }}
         >
-          <h2>Create Room</h2>
-          <label>
-            Room Name
-            <input value={roomName} onChange={(event) => onRoomNameChange(event.target.value)} />
+          <h2>{t('Create Room')}</h2>
+          <label>{t('Room Name')}<input value={roomName} onChange={(event) => onRoomNameChange(event.target.value)} />
           </label>
           <div className="pack-field">
-            <span className="pack-field-label">Character Pack</span>
+            <span className="pack-field-label">{t('Character Pack')}</span>
             <div className="pack-select">
-              <div aria-label="Selected character pack source" className="pack-select-trigger static">
-                <span className="pack-select-copy">
-                  <span className="pack-select-kicker">Pack Source</span>
-                  <strong>{selectedPack.label}</strong>
-                </span>
-                <span className="pack-option-meta">{selectedPack.meta}</span>
-              </div>
+              <select
+                aria-label={t('Character pack')}
+                className="pack-select-input"
+                value={selectedPackId}
+                onChange={(event) => selectPackSource(event.target.value)}
+              >
+                {bundledPacks.map((pack) => (
+                  <option key={pack.id} value={pack.id}>
+                    {pack.label}
+                  </option>
+                ))}
+                <option value={customPackId}>{t('Custom ZIP upload')}</option>
+              </select>
             </div>
           </div>
-          <div className="pack-upload-row">
-            <label className="pack-upload-button">
-              <input
-                accept=".zip,application/zip"
-                ref={fileInputRef}
-                type="file"
-                onChange={(event) => onCharacterPackFileChange(event.target.files?.[0] ?? null)}
-              />
-              Upload ZIP
-            </label>
-            <span className={characterPackFile ? 'pack-upload-file selected' : 'pack-upload-file'}>
-              {characterPackFile?.name ?? 'No ZIP selected'}
-            </span>
-            {characterPackFile ? (
-              <button className="pack-clear-button" onClick={clearCharacterPackFile} type="button">
-                Clear
-              </button>
-            ) : null}
-          </div>
-          {characterPackFile ? (
-            <p className="helper-text">{characterPackFile.name} will be uploaded during room creation.</p>
+          {selectedBundledPack ? (
+            isPreparingPack ? <p className="helper-text">{t('Preparing {pack}...', { pack: selectedBundledPack.label })}</p> : null
           ) : (
-            <p className="helper-text">Upload a character pack ZIP before creating a room.</p>
+            <>
+              <div className="pack-upload-row">
+                <label className="pack-upload-button">
+                  <input
+                    accept=".zip,application/zip"
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={(event) => onCharacterPackFileChange(event.target.files?.[0] ?? null)}
+                  />{t('Upload ZIP')}</label>
+                <span className={characterPackFile ? 'pack-upload-file selected' : 'pack-upload-file'}>
+                  {characterPackFile?.name ?? t('No ZIP selected')}
+                </span>
+                {characterPackFile ? (
+                  <button className="pack-clear-button" onClick={clearCharacterPackFile} type="button">{t('Clear')}</button>
+                ) : null}
+              </div>
+              {characterPackFile ? (
+                <p className="helper-text">{t('{file} will be uploaded during room creation.', { file: characterPackFile.name })}</p>
+              ) : null}
+            </>
           )}
-          <button disabled={!displayName.trim() || !characterPackFile} type="submit">Create Room</button>
+          {packError ? <p className="helper-text">{t(packError)}</p> : null}
+          <button disabled={!displayName.trim() || !characterPackFile || isPreparingPack} type="submit">{t('Create Room')}</button>
         </form>
       </section>
     </section>

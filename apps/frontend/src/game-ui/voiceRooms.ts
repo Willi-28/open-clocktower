@@ -21,6 +21,40 @@ export function privateVoiceRoomFor(currentPlayerId: string, targetPlayerId: str
   return [currentPlayerId, targetPlayerId].sort().join(':private:');
 }
 
+/** Return only the two participants visible inside the viewer's storyteller call. */
+export function privateStorytellerCallParticipants(
+  participants: VoiceParticipant[],
+  joinedVoiceRoom: string | null,
+  currentPlayerId: string,
+  storytellerId: string,
+) {
+  if (!currentPlayerId || !storytellerId || joinedVoiceRoom !== privateVoiceRoomFor(currentPlayerId, storytellerId)) {
+    return [];
+  }
+  return participants.filter(
+    (participant) =>
+      participant.voiceRoom === joinedVoiceRoom &&
+      (participant.playerId === currentPlayerId || participant.playerId === storytellerId),
+  );
+}
+
+/** Expose only speakers from the viewer's own permitted room to the night table. */
+export function nightVoiceParticipantsForTable(
+  participants: VoiceParticipant[],
+  joinedVoiceRoom: string | null,
+  currentPlayerId: string,
+  storytellerId: string,
+  allowPublicVoice: boolean,
+  publicVoiceRooms: readonly string[],
+) {
+  if (currentPlayerId && storytellerId && joinedVoiceRoom === privateVoiceRoomFor(currentPlayerId, storytellerId)) {
+    return privateStorytellerCallParticipants(participants, joinedVoiceRoom, currentPlayerId, storytellerId);
+  }
+  return allowPublicVoice && joinedVoiceRoom && publicVoiceRooms.includes(joinedVoiceRoom)
+    ? participants.filter((participant) => participant.voiceRoom === joinedVoiceRoom)
+    : [];
+}
+
 /** Render a public or private voice room name for display. */
 export function voiceRoomLabel(voiceRoom: string, playerName: (playerId: string | undefined) => string) {
   if (!voiceRoom.includes(':private:')) {

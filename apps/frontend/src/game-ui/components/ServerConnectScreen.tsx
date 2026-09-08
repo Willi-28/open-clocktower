@@ -6,6 +6,8 @@
  * the bundled UI and the normal setup screen takes over.
  */
 
+import { useUiText } from '../../i18n';
+
 type ServerConnectScreenProps = {
   isConnecting: boolean;
   onConnect: () => void;
@@ -22,6 +24,7 @@ export function ServerConnectScreen({
   onServerUrlChange,
   serverUrl,
 }: ServerConnectScreenProps) {
+  const t = useUiText();
   return (
     <section className="server-connect-screen">
       <div className="server-connect-content">
@@ -34,25 +37,22 @@ export function ServerConnectScreen({
         >
           <input
             aria-describedby="server-connect-help-text"
-            aria-label="Server address"
+            aria-label={t('Server address')}
             autoFocus
             placeholder="https://your-open-clocktower-server.example"
             value={serverUrl}
             onChange={(event) => onServerUrlChange(event.target.value)}
           />
           <button disabled={isConnecting || !serverUrl.trim()} type="submit">
-            {isConnecting ? 'Connecting...' : 'Connect'}
+            {t(isConnecting ? 'Connecting...' : 'Connect')}
           </button>
         </form>
         <aside className="server-connect-help" aria-labelledby="server-connect-help-title">
-          <strong id="server-connect-help-title">Need a server?</strong>
+          <strong id="server-connect-help-title">{t('Need a server?')}</strong>
           <p id="server-connect-help-text">
-            The desktop app connects to an existing self-hosted Open Clocktower server. If your group does not have one yet,
-            deploy the Docker server first and paste its public HTTPS address here.
+            {t('The desktop app connects to an existing self-hosted Open Clocktower server. If your group does not have one yet, deploy the Docker server first and paste its public HTTPS address here.')}
           </p>
-          <a href={deploymentDocsUrl} target="_blank" rel="noreferrer">
-            Open self-hosting documentation
-          </a>
+          <a href={deploymentDocsUrl} target="_blank" rel="noreferrer">{t('Open self-hosting documentation')}</a>
         </aside>
       </div>
     </section>

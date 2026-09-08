@@ -8,6 +8,7 @@
 
 import type { GamePhase } from '../../api/client';
 import { VoiceMuteIcon } from './VoiceMuteIcon';
+import { useUiText } from '../../i18n';
 
 export type VoiceOccupant = {
   id: string;
@@ -19,6 +20,7 @@ type VoiceRoomsPanelProps = {
   currentPlayerName: string;
   currentPlayerAvatarUrl: string | null;
   hasUnreadChat: boolean;
+  hideVoicePresence: boolean;
   isChatOpen: boolean;
   isDeafened: boolean;
   isMuted: boolean;
@@ -68,6 +70,7 @@ export function VoiceRoomsPanel({
   currentPlayerName,
   currentPlayerAvatarUrl,
   hasUnreadChat,
+  hideVoicePresence,
   isChatOpen,
   isDeafened,
   isMuted,
@@ -90,6 +93,7 @@ export function VoiceRoomsPanel({
   voiceRoomLabel,
   voiceRooms,
 }: VoiceRoomsPanelProps) {
+  const t = useUiText();
   // Night can lock public rooms, but a private storyteller call must never trap
   // the player; leaving it quietly is always allowed.
   const isPrivateCall = Boolean(joinedVoiceRoom?.includes(':private:'));
@@ -101,7 +105,7 @@ export function VoiceRoomsPanel({
     <section className="voice-panel" aria-labelledby="voice-panel-heading">
       <div className="voice-panel-title" id="voice-panel-heading">
         <span className="voice-panel-heading">
-          <strong>Voice Rooms</strong>
+          <strong>{t('Voice Rooms')}</strong>
         </span>
       </div>
 
@@ -132,8 +136,8 @@ export function VoiceRoomsPanel({
                   <span className="voice-room-body">
                     {/* Public rooms render as their own name; a private call
                         becomes "Private Call: A + B" instead of its raw id. */}
-                    <span className="voice-room-name">{voiceRoomLabel(voiceRoom)}</span>
-                    {occupants.length === 0 ? <span className="voice-room-sub">silence reigns…</span> : null}
+                    <span className="voice-room-name">{t(voiceRoomLabel(voiceRoom))}</span>
+                    {!hideVoicePresence && occupants.length === 0 ? <span className="voice-room-sub">{t('silence reigns...')}</span> : null}
                   </span>
                   {isJoined ? <span className="voice-room-marker" aria-hidden="true">◆</span> : null}
                 </button>
@@ -155,7 +159,7 @@ export function VoiceRoomsPanel({
                             <span className="voice-occupant-status" aria-hidden="true">
                               <span
                                 className="voice-occupant-muted"
-                                title={deafenedSet.has(occupant.id) ? 'Muted & deafened' : 'Microphone muted'}
+                                title={t(deafenedSet.has(occupant.id) ? 'Muted & deafened' : 'Microphone muted')}
                               >
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                   <path d="M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.7" />
@@ -164,7 +168,7 @@ export function VoiceRoomsPanel({
                                 </svg>
                               </span>
                               {deafenedSet.has(occupant.id) ? (
-                                <span className="voice-occupant-muted deafened" title="Deafened (hears nobody)">
+                                <span className="voice-occupant-muted deafened" title={t('Deafened (hears nobody)')}>
                                   <HeadphoneIcon deafened />
                                 </span>
                               ) : null}
@@ -184,13 +188,11 @@ export function VoiceRoomsPanel({
         <div className="voice-panel-footer">
           {needsVoiceAudioUnlock ? (
             <div className="voice-audio-unlock" role="alert">
-              <p className="helper-text">Your browser blocked incoming voice audio.</p>
-              <button onClick={onEnableVoiceAudio} type="button">
-                Enable voice audio
-              </button>
+              <p className="helper-text">{t('Your browser blocked incoming voice audio.')}</p>
+              <button onClick={onEnableVoiceAudio} type="button">{t('Enable voice audio')}</button>
             </div>
           ) : null}
-          {publicVoiceRoomsLocked ? <p className="helper-text">Public voice rooms are locked during night. Private calls can still be left quietly.</p> : null}
+          {publicVoiceRoomsLocked ? <p className="helper-text">{t('Public voice rooms are locked during night. Private calls can still be left quietly.')}</p> : null}
 
           <OrnamentDivider />
 
@@ -206,7 +208,7 @@ export function VoiceRoomsPanel({
               )}
               <span className="voice-user-text">
                 <strong>{currentPlayerName}</strong>
-                <small>{joinedVoiceRoom ? voiceRoomLabel(joinedVoiceRoom) : 'Not in voice'}</small>
+                <small>{joinedVoiceRoom ? t(voiceRoomLabel(joinedVoiceRoom)) : t('Not in voice')}</small>
               </span>
             </span>
             <span className="voice-user-controls">
@@ -219,13 +221,13 @@ export function VoiceRoomsPanel({
                 onClick={onToggleChat}
                 aria-label={
                   hasUnreadChat
-                    ? 'Open text chat window (unread messages)'
+                    ? t('Open text chat window (unread messages)')
                     : isChatOpen
-                      ? 'Close text chat window'
-                      : 'Open text chat window'
+                      ? t('Close text chat window')
+                      : t('Open text chat window')
                 }
                 aria-pressed={isChatOpen}
-                title={hasUnreadChat ? 'Text chat - unread messages' : isChatOpen ? 'Close text chat' : 'Open text chat'}
+                title={t(hasUnreadChat ? 'Text chat - unread messages' : isChatOpen ? 'Close text chat' : 'Open text chat')}
                 type="button"
               >
                 <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -233,20 +235,20 @@ export function VoiceRoomsPanel({
                 </svg>
               </button>
               <button
-                className={isMuted ? 'voice-user-button active' : 'voice-user-button'}
+                className={isMuted ? 'voice-user-button voice-user-mic active' : 'voice-user-button voice-user-mic'}
                 disabled={!joinedVoiceRoom || isDeafened}
                 onClick={onToggleMuted}
-                aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
-                title={isDeafened ? 'Microphone stays muted while deafened' : isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                aria-label={t(isMuted ? 'Unmute microphone' : 'Mute microphone')}
+                title={t(isDeafened ? 'Microphone stays muted while deafened' : isMuted ? 'Unmute microphone' : 'Mute microphone')}
                 type="button"
               >
                 <VoiceMuteIcon isMuted={isMuted} />
               </button>
               <button
-                className={isDeafened ? 'voice-user-button active' : 'voice-user-button'}
+                className={isDeafened ? 'voice-user-button voice-user-deafen active' : 'voice-user-button voice-user-deafen'}
                 onClick={onToggleDeafened}
-                aria-label={isDeafened ? 'Undeafen' : 'Deafen (mute everyone)'}
-                title={isDeafened ? 'Undeafen' : 'Deafen (mute everyone)'}
+                aria-label={t(isDeafened ? 'Undeafen' : 'Deafen (mute everyone)')}
+                title={t(isDeafened ? 'Undeafen' : 'Deafen (mute everyone)')}
                 type="button"
               >
                 <HeadphoneIcon deafened={isDeafened} />
@@ -255,8 +257,8 @@ export function VoiceRoomsPanel({
                 className="voice-user-button voice-user-leave"
                 disabled={!joinedVoiceRoom || joinedVoiceRoom === voiceRooms[0] || isVoiceSwitching}
                 onClick={() => onLeaveVoiceRoom(!(roomPhase === 'night' && !isStoryteller && isPrivateCall))}
-                aria-label="Leave voice room"
-                title={isPrivateCall ? 'Leave private call' : 'Leave voice room'}
+                aria-label={t('Leave voice room')}
+                title={t(isPrivateCall ? 'Leave private call' : 'Leave voice room')}
                 type="button"
               >
                 <LeaveIcon />

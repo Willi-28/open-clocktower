@@ -11,6 +11,7 @@ import type { Character, Player, RoomState } from '../../api/client';
 import { characterRole } from '../gameText';
 import { formatTimer } from '../timer';
 import { RoleDistribution } from './RoleDistribution';
+import { useUiText } from '../../i18n';
 
 export type StorytellerToolsPanelProps = {
   activeNomination: RoomState['active_nomination'] | undefined;
@@ -96,6 +97,7 @@ export function StorytellerToolsPanel({
   onToggleTimer,
   onTransferStoryteller,
 }: StorytellerToolsPanelProps) {
+  const t = useUiText();
   const shareablePlayers = useMemo(() => room.players.filter((player) => !player.is_storyteller), [room.players]);
   const [selectedGrimoirePlayerId, setSelectedGrimoirePlayerId] = useState('');
   const [singleAssignCharacterId, setSingleAssignCharacterId] = useState('');
@@ -134,21 +136,15 @@ export function StorytellerToolsPanel({
   return (
     <div className="storyteller-tools">
       <div className="button-row phase-button-row">
-        <button disabled={!isLobby && !room.show_board} onClick={onStartGame} type="button">
-          Start Game
-        </button>
-        <button disabled={isLobby || room.phase === 'day'} onClick={onSetDay} type="button">
-          Day
-        </button>
-        <button disabled={isLobby || room.phase === 'night'} onClick={onSetNight} type="button">
-          Night
-        </button>
+        <button disabled={!isLobby && !room.show_board} onClick={onStartGame} type="button">{t('Start Game')}</button>
+        <button disabled={isLobby || room.phase === 'day'} onClick={onSetDay} type="button">{t('Day')}</button>
+        <button disabled={isLobby || room.phase === 'night'} onClick={onSetNight} type="button">{t('Night')}</button>
       </div>
 
       <details>
-        <summary>Pre-Game</summary>
+        <summary>{t('Pre-Game')}</summary>
         <details className="live-game-section" open>
-          <summary>Room Rules</summary>
+          <summary>{t('Room Rules')}</summary>
           <RoleDistribution
             count={displayedSeatCount}
             seatControl={{ min: 5, max: 20, locked: !isLobby && !room.show_board, onChange: onSetSeatCount }}
@@ -160,14 +156,14 @@ export function StorytellerToolsPanel({
               onChange={(event) => onTogglePublicVoiceDuringNight(event.target.checked)}
             />
             <span className="toggle-switch" aria-hidden="true" />
-            <span className="toggle-label">Allow public voice chat during night</span>
+            <span className="toggle-label">{t('Allow public voice chat during night')}</span>
           </label>
         </details>
 
         <details className="live-game-section">
-          <summary>Character Setup</summary>
-          {characters.length === 0 ? <p className="helper-text">No character pack is loaded. Choose a pack before creating the next room.</p> : null}
-          <p className="helper-text">Select the in-play characters, then assign them randomly to seated players.</p>
+          <summary>{t('Character Setup')}</summary>
+          {characters.length === 0 ? <p className="helper-text">{t('No character pack is loaded. Choose a pack before creating the next room.')}</p> : null}
+          <p className="helper-text">{t('Select the in-play characters, then assign them randomly to seated players.')}</p>
           <div className="character-pool">
             {characters.map((character) => {
               const isSelected = randomCharacterIds.includes(character.id);
@@ -190,22 +186,20 @@ export function StorytellerToolsPanel({
             onClick={onAssignRandomCharacters}
             type="button"
           >
-            Randomly Assign {randomCharacterIds.length}/{seatedPlayerCount}
+            {t('Randomly Assign')} {randomCharacterIds.length}/{seatedPlayerCount}
           </button>
           {!isLobby && !room.show_board ? (
-            <p className="helper-text">Random assignment is locked mid-game - it would reshuffle every role. Use the single assignment below for travelers.</p>
+            <p className="helper-text">{t('Random assignment is locked mid-game - it would reshuffle every role. Use the single assignment below for travelers.')}</p>
           ) : null}
         </details>
 
         <details className="live-game-section">
-          <summary>Assign Single Character</summary>
+          <summary>{t('Assign Single Character')}</summary>
           <p className="helper-text">
-            Give one player a role without touching anyone else - e.g. a traveler joining mid-game. Select the player in the list below first.
+            {t('Give one player a role without touching anyone else - e.g. a traveler joining mid-game. Select the player in the list below first.')}
           </p>
-          <label>
-            Character
-            <select value={singleAssignCharacterId} onChange={(event) => setSingleAssignCharacterId(event.target.value)}>
-              <option value="">Choose a character...</option>
+          <label>{t('Character')}<select value={singleAssignCharacterId} onChange={(event) => setSingleAssignCharacterId(event.target.value)}>
+              <option value="">{t('Choose a character...')}</option>
               {characters.map((character) => (
                 <option key={character.id} value={character.id}>
                   {characterRole(character)}
@@ -218,12 +212,14 @@ export function StorytellerToolsPanel({
             onClick={() => onAssignCharacter(selectedPlayerId, singleAssignCharacterId)}
             type="button"
           >
-            Assign to {selectedPlayer && !selectedPlayer.is_storyteller ? selectedPlayer.display_name : 'selected player'}
+            {t('Assign to {target}', {
+              target: selectedPlayer && !selectedPlayer.is_storyteller ? selectedPlayer.display_name : t('selected player'),
+            })}
           </button>
         </details>
 
         <details className="live-game-section">
-          <summary>{isLobby ? 'Lobby Players' : 'Room Players'}</summary>
+          <summary>{t(isLobby ? 'Lobby Players' : 'Room Players')}</summary>
           <div className="player-list">
             {room.players.map((player) => (
               <button
@@ -234,35 +230,31 @@ export function StorytellerToolsPanel({
               >
                 <span>{player.display_name}</span>
                 <small>
-                  {player.is_storyteller ? 'Storyteller' : 'Player'} - {player.is_connected ? 'Online' : 'Offline'}
+                  {t(player.is_storyteller ? 'Storyteller' : 'Player')} - {t(player.is_connected ? 'Online' : 'Offline')}
                 </small>
               </button>
             ))}
           </div>
-          <button disabled={!canTransferStoryteller || !selectedPlayerId || selectedPlayerId === currentPlayerId} onClick={() => onTransferStoryteller(selectedPlayerId)} type="button">
-            Transfer Storyteller Role
-          </button>
+          <button disabled={!canTransferStoryteller || !selectedPlayerId || selectedPlayerId === currentPlayerId} onClick={() => onTransferStoryteller(selectedPlayerId)} type="button">{t('Transfer Storyteller Role')}</button>
           <button
             className="secondary danger-button"
             disabled={!canTransferStoryteller || !selectedPlayerId || selectedPlayerId === currentPlayerId || Boolean(selectedPlayer?.is_storyteller)}
             onClick={() => onKickPlayer(selectedPlayerId)}
             type="button"
-          >
-            Kick Player
-          </button>
-          {!canTransferStoryteller ? <p className="helper-text">Storyteller transfer is available before the game starts or after Show Board.</p> : null}
-          {selectedPlayer?.is_storyteller ? <p className="helper-text">The storyteller stays in the room without a seat.</p> : null}
+          >{t('Kick Player')}</button>
+          {!canTransferStoryteller ? <p className="helper-text">{t('Storyteller transfer is available before the game starts or after Show Board.')}</p> : null}
+          {selectedPlayer?.is_storyteller ? <p className="helper-text">{t('The storyteller stays in the room without a seat.')}</p> : null}
         </details>
       </details>
 
       <details>
-        <summary>Live Game</summary>
+        <summary>{t('Live Game')}</summary>
         <details className="live-game-section timer-tool">
-          <summary>Timer</summary>
+          <summary>{t('Timer')}</summary>
           <div className="timer-tool-grid">
             <div className="timer-display">
               <input
-                aria-label="Timer duration"
+                aria-label={t('Timer duration')}
                 inputMode="numeric"
                 value={isEditingTimer ? timerDraft : formatTimer(timerRemaining)}
                 onBlur={commitTimerDraft}
@@ -285,18 +277,14 @@ export function StorytellerToolsPanel({
                   }
                 }}
               />
-              <span>{isTimerRunning ? 'Running' : 'Paused'}</span>
+              <span>{t(isTimerRunning ? 'Running' : 'Paused')}</span>
             </div>
             <div className="timer-tool-actions">
               <button onClick={onToggleTimer} type="button">
-                {isTimerRunning ? 'Pause' : 'Start'}
+                {t(isTimerRunning ? 'Pause' : 'Start')}
               </button>
-              <button className="secondary" onClick={() => onResetTimer()} type="button">
-                Reset
-              </button>
-              <button className="secondary" onClick={onRingBell} type="button">
-                Ring Bell
-              </button>
+              <button className="secondary" onClick={() => onResetTimer()} type="button">{t('Reset')}</button>
+              <button className="secondary" onClick={onRingBell} type="button">{t('Ring Bell')}</button>
             </div>
           </div>
         </details>
@@ -305,45 +293,37 @@ export function StorytellerToolsPanel({
           <div className="live-game-section vote-panel">
             <div className="vote-count-headline">
               <span className={hasExecutionVotes ? 'vote-threshold reached' : 'vote-threshold'}>
-                <strong>{voteCount}</strong> of {requiredExecutionVotes} votes
+                <strong>{voteCount}</strong> {t('of {required} votes', { required: requiredExecutionVotes })}
               </span>
             </div>
             <div className="vote-counter-meter">
-              <span>Clockwise count</span>
+              <span>{t('Clockwise count')}</span>
               <strong>{Math.max(0, voteCountIndex + 1)}/{activeVoteOrderLength}</strong>
-              <span>Votes counted</span>
+              <span>{t('Votes counted')}</span>
               <strong>{runningVoteCount}</strong>
             </div>
             <div className="vote-count-tools">
               <div className="button-row">
                 <button disabled={activeVoteOrderLength === 0 || isVoteCountRunning} onClick={onStartVoteCount} type="button">
-                  {isVoteCountRunning ? 'Counting...' : 'Count Vote'}
+                  {t(isVoteCountRunning ? 'Counting...' : 'Count Vote')}
                 </button>
-                <button className="secondary" onClick={onResetVoteCount} type="button">
-                  Reset Count
-                </button>
-                <button disabled={!hasExecutionVotes} onClick={() => onExecutePlayer(activeNomination.nominee_id)} type="button">
-                  Execute
-                </button>
-                <button className="secondary" onClick={onCancelVote} type="button">
-                  Cancel Vote
-                </button>
+                <button className="secondary" onClick={onResetVoteCount} type="button">{t('Reset Count')}</button>
+                <button disabled={!hasExecutionVotes} onClick={() => onExecutePlayer(activeNomination.nominee_id)} type="button">{t('Execute')}</button>
+                <button className="secondary" onClick={onCancelVote} type="button">{t('Cancel Vote')}</button>
               </div>
             </div>
           </div>
         ) : null}
 
         <details className="live-game-section">
-          <summary>Share Grimoire</summary>
-          <p className="helper-text">Temporarily share roles and reminder tokens with selected players.</p>
-          <label>
-            Player
-            <select value={selectedGrimoirePlayerId} onChange={(event) => setSelectedGrimoirePlayerId(event.target.value)}>
-              <option value="">Choose player</option>
+          <summary>{t('Share Grimoire')}</summary>
+          <p className="helper-text">{t('Temporarily share roles and reminder tokens with selected players.')}</p>
+          <label>{t('Player')}<select value={selectedGrimoirePlayerId} onChange={(event) => setSelectedGrimoirePlayerId(event.target.value)}>
+              <option value="">{t('Choose player')}</option>
               {shareablePlayers.map((player) => (
                 <option key={player.id} value={player.id}>
                   {player.display_name}
-                  {room.shared_grimoire_player_ids.includes(player.id) ? ' - shared' : ''}
+                  {room.shared_grimoire_player_ids.includes(player.id) ? ` - ${t('shared')}` : ''}
                 </option>
               ))}
             </select>
@@ -357,16 +337,16 @@ export function StorytellerToolsPanel({
             }}
             type="button"
           >
-            {isSelectedGrimoirePlayerShared ? 'Stop Sharing With Player' : 'Share With Player'}
+            {t(isSelectedGrimoirePlayerShared ? 'Stop Sharing With Player' : 'Share With Player')}
           </button>
         </details>
       </details>
 
       <details>
-        <summary>Post-Game</summary>
+        <summary>{t('Post-Game')}</summary>
         <div className="post-game-actions">
           <button disabled={room.show_board} onClick={onShowBoard} type="button">
-            {room.show_board ? 'Board Shown' : 'Show Board'}
+            {t(room.show_board ? 'Board Shown' : 'Show Board')}
           </button>
         </div>
       </details>

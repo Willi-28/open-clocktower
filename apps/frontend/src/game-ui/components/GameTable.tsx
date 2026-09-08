@@ -13,6 +13,7 @@ import { voiceRooms } from '../gameConfig';
 import { phaseLabels } from '../gameText';
 import { calculateCircularSeats } from '../layout/circularSeats';
 import type { ReminderToken } from '../types';
+import { useUiText } from '../../i18n';
 
 type GameTableProps = {
   assignments: CharacterAssignment[];
@@ -123,6 +124,7 @@ const TableSeatButton = memo(function TableSeatButton({
   seatScale,
   top,
 }: TableSeatButtonProps) {
+  const t = useUiText();
   const seatStyle = useMemo(
     () =>
       ({
@@ -162,21 +164,21 @@ const TableSeatButton = memo(function TableSeatButton({
 
   return (
     <button
-      className={className}
+      className={`${className}${avatarUrl ? ' has-avatar' : ''}`}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       style={seatStyle}
       type="button"
     >
-      {isNominator ? <span className="nomination-role">Accuser</span> : null}
-      {isNominee ? <span className="nomination-role accused">Accused</span> : null}
-      {hasRaisedHand ? <span className="raised-hand-indicator">Hand</span> : null}
-      {playerStatus === 'dead' ? (
-        <span className={hasDeadVote ? 'dead-vote-token available' : 'dead-vote-token spent'}>
-          {hasDeadVote ? 'Dead Vote' : 'Spent'}
-        </span>
+      {isNominator ? <span className="nomination-role">{t('Accuser')}</span> : null}
+      {isNominee ? <span className="nomination-role accused">{t('Accused')}</span> : null}
+      {hasRaisedHand ? <span className="raised-hand-indicator">{t('Hand')}</span> : null}
+      {playerStatus === 'dead' && hasDeadVote ? (
+        <span className="dead-vote-token" aria-label={t('Dead Vote')} role="img" />
       ) : null}
-      {avatarUrl ? <img className="seat-avatar" alt="" draggable={false} src={avatarUrl} /> : null}
+      <span className="seat-visual" aria-hidden="true">
+        {avatarUrl ? <img className="seat-avatar" alt="" draggable={false} src={avatarUrl} /> : null}
+      </span>
       {playerStatus === null ? (
         <span className="seat-empty-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -269,6 +271,7 @@ export function GameTable({
   showTable,
   storyteller,
 }: GameTableProps) {
+  const t = useUiText();
   const onSeatSelectRef = useRef(onSeatSelect);
   onSeatSelectRef.current = onSeatSelect;
   const onSeatMenuRef = useRef(onSeatMenu);
@@ -590,14 +593,14 @@ export function GameTable({
             {room.phase !== 'lobby' ? (
               <span className="table-phase" data-phase={room.phase}>
                 <PhaseIcon phase={room.phase} />
-                <span className="table-phase-label">{phaseLabels[room.phase]}</span>
+                <span className="table-phase-label">{t(phaseLabels[room.phase])}</span>
               </span>
             ) : null}
             {voteCountIndex >= 0 ? (
               <div className="table-vote-counter">
                 <span>{Math.min(voteCountIndex + 1, voteScanTotal)}/{voteScanTotal}</span>
                 <strong>{voteCounted}</strong>
-                <small>votes</small>
+                <small>{t('votes')}</small>
               </div>
             ) : null}
           </div>
@@ -606,7 +609,7 @@ export function GameTable({
         {activeNomination ? (
           <div className="nomination-display">
             <span>{nominatorName}</span>
-            <strong>accuses</strong>
+            <strong>{t('accuses')}</strong>
             <span>{nomineeName}</span>
           </div>
         ) : null}
@@ -735,7 +738,8 @@ export function GameTable({
             <button
               className={[
                 'seat occupied alive storyteller-table-seat',
-                isInFocusedVoiceRoom ? 'voice-focused-seat' : '',
+                storyteller.avatar_url ? 'has-avatar' : '',
+                isInFocusedVoiceRoom ? 'voice-focused-seat storyteller-voice-center' : '',
                 shouldDimForVoice(storyteller.id) ? 'voice-unfocused' : '',
                 isSpeaking ? 'speaking-seat' : '',
               ].join(' ')}
@@ -760,11 +764,13 @@ export function GameTable({
               } as CSSProperties}
               type="button"
             >
-              {storyteller.avatar_url ? <img className="seat-avatar" alt="" draggable={false} src={storyteller.avatar_url} /> : null}
+              <span className="seat-visual" aria-hidden="true">
+                {storyteller.avatar_url ? <img className="seat-avatar" alt="" draggable={false} src={storyteller.avatar_url} /> : null}
+              </span>
               {!storyteller.avatar_url ? (
                 <span className="seat-initials" aria-hidden="true">{seatInitials(storyteller.display_name)}</span>
               ) : null}
-              <span className="storyteller-seat-tag" aria-hidden="true">Storyteller</span>
+              <span className="storyteller-seat-tag" aria-hidden="true">{t('Storyteller')}</span>
               <span className="seat-nameplate storyteller-nameplate">
                 {isStorytellerInVoice ? (
                   <span className={isStorytellerMuted ? 'seat-mic muted' : 'seat-mic'} aria-hidden="true">
@@ -830,7 +836,7 @@ export function GameTable({
               onConsumeSuppressedSeatClick={consumeSuppressedSeatClick}
               onSeatSelect={handleSeatSelect}
               onSeatMenu={handleSeatMenu}
-              playerName={player?.display_name ?? 'Open'}
+              playerName={player?.display_name ?? t('Open')}
               playerStatus={player?.status ?? null}
               seatIndex={seat.index}
               seatScale={isInFocusedVoiceRoom ? voiceFocusSeatScale : seatScale}

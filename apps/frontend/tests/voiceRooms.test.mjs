@@ -18,6 +18,8 @@ function loadModule(relativePath) {
 }
 
 const {
+  nightVoiceParticipantsForTable,
+  privateStorytellerCallParticipants,
   privateVoiceRoomFor,
   publicVoiceOccupantNames,
   storytellerVoiceLabel,
@@ -40,6 +42,44 @@ const playerName = (playerId) => names.get(playerId) ?? 'Unknown';
 
 assert.equal(privateVoiceRoomFor('bob', 'alice'), 'alice:private:bob');
 assert.equal(privateVoiceRoomFor('alice', 'bob'), 'alice:private:bob');
+
+{
+  const participants = [
+    { playerId: 'st', voiceRoom: 'alice:private:st' },
+    { playerId: 'alice', voiceRoom: 'alice:private:st' },
+    { playerId: 'intruder', voiceRoom: 'alice:private:st' },
+    { playerId: 'bob', voiceRoom: 'Town Square' },
+  ];
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(privateStorytellerCallParticipants(participants, 'alice:private:st', 'alice', 'st'))),
+    [
+      { playerId: 'st', voiceRoom: 'alice:private:st' },
+      { playerId: 'alice', voiceRoom: 'alice:private:st' },
+    ],
+  );
+  assert.equal(privateStorytellerCallParticipants(participants, 'Town Square', 'alice', 'st').length, 0);
+  assert.equal(privateStorytellerCallParticipants(participants, 'bob:private:st', 'alice', 'st').length, 0);
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(nightVoiceParticipantsForTable(
+      participants,
+      'Town Square',
+      'bob',
+      'st',
+      true,
+      ['Town Square', 'The Inn'],
+    ))),
+    [{ playerId: 'bob', voiceRoom: 'Town Square' }],
+  );
+  assert.equal(nightVoiceParticipantsForTable(
+    participants,
+    'Town Square',
+    'bob',
+    'st',
+    false,
+    ['Town Square', 'The Inn'],
+  ).length, 0);
+}
 
 assert.equal(voiceRoomLabel('Town Square', playerName), 'Town Square');
 assert.equal(voiceRoomLabel('alice:private:bob', playerName), 'Private Call: Alice + Bob');

@@ -1,0 +1,242 @@
+RETRO-RPG – ASSET-ZUORDNUNG FÜR OPEN CLOCKTOWER
+
+WICHTIG
+- Dies ist die bereinigte Retro-RPG-Version.
+- Day/Night-Phasenassets bleiben natürlich erhalten, weil sie funktional zur Tag-/Nachtphase von Open Clocktower gehören.
+- Sämtliche Überschriften und Beschriftungen sollen im Frontend als echter Text gerendert werden.
+
+==================================================
+BASIS / HINTERGRUND / TISCH
+==================================================
+
+tavern-background.png
+- Haupthintergrund der Retro-RPG-Oberfläche.
+
+table.png
+- Zentraler Spieltisch.
+
+phase-day.png
+- Großes dekoratives Asset für die Tagphase, ohne eingebrannten Text.
+
+phase-night.png
+- Großes dekoratives Asset für die Nachtphase, ohne eingebrannten Text.
+
+phase-day-icon.png
+- Kompakter Tag-Indikator.
+
+phase-night-icon.png
+- Kompakter Nacht-Indikator.
+
+==================================================
+SPIELER / SITZE / ROLLEN
+==================================================
+
+seat-content-empty.png / seat-content-occupied.png
+- Inhalt eines freien beziehungsweise belegten Sitzes.
+
+seat-frame-overlay.png
+- Gemeinsamer Goldrahmen über Standard- und Custom-Bildern.
+
+nameplate.png
+- Namensschild für Spielername, Rollenname oder kurzen Status.
+
+voice-avatar-frame-ui.png
+- Neutraler Retro-RPG-Portrait-/Avatarrahmen für Voice Rooms bzw. Sprecher.
+
+role-card-frame.png
+- Rahmen für Charakter-/Rollenkarten.
+
+inner-card-frame-ui.png
+- Zusätzlicher Innenrahmen für Karten oder Detailbereiche innerhalb größerer Panels.
+
+==================================================
+PANELS / DIALOGE / MENÜS
+==================================================
+
+panel-frame.png
+- Standard-Panel für Seitenleisten und größere UI-Bereiche.
+
+panel-fill.png
+- Schlichte Innenfläche passend zu panel-frame.png.
+
+modal-frame-ui.png
+- Größeres Dialog-/Popup-Fenster.
+- Geeignet für Einstellungen, Bestätigungen, Hinweise, Rolleninfos usw.
+
+context-menu-frame-ui.png
+- Kleineres Kontextmenü / Dropdown / Rechtsklick-Menü.
+
+panel-header-frame-ui.png
+- Schmale Kopfzeile für Panels.
+- Text wie „Characters“, „Order“, „Tools“ etc. wird darüber separat gerendert.
+
+==================================================
+TABS
+==================================================
+
+tab-normal-ui.png
+- Normaler Tab/Reiter.
+
+tab-hover-ui.png
+- Tab im Hover-Zustand.
+
+tab-active-ui.png
+- Aktiver/ausgewählter Tab.
+
+tabs-ui-sheet.png
+- Alle drei Tab-Zustände zusätzlich gemeinsam in einer Sprite-Sheet-Datei.
+
+==================================================
+CHAT
+==================================================
+
+chat-bubble-own-ui.png
+- Eigene Chatnachricht.
+
+chat-bubble-other-ui.png
+- Nachricht eines anderen Spielers.
+
+chat-bubble-system-ui.png
+- System-/Spielnachricht.
+
+chat-bubble-own-slice.png / chat-bubble-other-slice.png / chat-bubble-system-slice.png
+- Verlustfrei zugeschnittene Laufzeitvarianten der drei Chatblasen. Diese
+  Dateien werden per CSS 9-Slice skaliert, damit der Rahmen mit Textlaenge und
+  Textbreite waechst. Bei Aenderungen an den UI-Originalen neu zuschneiden.
+
+chat-bubbles-ui-sheet.png
+- Alle drei Chatblasen zusätzlich gemeinsam in einer Sprite-Sheet-Datei.
+
+==================================================
+BUTTONS / INPUT
+==================================================
+
+button.png
+- Standard-Button.
+
+button-active.png
+- Aktiver/ausgewählter Button.
+
+button-hover.png
+- Hover-Zustand.
+
+button-pressed.png
+- Gedrückter Zustand.
+
+button-disabled.png
+- Deaktivierter Zustand.
+
+input.png
+- Normales Eingabefeld.
+
+input-focus.png
+- Eingabefeld mit Fokus.
+
+input-error.png
+- Fehlerzustand eines Eingabefelds.
+
+==================================================
+SCROLLBAR
+==================================================
+
+scrollbar-track.png
+- Hintergrund/Spur der Scrollbar.
+
+scrollbar-thumb.png
+- Beweglicher Scrollbar-Griff.
+
+==================================================
+TEXTFREIE TITELRAHMEN
+==================================================
+
+title-characters.png
+- Rahmen für „Characters“.
+
+title-order.png
+- Rahmen für „Order“.
+
+title-tools.png
+- Rahmen für „Tools“.
+
+title-town-chat.png
+- Rahmen für „Town Chat“.
+
+title-voice-rooms.png
+- Rahmen für „Voice Rooms“.
+
+title-clocktower.png
+- Breiter Haupttitel-/Logo-Bereich.
+
+title-day.png
+- Kleiner Phasen-/Titelrahmen.
+
+title-frame-medium.png
+- Generischer mittlerer Titelrahmen.
+
+title-frame-wide.png
+- Generischer breiter Titelrahmen.
+
+title-frame-large.png
+- Generischer großer Titelrahmen.
+
+==================================================
+EMPFOHLENE ZUORDNUNG IN OPEN CLOCKTOWER
+==================================================
+
+Links / Voice Rooms:
+- title-voice-rooms.png
+- panel-frame.png
+- panel-header-frame-ui.png
+- voice-avatar-frame-ui.png
+- scrollbar-track.png
+- scrollbar-thumb.png
+
+Mitte / Spieltisch:
+- tavern-background.png
+- table.png
+- seat-content-empty.png / seat-content-occupied.png
+- seat-frame-overlay.png
+- nameplate.png
+- phase-day.png / phase-night.png
+- phase-day-icon.png / phase-night-icon.png
+
+Rechts / Characters, Order, Tools:
+- title-characters.png
+- title-order.png
+- title-tools.png
+- role-card-frame.png
+- inner-card-frame-ui.png
+- panel-frame.png
+
+Chat:
+- title-town-chat.png
+- chat-bubble-own-ui.png
+- chat-bubble-other-ui.png
+- chat-bubble-system-ui.png
+- chat-bubble-own-slice.png
+- chat-bubble-other-slice.png
+- chat-bubble-system-slice.png
+- input.png / input-focus.png / input-error.png
+- button*.png
+
+Popups / Menüs:
+- modal-frame-ui.png
+- context-menu-frame-ui.png
+- panel-header-frame-ui.png
+
+Tabs:
+- tab-normal-ui.png
+- tab-hover-ui.png
+- tab-active-ui.png
+
+==================================================
+DESIGNREGEL
+==================================================
+
+Der Retro-RPG-Stil bleibt bewusst warm:
+- dunkles Burgunderrot / Braun
+- Gold-/Messingrahmen
+- klare Pixel-/Retro-RPG-Anmutung
+
+Keine zusätzlichen Mondmedaillons oder Nachtmotive wurden in die neuen neutralen UI-Assets eingebaut.
+Tag/Nacht-Symbole existieren ausschließlich dort, wo sie funktional die Spielphase darstellen.

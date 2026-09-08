@@ -40,6 +40,7 @@ import { SetupScreen } from './game-ui/components/SetupScreen';
 import { VoiceRoomsPanel } from './game-ui/components/VoiceRoomsPanel';
 import { ClientSettings, clientSettingsKey, loadClientSettings } from './game-ui/clientSettings';
 import { privateChatTargets } from './game-ui/chatRules';
+import { UiLanguageContext, translateUiText } from './i18n';
 import { voiceRooms } from './game-ui/gameConfig';
 import { phaseLabels } from './game-ui/gameText';
 import { useGameData } from './game-ui/hooks/useGameData';
@@ -61,7 +62,7 @@ import {
   seatedPlayerCount,
   voteForPlayer as getVoteForPlayer,
 } from './game-ui/voting';
-import { voiceRoomLabel } from './game-ui/voiceRooms';
+import { nightVoiceParticipantsForTable, voiceRoomLabel } from './game-ui/voiceRooms';
 import { openRoomSocket } from './websocket/roomSocket';
 
 const defaultVoiceRoom = voiceRooms[0];
@@ -74,11 +75,13 @@ const appThemeBackgroundClasses: Record<ClientSettings['appTheme'], string> = {
   magic: 'background-magic',
   island: 'background-island',
   'retro-rpg': 'background-retro-rpg',
+  'flog-in': 'background-flog-in',
 };
 
 type PendingConfirmation = {
   confirmLabel: string;
   message: string;
+  messageValues?: Record<string, string | number>;
   onConfirm: () => void;
   title: string;
   variant?: 'default' | 'danger';
@@ -460,14 +463,45 @@ export function App() {
     };
   }, [tokenMenu]);
 
-  // At night players must not see who is (or is not) in a voice room - that
-  // would reveal who is privately calling. Only presence in their own current
-  // voice room stays visible; the storyteller keeps full presence.
+  // Voice transport still needs its peers at night, but none of that presence
+  // may reach a player's UI while the storyteller moves through private calls.
   const hideNightVoicePresence = Boolean(room && room.phase === 'night' && !isStoryteller);
   const publicVoiceRoomsLocked = Boolean(room && room.phase === 'night' && !isStoryteller && !room.allow_public_voice_during_night);
-  const visibleVoiceParticipants = hideNightVoicePresence
-    ? voiceSession.voiceParticipants.filter((participant) => participant.voiceRoom === voiceSession.joinedVoiceRoom)
-    : voiceSession.voiceParticipants;
+  const visibleVoiceParticipants = hideNightVoicePresence ? [] : voiceSession.voiceParticipants;
+  const visibleSpeakingPlayerIds = hideNightVoicePresence ? [] : voiceActivity.speakingPlayerIds;
+  const visibleMutedPlayerIds = hideNightVoicePresence ? [] : mutedPlayerIds;
+  const visibleDeafenedPlayerIds = hideNightVoicePresence ? [] : deafenedPlayerIds;
+  const nightTableVoiceParticipants = useMemo(
+    () => hideNightVoicePresence
+      ? nightVoiceParticipantsForTable(
+          voiceSession.voiceParticipants,
+          voiceSession.joinedVoiceRoom,
+          currentPlayer?.id ?? '',
+          storyteller?.id ?? '',
+          Boolean(room?.allow_public_voice_during_night),
+          voiceRooms,
+        )
+      : [],
+    [
+      currentPlayer?.id,
+      hideNightVoicePresence,
+      room?.allow_public_voice_during_night,
+      storyteller?.id,
+      voiceSession.joinedVoiceRoom,
+      voiceSession.voiceParticipants,
+    ],
+  );
+  const nightTableVoicePlayerIds = useMemo(
+    () => new Set(nightTableVoiceParticipants.map((participant) => participant.playerId)),
+    [nightTableVoiceParticipants],
+  );
+  const tableVoiceParticipants = hideNightVoicePresence ? nightTableVoiceParticipants : visibleVoiceParticipants;
+  const tableSpeakingPlayerIds = hideNightVoicePresence
+    ? voiceActivity.speakingPlayerIds.filter((playerId) => nightTableVoicePlayerIds.has(playerId))
+    : visibleSpeakingPlayerIds;
+  const tableMutedPlayerIds = hideNightVoicePresence
+    ? mutedPlayerIds.filter((playerId) => nightTableVoicePlayerIds.has(playerId))
+    : visibleMutedPlayerIds;
   // A private call is not one of the fixed public rooms, so while one is active
   // it is appended to the list. Without a block of its own the call has no
   // occupant rows at all - which is why nobody showed a speaking ring in it.
@@ -820,11 +854,6 @@ export function App() {
 
   /** Return current occupants (name + avatar) for one voice room. */
   function publicVoiceOccupants(voiceRoom: string) {
-    // At night the panel must not reveal who is where - except for the room this
-    // player is in themselves, whose occupants they can already hear anyway.
-    if (hideNightVoicePresence && voiceRoom !== voiceSession.joinedVoiceRoom) {
-      return [];
-    }
     return visibleVoiceParticipants
       .filter((participant) => participant.voiceRoom === voiceRoom)
       .map((participant) => {
@@ -911,7 +940,8 @@ export function App() {
   function confirmKickPlayer(playerToKick: RoomState['players'][number]) {
     setPendingConfirmation({
       confirmLabel: 'Kick Player',
-      message: `Remove ${playerToKick.display_name} from this room? They will be disconnected from the current session.`,
+      message: 'Remove {player} from this room? They will be disconnected from the current session.',
+      messageValues: { player: playerToKick.display_name },
       onConfirm: () => {
         setPendingConfirmation(null);
         tableUi.setSelectedSeatActionPlayerId('');
@@ -946,7 +976,8 @@ export function App() {
     }
     setPendingConfirmation({
       confirmLabel: 'Share Grimoire',
-      message: `Share roles and storyteller reminder tokens with ${playerName(playerId)}? This exposes hidden information during the game.`,
+      message: 'Share roles and storyteller reminder tokens with {player}? This exposes hidden information during the game.',
+      messageValues: { player: playerName(playerId) },
       onConfirm: () => {
         setPendingConfirmation(null);
         setSharedGrimoirePlayer(playerId, true);
@@ -968,7 +999,13 @@ export function App() {
     });
   }
 
+  // App renders the provider, so it cannot read the language through the hook:
+  // a provider never sees its own value. It translates against the setting.
+  const t = (text: string, values?: Record<string, string | number>) =>
+    translateUiText(clientSettings.uiLanguage, text, values);
+
   return (
+    <UiLanguageContext.Provider value={clientSettings.uiLanguage}>
     <main className={appShellClassName} ref={appShellRef}>
       {showDesktopShellActions ? (
         <div className="desktop-shell-actions">
@@ -976,22 +1013,18 @@ export function App() {
             <button
               className="desktop-change-server-button"
               onClick={() => void changeDesktopServer()}
-              title="Change Server"
-              aria-label="Change Server"
+              title={t('Change Server')}
+              aria-label={t('Change Server')}
               type="button"
-            >
-              Change Server
-            </button>
+            >{t('Change Server')}</button>
           ) : null}
           <button
             className="desktop-leave-game-button"
             onClick={() => desktopBridge?.close()}
-            title="Leave Game"
-            aria-label="Leave Game"
+            title={t('Leave Game')}
+            aria-label={t('Leave Game')}
             type="button"
-          >
-            Leave Game
-          </button>
+          >{t('Leave Game')}</button>
         </div>
       ) : null}
       {isShell ? (
@@ -1028,7 +1061,7 @@ export function App() {
           onOpenSettings={() => tableUi.setIsSettingsOpen(true)}
           onToggleFullscreen={() => void toggleFullscreen()}
           onToggleOpen={() => setIsTopBarOpen((open) => !open)}
-          phaseLabel={room.show_board ? 'Game ended' : room.phase === 'lobby' ? 'Game not started yet' : phaseLabels[room.phase]}
+          phaseLabel={room.show_board ? t('Game ended') : room.phase === 'lobby' ? t('Game not started yet') : t(phaseLabels[room.phase])}
           room={displayedRoom ?? room}
         />
         <section
@@ -1040,7 +1073,7 @@ export function App() {
         >
           <aside className="edge-panel left-edge">
             <VoiceRoomsPanel
-              currentPlayerName={currentPlayer?.display_name ?? displayName ?? 'You'}
+              currentPlayerName={currentPlayer?.display_name ?? displayName ?? t('You')}
               currentPlayerAvatarUrl={currentPlayer?.avatar_url ?? null}
               hasUnreadChat={chat.hasUnreadChat}
               isChatOpen={isChatPopoutOpen}
@@ -1053,15 +1086,16 @@ export function App() {
               onEnableVoiceAudio={() => void voicePeers.enableVoiceAudio()}
               onJoinVoiceRoom={(voiceRoom) => void voiceSession.joinSelectedVoiceRoom(voiceRoom)}
               onLeaveVoiceRoom={(returnToDefault = true) => voiceSession.leaveVoiceRoom(returnToDefault)}
-              mutedPlayerIds={mutedPlayerIds}
-              deafenedPlayerIds={deafenedPlayerIds}
+              mutedPlayerIds={visibleMutedPlayerIds}
+              deafenedPlayerIds={visibleDeafenedPlayerIds}
               onToggleChat={toggleChatPopout}
               onToggleDeafened={toggleDeafened}
               onToggleMuted={toggleMuted}
+              hideVoicePresence={hideNightVoicePresence}
               publicVoiceRoomsLocked={publicVoiceRoomsLocked}
               publicVoiceOccupants={publicVoiceOccupants}
               roomPhase={room.phase}
-              speakingPlayerIds={voiceActivity.speakingPlayerIds}
+              speakingPlayerIds={visibleSpeakingPlayerIds}
               voiceRoomLabel={(voiceRoom) => voiceRoomLabel(voiceRoom, playerName)}
               voiceRooms={visibleVoiceRooms}
             />
@@ -1097,22 +1131,18 @@ export function App() {
 
           <div className="table-wrap" style={{ '--table-zoom': tableUi.tableZoom } as CSSProperties}>
             <div className={timer.timerRemaining <= 10 && timer.isTimerRunning ? 'table-timer urgent' : 'table-timer'}>
-              <span>Discussion</span>
+              <span>{t('Discussion')}</span>
               <strong>{formatTimer(timer.timerRemaining)}</strong>
             </div>
-            {timer.showTimerDone ? <div className="timer-done-toast">Time is up</div> : null}
+            {timer.showTimerDone ? <div className="timer-done-toast">{t('Time is up')}</div> : null}
             {voiceSession.incomingVoiceCall ? (
               <div className="incoming-call-toast">
                 <div>
                   <strong>{playerName(voiceSession.incomingVoiceCall.fromPlayerId)}</strong>
-                  <span>Private voice call</span>
+                  <span>{t('Private voice call')}</span>
                 </div>
-                <button onClick={() => void voiceSession.acceptPrivateCall()} type="button">
-                  Accept
-                </button>
-                <button className="secondary" onClick={voiceSession.rejectPrivateCall} type="button">
-                  Decline
-                </button>
+                <button onClick={() => void voiceSession.acceptPrivateCall()} type="button">{t('Accept')}</button>
+                <button className="secondary" onClick={voiceSession.rejectPrivateCall} type="button">{t('Decline')}</button>
               </div>
             ) : null}
             {isStoryteller ? (
@@ -1142,19 +1172,19 @@ export function App() {
               onReminderRemove={annotations.deleteReminder}
               onReminderMove={annotations.moveReminder}
               onStorytellerClick={handleStorytellerClick}
-              mutedPlayerIds={mutedPlayerIds}
+              mutedPlayerIds={tableMutedPlayerIds}
               raisedHandPlayerIds={voting.voteRaisedHandPlayerIds}
               reminders={visibleReminders}
               room={tableRoom ?? room}
               seatedPlayers={seatedPlayers}
               guesses={annotations.guesses}
-              speakingPlayerIds={voiceActivity.speakingPlayerIds}
+              speakingPlayerIds={tableSpeakingPlayerIds}
               voteCountIndex={voting.voteCountIndex}
               voteCounted={voting.runningVoteCount}
               voteOrderPlayerIds={voting.activeVoteOrder.map((player) => player.id)}
               voteScanTotal={voting.activeVoteOrder.length}
               joinedVoiceRoom={voiceSession.joinedVoiceRoom}
-              voiceParticipants={visibleVoiceParticipants}
+              voiceParticipants={tableVoiceParticipants}
               showTable={clientSettings.showTable}
               storyteller={storyteller}
             />
@@ -1221,10 +1251,10 @@ export function App() {
                       top: Math.max(12, Math.min(tokenMenu.clientY, window.innerHeight - tokenMenuViewportHeight - 12)),
                     }}
                   >
-                    <strong>Place reminder</strong>
+                    <strong>{t('Place reminder')}</strong>
                     <div className="token-context-grid">
                       {reminderTokenOptions.length === 0 ? (
-                        <p className="helper-text">No reminder token PNGs loaded.</p>
+                        <p className="helper-text">{t('No reminder token PNGs loaded.')}</p>
                       ) : null}
                       {reminderTokenOptions.map((token) => (
                         <button
@@ -1351,6 +1381,7 @@ export function App() {
           availableCharacterLanguages={availableCharacterLanguages}
           defaultCharacterLanguage={defaultCharacterLanguage}
           currentPlayerId={currentPlayerId}
+          hideVoicePresence={hideNightVoicePresence}
           isMuted={isMuted}
           onClose={() => tableUi.setIsSettingsOpen(false)}
           onMicTestActiveChange={handleMicTestActiveChange}
@@ -1367,6 +1398,7 @@ export function App() {
         <ConfirmActionDialog
           confirmLabel={pendingConfirmation.confirmLabel}
           message={pendingConfirmation.message}
+          messageValues={pendingConfirmation.messageValues}
           onCancel={() => setPendingConfirmation(null)}
           onConfirm={pendingConfirmation.onConfirm}
           title={pendingConfirmation.title}
@@ -1374,7 +1406,8 @@ export function App() {
         />
       ) : null}
 
-      {error ? <p className="error-banner">{error}</p> : null}
+      {error ? <p className="error-banner">{t(error)}</p> : null}
     </main>
+    </UiLanguageContext.Provider>
   );
 }

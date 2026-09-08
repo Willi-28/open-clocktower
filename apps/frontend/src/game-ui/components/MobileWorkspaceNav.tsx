@@ -5,6 +5,8 @@
  * workspaces; this nav lets users switch between them without long scrolling.
  */
 
+import { useUiText } from '../../i18n';
+
 export type MobileWorkspaceView = 'table' | 'communication' | 'tools';
 
 type MobileWorkspaceNavProps = {
@@ -17,6 +19,7 @@ type MobileWorkspaceNavProps = {
  * forcing players through one very long scrolling workspace.
  */
 export function MobileWorkspaceNav({ activeView, onSelectView }: MobileWorkspaceNavProps) {
+  const t = useUiText();
   const views: Array<{ id: MobileWorkspaceView; label: string }> = [
     { id: 'table', label: 'Table' },
     { id: 'communication', label: 'Chat & Voice' },
@@ -24,7 +27,7 @@ export function MobileWorkspaceNav({ activeView, onSelectView }: MobileWorkspace
   ];
 
   return (
-    <nav aria-label="Mobile workspace" className="mobile-workspace-nav">
+    <nav aria-label={t('Mobile workspace')} className="mobile-workspace-nav">
       {views.map((view) => (
         <button
           aria-pressed={activeView === view.id}
@@ -33,7 +36,7 @@ export function MobileWorkspaceNav({ activeView, onSelectView }: MobileWorkspace
           onClick={() => onSelectView(view.id)}
           type="button"
         >
-          {view.label}
+          {t(view.label)}
         </button>
       ))}
     </nav>

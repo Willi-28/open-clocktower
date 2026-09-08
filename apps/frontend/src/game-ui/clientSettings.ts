@@ -5,15 +5,19 @@
  * theme, language, audio, and visibility preferences between sessions.
  */
 
+import type { UiLanguage } from '../i18n';
+
 export const clientSettingsKey = 'open-clocktower.client-settings.v1';
 
 export type ClientSettings = {
   showTable: boolean;
-  appTheme: 'classic' | 'dark' | 'light' | 'universe' | 'magic' | 'island' | 'retro-rpg';
+  appTheme: 'classic' | 'dark' | 'light' | 'universe' | 'magic' | 'island' | 'retro-rpg' | 'flog-in';
   nightEffect: 'subtle' | 'fog' | 'none';
   soundVolume: number;
   soundFiltersEnabled: boolean;
   characterLanguage: string;
+  // Language of the app itself. Character packs keep their own selector.
+  uiLanguage: UiLanguage;
   selectedAudioInputId: string;
   selectedAudioOutputId: string;
   remoteVolumes: Record<string, number>;
@@ -26,6 +30,7 @@ export const defaultClientSettings: ClientSettings = {
   soundVolume: 1,
   soundFiltersEnabled: true,
   characterLanguage: '',
+  uiLanguage: 'en',
   selectedAudioInputId: '',
   selectedAudioOutputId: '',
   remoteVolumes: {},
@@ -51,7 +56,7 @@ export function loadClientSettings(): ClientSettings {
     const soundVolume = typeof stored.soundVolume === 'number' && Number.isFinite(stored.soundVolume)
       ? Math.max(0, Math.min(2, stored.soundVolume))
       : defaultClientSettings.soundVolume;
-    const appTheme = ['classic', 'dark', 'light', 'universe', 'magic', 'island', 'retro-rpg'].includes(String(stored.appTheme))
+    const appTheme = ['classic', 'dark', 'light', 'universe', 'magic', 'island', 'retro-rpg', 'flog-in'].includes(String(stored.appTheme))
       ? stored.appTheme as ClientSettings['appTheme']
       : defaultClientSettings.appTheme;
     const nightEffect = ['subtle', 'fog', 'none'].includes(String(stored.nightEffect))
@@ -64,6 +69,7 @@ export function loadClientSettings(): ClientSettings {
       soundVolume,
       soundFiltersEnabled: typeof stored.soundFiltersEnabled === 'boolean' ? stored.soundFiltersEnabled : defaultClientSettings.soundFiltersEnabled,
       characterLanguage: typeof stored.characterLanguage === 'string' ? stored.characterLanguage : '',
+      uiLanguage: stored.uiLanguage === 'de' ? 'de' : 'en',
       selectedAudioInputId: typeof stored.selectedAudioInputId === 'string' ? stored.selectedAudioInputId : '',
       selectedAudioOutputId: typeof stored.selectedAudioOutputId === 'string' ? stored.selectedAudioOutputId : '',
       remoteVolumes: sanitizeRemoteVolumes(stored.remoteVolumes),

@@ -86,6 +86,23 @@ export type ReminderTokenDefinition = {
   available_languages: string[];
 };
 
+export type CreditEntry = {
+  name: string;
+  role: string;
+  url: string | null;
+  works: string[];
+};
+
+export type PackCredits = {
+  pack_name: string;
+  author: string;
+  url: string | null;
+  license: string;
+  license_url: string | null;
+  notice: string;
+  entries: CreditEntry[];
+};
+
 export type CharacterAssignment = {
   player_id: string;
   character_id: string;
@@ -339,6 +356,11 @@ export function listCharacters(roomId: string, language = '') {
 export function listReminderTokens(roomId: string, language = '') {
   const query = language ? `?language=${encodeURIComponent(language)}` : '';
   return request<ReminderTokenDefinition[]>(`/api/rooms/${roomId}/reminder-tokens${query}`);
+}
+
+/** Read the attribution shipped inside the room's character pack. */
+export function getPackCredits(roomId: string) {
+  return request<PackCredits>(`/api/rooms/${roomId}/credits`);
 }
 
 /** Assign one character to one player without touching other assignments. */
